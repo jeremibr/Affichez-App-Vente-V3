@@ -2,15 +2,7 @@ import { formatCurrencyCAD } from '../../lib/utils';
 import type { ZoneA_DeptTotal } from '../../types/database';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
-
-const DEPARTMENTS = [
-    'MULTI-ANNONCEURS',
-    'PROMOTIONNEL',
-    'DIST. PUBLICITAIRE SOLO',
-    'NUMERIQUE',
-    'APPLICATION',
-    'SERVICES IA'
-] as const;
+import { DEPARTMENTS } from '../../lib/constants';
 
 // Shorter display names for table headers
 const DEPT_SHORT: Record<string, string> = {

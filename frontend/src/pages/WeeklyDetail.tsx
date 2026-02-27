@@ -44,8 +44,12 @@ export default function WeeklyDetail() {
 
     const fetchWeekData = useCallback(async (weekStart: string, showLoader = true) => {
         if (showLoader) setLoading(true);
+        let summaryQuery = supabase.from('v_weekly_summary').select('*').eq('week_start', weekStart);
+        if (selectedOffice !== 'Toutes') summaryQuery = summaryQuery.eq('office', selectedOffice);
+        if (selectedStatus !== 'Toutes') summaryQuery = summaryQuery.eq('status', selectedStatus);
+
         const [{ data: sData }, { data: lData }] = await Promise.all([
-            supabase.from('v_weekly_summary').select('*').eq('week_start', weekStart),
+            summaryQuery,
             supabase.rpc('get_weekly_detail', {
                 p_week_start: weekStart,
                 p_office: selectedOffice === 'Toutes' ? null : selectedOffice,
@@ -75,12 +79,10 @@ export default function WeeklyDetail() {
     }, [summaryData]);
 
     const filteredSummaryData = useMemo(() => summaryData.filter(row => {
-        const matchOffice = selectedOffice === 'Toutes' || row.office === selectedOffice;
-        const matchStatus = selectedStatus === 'Toutes' || row.status === selectedStatus;
         const matchDept = selectedDept === 'Toutes' || row.department === selectedDept;
         const matchRep = selectedRep === 'Tous' || row.rep_name === selectedRep;
-        return matchOffice && matchStatus && matchDept && matchRep;
-    }), [summaryData, selectedOffice, selectedStatus, selectedDept, selectedRep]);
+        return matchDept && matchRep;
+    }), [summaryData, selectedDept, selectedRep]);
 
     const filteredLineItems = useMemo(() => lineItems.filter(row => {
         const matchDept = selectedDept === 'Toutes' || row.department === selectedDept;

@@ -46,6 +46,7 @@ export type ZoneB_DetailRow = {
 export type YoYRow = {
     quarter: number;
     rep_name: string;
+    office: string;
     current_avg: number;
     previous_avg: number;
     resultat: number;

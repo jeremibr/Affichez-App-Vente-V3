@@ -27,13 +27,16 @@ export function SommaireTable({
     year: number;
     selectedMonth?: number | 'Toutes';
 }) {
-    const displayMonthsRaw = selectedMonth && selectedMonth !== 'Toutes'
-        ? MONTHS.filter(m => m.value === selectedMonth)
-        : MONTHS;
+    const displayMonths = useMemo(
+        () => selectedMonth && selectedMonth !== 'Toutes'
+            ? MONTHS.filter(m => m.value === selectedMonth)
+            : MONTHS,
+        [selectedMonth]
+    );
 
     // Build a record of rows for easier sorting
     const rowsWithData = useMemo<SommaireTableRow[]>(() => {
-        return displayMonthsRaw.map(monthObj => {
+        return displayMonths.map(monthObj => {
             const row = data.find(d => d.month === monthObj.value) || {
                 month: monthObj.value, objectif: 0, actual_amount: 0, pct_atteint: 0
             };
@@ -47,7 +50,7 @@ export function SommaireTable({
                 pct_atteint: Number(row.pct_atteint || 0)
             };
         });
-    }, [data, prevYearData, displayMonthsRaw]);
+    }, [data, prevYearData, displayMonths]);
 
     const { sortedData, sortConfig, handleSort } = useSort<SommaireTableRow>(rowsWithData);
 
@@ -55,7 +58,7 @@ export function SommaireTable({
     let totalActual = 0;
     let totalPrevYear = 0;
 
-    displayMonthsRaw.forEach(m => {
+    displayMonths.forEach(m => {
         const rowData = data.find(d => d.month === m.value);
         if (rowData) {
             totalObjectif += Number(rowData.objectif || 0);
@@ -80,7 +83,7 @@ export function SommaireTable({
             {/* Card header */}
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{title}</h2>
-                <span className="text-xs text-slate-400 font-medium">{displayMonthsRaw.length === 1 ? displayMonthsRaw[0].label : `${year}`}</span>
+                <span className="text-xs text-slate-400 font-medium">{displayMonths.length === 1 ? displayMonths[0].label : `${year}`}</span>
             </div>
 
             {/* Table – no x-scroll needed, fixed layout */}
