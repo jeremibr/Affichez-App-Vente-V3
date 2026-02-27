@@ -44,6 +44,8 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [grandTotalData, setGrandTotalData] = useState<SommaireRow[]>([]);
     const [deptData, setDeptData] = useState<SommaireRow[]>([]);
+    const [prevGrandTotalData, setPrevGrandTotalData] = useState<SommaireRow[]>([]);
+    const [prevDeptData, setPrevDeptData] = useState<SommaireRow[]>([]);
     const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -56,12 +58,16 @@ export default function Dashboard() {
         const [
             { data: grandData },
             { data: dData },
+            { data: prevGrandData },
+            { data: prevDData },
             { data: kpiData },
             { data: clientData },
             { data: leaderData }
         ] = await Promise.all([
             supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam }),
+            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
+            supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 5 }),
             supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam })
@@ -69,6 +75,8 @@ export default function Dashboard() {
 
         setGrandTotalData(grandData || []);
         setDeptData(dData || []);
+        setPrevGrandTotalData(prevGrandData || []);
+        setPrevDeptData(prevDData || []);
         setKpis(kpiData?.[0] || null);
         setTopClients(clientData || []);
         setLeaderboard(leaderData || []);
@@ -215,6 +223,7 @@ export default function Dashboard() {
                         <SommaireTable
                             title={selectedDept === 'Toutes' ? "Performance Globale" : `Performance — ${selectedDept}`}
                             data={selectedDept === 'Toutes' ? grandTotalData : deptData.filter(x => x.department === selectedDept)}
+                            prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
                             year={year}
                             selectedMonth={selectedMonth}
                         />

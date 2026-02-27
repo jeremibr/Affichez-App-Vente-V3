@@ -17,11 +17,13 @@ interface SommaireTableRow {
 export function SommaireTable({
     title,
     data,
+    prevYearData,
     year,
     selectedMonth
 }: {
     title: string;
     data: SommaireRow[];
+    prevYearData?: SommaireRow[];
     year: number;
     selectedMonth?: number | 'Toutes';
 }) {
@@ -35,27 +37,33 @@ export function SommaireTable({
             const row = data.find(d => d.month === monthObj.value) || {
                 month: monthObj.value, objectif: 0, actual_amount: 0, pct_atteint: 0
             };
+            const prevRow = prevYearData?.find(d => d.month === monthObj.value);
             return {
                 label: monthObj.label,
                 month: monthObj.value,
-                prevYear: 0, // Placeholder as per current impl
+                prevYear: Number(prevRow?.actual_amount || 0),
                 actual_amount: Number(row.actual_amount || 0),
                 objectif: Number(row.objectif || 0),
                 pct_atteint: Number(row.pct_atteint || 0)
             };
         });
-    }, [data, displayMonthsRaw]);
+    }, [data, prevYearData, displayMonthsRaw]);
 
     const { sortedData, sortConfig, handleSort } = useSort<SommaireTableRow>(rowsWithData);
 
     let totalObjectif = 0;
     let totalActual = 0;
+    let totalPrevYear = 0;
 
     displayMonthsRaw.forEach(m => {
         const rowData = data.find(d => d.month === m.value);
         if (rowData) {
             totalObjectif += Number(rowData.objectif || 0);
             totalActual += Number(rowData.actual_amount || 0);
+        }
+        const prevRow = prevYearData?.find(d => d.month === m.value);
+        if (prevRow) {
+            totalPrevYear += Number(prevRow.actual_amount || 0);
         }
     });
 
@@ -120,7 +128,7 @@ export function SommaireTable({
                             return (
                                 <tr key={row.month} className="hover:bg-slate-50/60 transition-colors">
                                     <td className="px-5 py-3 font-medium text-slate-700">{row.label}</td>
-                                    <td className="px-5 py-3 text-right text-slate-300 tabular-nums">{formatCurrencyCAD(0)}</td>
+                                    <td className={cn("px-5 py-3 text-right tabular-nums", row.prevYear > 0 ? "text-slate-400" : "text-slate-300")}>{formatCurrencyCAD(row.prevYear)}</td>
                                     <td className={cn("px-5 py-3 text-right tabular-nums font-medium", hasData ? "text-slate-800" : "text-slate-300")}>
                                         {formatCurrencyCAD(row.actual_amount)}
                                     </td>
@@ -141,7 +149,7 @@ export function SommaireTable({
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black border-t-2 border-brand-main">
                             <td className="px-5 py-4 text-xs uppercase tracking-wider">Total</td>
-                            <td className="px-5 py-4 text-right text-white/50 tabular-nums text-sm">{formatCurrencyCAD(0)}</td>
+                            <td className="px-5 py-4 text-right text-white/50 tabular-nums text-sm">{formatCurrencyCAD(totalPrevYear)}</td>
                             <td className="px-5 py-4 text-right font-black tabular-nums">{formatCurrencyCAD(totalActual)}</td>
                             <td className="px-5 py-4 text-right text-white/70 tabular-nums text-xs">{formatCurrencyCAD(totalObjectif)}</td>
                             <td className="px-5 py-4 text-right">
