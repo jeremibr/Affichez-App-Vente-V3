@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, LineChart, Settings, Menu, X } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, LineChart, Settings, Menu } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const navigation = [
