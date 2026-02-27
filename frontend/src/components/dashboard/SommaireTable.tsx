@@ -10,6 +10,7 @@ interface SommaireTableRow {
     month: number;
     prevYear: number;
     actual_amount: number;
+    delta: number;
     objectif: number;
     pct_atteint: number;
 }
@@ -41,11 +42,14 @@ export function SommaireTable({
                 month: monthObj.value, objectif: 0, actual_amount: 0, pct_atteint: 0
             };
             const prevRow = prevYearData?.find(d => d.month === monthObj.value);
+            const prevYearAmt = Number(prevRow?.actual_amount || 0);
+            const actualAmt = Number(row.actual_amount || 0);
             return {
                 label: monthObj.label,
                 month: monthObj.value,
-                prevYear: Number(prevRow?.actual_amount || 0),
-                actual_amount: Number(row.actual_amount || 0),
+                prevYear: prevYearAmt,
+                actual_amount: actualAmt,
+                delta: actualAmt - prevYearAmt,
                 objectif: Number(row.objectif || 0),
                 pct_atteint: Number(row.pct_atteint || 0)
             };
@@ -71,6 +75,8 @@ export function SommaireTable({
     });
 
     const totalPct = totalObjectif > 0 ? (totalActual / totalObjectif) * 100 : 0;
+    const totalDelta = totalActual - totalPrevYear;
+    const totalDeltaPct = totalPrevYear > 0 ? Math.round((totalDelta / totalPrevYear) * 100) : null;
 
     const getPctStyle = (pct: number) => {
         if (pct >= 90) return 'text-emerald-600 bg-emerald-50';
@@ -107,6 +113,14 @@ export function SommaireTable({
                             </th>
                             <th
                                 className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                onClick={() => handleSort('delta')}
+                            >
+                                <div className="flex items-center justify-end gap-2">
+                                    Évol. N-1 <SortIcon order={sortConfig.key === 'delta' ? sortConfig.order : null} />
+                                </div>
+                            </th>
+                            <th
+                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
                                 onClick={() => handleSort('objectif')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -135,6 +149,26 @@ export function SommaireTable({
                                     <td className={cn("px-5 py-3 text-right tabular-nums font-medium", hasData ? "text-slate-800" : "text-slate-300")}>
                                         {formatCurrencyCAD(row.actual_amount)}
                                     </td>
+                                    <td className="px-5 py-3 text-right">
+                                        {row.prevYear > 0 ? (
+                                            <div className="flex flex-col items-end gap-0.5">
+                                                <span className={cn(
+                                                    "text-xs font-semibold tabular-nums",
+                                                    row.delta > 0 ? "text-emerald-600" : row.delta < 0 ? "text-red-500" : "text-slate-400"
+                                                )}>
+                                                    {row.delta > 0 ? '+' : ''}{formatCurrencyCAD(row.delta)}
+                                                </span>
+                                                <span className={cn(
+                                                    "text-[10px] font-bold tabular-nums",
+                                                    row.delta > 0 ? "text-emerald-400" : row.delta < 0 ? "text-red-400" : "text-slate-300"
+                                                )}>
+                                                    {row.delta > 0 ? '+' : ''}{Math.round((row.delta / row.prevYear) * 100)}%
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-slate-200 text-xs">—</span>
+                                        )}
+                                    </td>
                                     <td className="px-5 py-3 text-right text-slate-400 tabular-nums text-xs">{formatCurrencyCAD(row.objectif)}</td>
                                     <td className="px-5 py-3 text-right">
                                         {hasData ? (
@@ -154,6 +188,28 @@ export function SommaireTable({
                             <td className="px-5 py-4 text-xs uppercase tracking-wider">Total</td>
                             <td className="px-5 py-4 text-right text-white/50 tabular-nums text-sm">{formatCurrencyCAD(totalPrevYear)}</td>
                             <td className="px-5 py-4 text-right font-black tabular-nums">{formatCurrencyCAD(totalActual)}</td>
+                            <td className="px-5 py-4 text-right">
+                                {totalPrevYear > 0 ? (
+                                    <div className="flex flex-col items-end gap-0.5">
+                                        <span className={cn(
+                                            "text-xs font-bold tabular-nums",
+                                            totalDelta > 0 ? "text-emerald-300" : totalDelta < 0 ? "text-red-300" : "text-white/50"
+                                        )}>
+                                            {totalDelta > 0 ? '+' : ''}{formatCurrencyCAD(totalDelta)}
+                                        </span>
+                                        {totalDeltaPct !== null && (
+                                            <span className={cn(
+                                                "text-[10px] font-bold tabular-nums",
+                                                totalDelta > 0 ? "text-emerald-400" : totalDelta < 0 ? "text-red-400" : "text-white/30"
+                                            )}>
+                                                {totalDelta > 0 ? '+' : ''}{totalDeltaPct}%
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-white/30">—</span>
+                                )}
+                            </td>
                             <td className="px-5 py-4 text-right text-white/70 tabular-nums text-xs">{formatCurrencyCAD(totalObjectif)}</td>
                             <td className="px-5 py-4 text-right">
                                 <span className={cn(

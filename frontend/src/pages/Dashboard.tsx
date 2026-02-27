@@ -140,7 +140,7 @@ export default function Dashboard() {
                             trendLabel="de l'objectif"
                         />
                         <KPICard
-                            title="Taille moyenne"
+                            title="Vente moyenne"
                             value={formatCurrencyCAD(kpis?.avg_deal_size || 0)}
                             subText="Par transaction"
                             icon={Briefcase}
