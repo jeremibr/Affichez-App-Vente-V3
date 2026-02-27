@@ -1,0 +1,93 @@
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\components\Layout.tsx
+  12:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\components\Layout.tsx:12:9
+  10 |     // Close mobile menu when route changes
+  11 |     useEffect(() => {
+> 12 |         setIsMobileMenuOpen(false);
+     |         ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  13 |     }, [location]);
+  14 |
+  15 |     const navigation = [  react-hooks/set-state-in-effect
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\Dashboard.tsx
+  31:9  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\Dashboard.tsx:31:9
+  29 |
+  30 |     useEffect(() => {
+> 31 |         fetchDashboardData();
+     |         ^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  32 |
+  33 |         const channel = supabase
+  34 |             .channel('dashboard-sales')  react-hooks/set-state-in-effect
+  43:8  warning  React Hook useEffect has a missing dependency: 'fetchDashboardData'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/exhaustive-deps
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\QuarterlyAverages.tsx
+  32:9  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\QuarterlyAverages.tsx:32:9
+  30 |
+  31 |     useEffect(() => {
+> 32 |         fetchAverages();
+     |         ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  33 |
+  34 |         // Realtime sync
+  35 |         const channel = supabase  react-hooks/set-state-in-effect
+  45:8  warning  React Hook useEffect has a missing dependency: 'fetchAverages'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\WeeklyDetail.tsx
+  68:9   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\WeeklyDetail.tsx:68:9
+  66 |
+  67 |     useEffect(() => {
+> 68 |         fetchAvailableWeeks();
+     |         ^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  69 |     }, [fetchAvailableWeeks]);
+  70 |
+  71 |     useEffect(() => {                                   react-hooks/set-state-in-effect
+  73:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Users\jerem\Documents\Voice AI Project\Affichez-App-Vente\frontend\src\pages\WeeklyDetail.tsx:73:13
+  71 |     useEffect(() => {
+  72 |         if (selectedWeek) {
+> 73 |             fetchWeekData(selectedWeek);
+     |             ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  74 |         }
+  75 |     }, [selectedWeek, fetchWeekData]);
+  76 |  react-hooks/set-state-in-effect
+
+✖ 7 problems (5 errors, 2 warnings)
+

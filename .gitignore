@@ -1,0 +1,23 @@
+# Environment variables (contain API keys)
+.env
+.env.*
+*.local
+
+# Scripts with hardcoded secrets (Zoho tokens, Supabase service key)
+tmp/
+
+# Node
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
