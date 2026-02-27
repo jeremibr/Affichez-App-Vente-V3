@@ -193,14 +193,14 @@ export function SommaireTable({
                                     <div className="flex flex-col items-end gap-0.5">
                                         <span className={cn(
                                             "text-xs font-bold tabular-nums",
-                                            totalDelta > 0 ? "text-emerald-300" : totalDelta < 0 ? "text-red-300" : "text-white/50"
+                                            totalDelta > 0 ? "text-emerald-300" : totalDelta < 0 ? "text-rose-200" : "text-white/50"
                                         )}>
                                             {totalDelta > 0 ? '+' : ''}{formatCurrencyCAD(totalDelta)}
                                         </span>
                                         {totalDeltaPct !== null && (
                                             <span className={cn(
                                                 "text-[10px] font-bold tabular-nums",
-                                                totalDelta > 0 ? "text-emerald-400" : totalDelta < 0 ? "text-red-400" : "text-white/30"
+                                                totalDelta > 0 ? "text-emerald-400" : totalDelta < 0 ? "text-rose-200" : "text-white/30"
                                             )}>
                                                 {totalDelta > 0 ? '+' : ''}{totalDeltaPct}%
                                             </span>
