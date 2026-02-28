@@ -3,13 +3,13 @@ import { supabase } from '../lib/supabase';
 import {
     Users, Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
-    UserPlus, ToggleLeft, ToggleRight, X
+    UserPlus, ToggleLeft, ToggleRight, X, Zap, Loader2
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 
-type Tab = 'reps' | 'objectives' | 'quarters' | 'logs';
+type Tab = 'reps' | 'objectives' | 'quarters' | 'logs' | 'sync';
 
 interface Rep {
     id: string;
@@ -48,7 +48,8 @@ const tabItems: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'reps', label: 'Représentants', icon: Users },
     { id: 'objectives', label: 'Objectifs', icon: Target },
     { id: 'quarters', label: 'Trimestres', icon: Calendar },
-    { id: 'logs', label: 'Logs Webhook', icon: History },
+    { id: 'sync', label: 'Synchronisation', icon: Zap },
+    { id: 'logs', label: 'Historique', icon: History },
 ];
 
 export default function Settings() {
@@ -108,6 +109,7 @@ export default function Settings() {
             {activeTab === 'reps' && <RepsManager setMessage={setMessage} />}
             {activeTab === 'objectives' && <ObjectivesManager setMessage={setMessage} />}
             {activeTab === 'quarters' && <QuartersViewer />}
+            {activeTab === 'sync' && <SyncManager />}
             {activeTab === 'logs' && <WebhookLogs />}
         </div>
     );
@@ -398,6 +400,207 @@ function QuartersViewer() {
                         </div>
                     </div>
                 ))}
+            </div>
+        </div>
+    );
+}
+
+// ─── Sync Manager ─────────────────────────────────────────────────────────────
+interface SyncResult {
+    upserted: number;
+    deleted: number;
+    errors: string[];
+    duration_ms: number;
+}
+
+function SyncManager() {
+    const [syncing, setSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const [lastSync, setLastSync] = useState<WebhookLog | null>(null);
+    const [recentLogs, setRecentLogs] = useState<WebhookLog[]>([]);
+    const [logsLoading, setLogsLoading] = useState(true);
+
+    const fetchSyncLogs = async () => {
+        setLogsLoading(true);
+        const { data } = await supabase
+            .from('webhook_log')
+            .select('*')
+            .like('action', 'sync%')
+            .order('received_at', { ascending: false })
+            .limit(15);
+        const logs = data || [];
+        setRecentLogs(logs);
+        setLastSync(logs[0] ?? null);
+        setLogsLoading(false);
+    };
+
+    useEffect(() => { fetchSyncLogs(); }, []);
+
+    const handleSync = async () => {
+        setSyncing(true);
+        setSyncResult(null);
+        setSyncError(null);
+        try {
+            const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-sync`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                        'x-sync-source': 'manual',
+                    },
+                }
+            );
+            const data = await res.json();
+            if (!res.ok) {
+                setSyncError(data.error ?? 'Erreur inconnue');
+            } else {
+                setSyncResult(data as SyncResult);
+                fetchSyncLogs();
+            }
+        } catch (err) {
+            setSyncError(err instanceof Error ? err.message : 'Erreur réseau');
+        }
+        setSyncing(false);
+    };
+
+    const formatRelative = (iso: string) => {
+        const diffMs = Date.now() - new Date(iso).getTime();
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 1) return 'il y a quelques secondes';
+        if (diffMin < 60) return `il y a ${diffMin} min`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `il y a ${diffH}h`;
+        return `il y a ${Math.floor(diffH / 24)}j`;
+    };
+
+    return (
+        <div className="space-y-6 max-w-3xl">
+            {/* Sync card */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6">
+                <div className="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-brand-main" />
+                            Synchronisation Zoho Books
+                        </h2>
+                        <p className="text-xs text-slate-400 mt-1">
+                            Importe les devis Acceptés et Facturés depuis les deux organisations (QC + MTL).
+                            Les devis refusés sont supprimés automatiquement.
+                        </p>
+                        {lastSync && (
+                            <p className="text-xs text-slate-500 mt-2 font-medium">
+                                Dernière sync :{' '}
+                                <span className="text-slate-700">{formatRelative(lastSync.received_at)}</span>
+                                {' '}—{' '}
+                                <span className="font-mono text-[11px] text-slate-400">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
+                            </p>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="shrink-0 flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60"
+                    >
+                        {syncing
+                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Synchronisation...</>
+                            : <><RefreshCcw className="w-4 h-4" /> Synchroniser</>
+                        }
+                    </button>
+                </div>
+
+                {/* Result */}
+                {syncResult && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                            {syncResult.upserted} upsertés
+                        </div>
+                        <div className="text-slate-300">|</div>
+                        <div className="text-sm font-semibold text-slate-500">
+                            {syncResult.deleted} supprimés
+                        </div>
+                        <div className="text-slate-300">|</div>
+                        <div className="text-xs text-slate-400 font-mono">
+                            {(syncResult.duration_ms / 1000).toFixed(1)}s
+                        </div>
+                        {syncResult.errors.length > 0 && (
+                            <div className="w-full mt-2 text-xs text-red-600 bg-red-50 rounded-lg p-2">
+                                {syncResult.errors.join(' · ')}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {syncError && (
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-red-600">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        {syncError}
+                    </div>
+                )}
+            </div>
+
+            {/* Auto-sync info */}
+            <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                <span>
+                    Synchronisation automatique planifiée chaque jour à <strong className="text-slate-700">6h00</strong> (heure de Montréal) via pg_cron.
+                    Les données sont au maximum décalées de <strong className="text-slate-700">24 heures</strong>.
+                </span>
+            </div>
+
+            {/* Recent sync history */}
+            <div>
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-slate-700">Historique des synchronisations</h3>
+                    <button onClick={fetchSyncLogs} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Actualiser">
+                        <RefreshCcw className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-slate-100">
+                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Date</th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Type</th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Statut</th>
+                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Détails</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {logsLoading ? (
+                                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic text-sm">Chargement...</td></tr>
+                            ) : recentLogs.length === 0 ? (
+                                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic text-sm">Aucune synchronisation effectuée.</td></tr>
+                            ) : recentLogs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
+                                    <td className="px-5 py-3 text-xs text-slate-400">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
+                                    <td className="px-5 py-3">
+                                        <span className={cn(
+                                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
+                                            log.action === 'sync_manual' ? "bg-brand-main/10 text-brand-main" : "bg-slate-100 text-slate-500"
+                                        )}>
+                                            {log.action === 'sync_manual' ? 'Manuel' : 'Auto'}
+                                        </span>
+                                    </td>
+                                    <td className="px-5 py-3">
+                                        <span className={cn(
+                                            "inline-flex items-center gap-1 text-xs font-semibold",
+                                            log.status_code === 200 ? "text-emerald-600" : "text-red-500"
+                                        )}>
+                                            {log.status_code === 200 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                                            {log.status_code}
+                                        </span>
+                                    </td>
+                                    <td className="px-5 py-3 text-xs text-slate-400 max-w-xs truncate">
+                                        {log.error_message || '—'}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     );

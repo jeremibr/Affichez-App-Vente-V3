@@ -5,7 +5,7 @@ import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
 
 export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
-    const { sortedData, sortConfig, handleSort } = useSort(lineItems);
+    const { sortedData, sortConfig, handleSort } = useSort(lineItems, 'sale_date', 'desc');
     const totalAmount = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
 
     const getZohoUrl = (item: ZoneB_DetailRow) => {
