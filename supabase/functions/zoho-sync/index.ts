@@ -117,13 +117,18 @@ Deno.serve(async (req: Request) => {
     const accessToken = await getAccessToken();
     const repMap = await getReps();
 
+    // Only fetch estimates modified in the last 35 days
+    const cutoff = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10); // YYYY-MM-DD
+
     for (const org of ORGS) {
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
         const url = `https://www.zohoapis.com/books/v3/estimates` +
-          `?organization_id=${org.id}&page=${page}&per_page=200`;
+          `?organization_id=${org.id}&page=${page}&per_page=200&last_modified_time=${cutoff}`;
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -142,9 +147,6 @@ Deno.serve(async (req: Request) => {
         const toDelete: string[] = [];
 
         for (const est of estimates) {
-          const year = new Date(est.date as string).getFullYear();
-          if (year !== 2025 && year !== 2026) continue;
-
           const rawStatus = ((est.status as string) ?? '').toLowerCase();
           const zohoId = String(est.estimate_id);
 
@@ -200,17 +202,7 @@ Deno.serve(async (req: Request) => {
           totalDeleted += toDelete.length;
         }
 
-        // Early stop: entire page is before 2025
-        const first = estimates[0];
-        const last = estimates[estimates.length - 1];
-        if (
-          first && new Date(first.date as string).getFullYear() < 2025 &&
-          last && new Date(last.date as string).getFullYear() < 2025
-        ) {
-          hasMore = false;
-        } else {
-          hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
-        }
+        hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
         page++;
       }
     }
