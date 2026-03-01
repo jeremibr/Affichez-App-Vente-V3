@@ -55,7 +55,9 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
         if (diffMin < 60) return `il y a ${diffMin} min`;
         const diffH = Math.floor(diffMin / 60);
         if (diffH < 24) return `il y a ${diffH}h`;
-        return `il y a ${Math.floor(diffH / 24)}j`;
+        return new Date(iso).toLocaleString('fr-CA', {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
     };
 
     return (

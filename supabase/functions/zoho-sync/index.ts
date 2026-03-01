@@ -117,10 +117,9 @@ Deno.serve(async (req: Request) => {
     const accessToken = await getAccessToken();
     const repMap = await getReps();
 
-    // Only fetch estimates modified in the last 35 days
-    const cutoff = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10); // YYYY-MM-DD
+    // Fetch only the last 35 days of estimates for speed.
+    // date_start is a valid Zoho Books filter (by estimate date).
+    const dateStart = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     for (const org of ORGS) {
       let page = 1;
@@ -128,7 +127,7 @@ Deno.serve(async (req: Request) => {
 
       while (hasMore) {
         const url = `https://www.zohoapis.com/books/v3/estimates` +
-          `?organization_id=${org.id}&page=${page}&per_page=200&last_modified_time=${cutoff}`;
+          `?organization_id=${org.id}&page=${page}&per_page=200&date_start=${dateStart}`;
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
