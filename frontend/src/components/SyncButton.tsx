@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+
+// Module-level flag: survives React navigation, resets on full browser refresh
+let autoSyncDone = false;
 import { Loader2, RefreshCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -46,8 +49,13 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
         setSyncing(false);
     }, [fetchLastSync, onSyncComplete]);
 
-    // Auto-sync on every page load
-    useEffect(() => { handleSync(); }, [handleSync]);
+    // Auto-sync once on full page load only — nothing happens on tab/page navigation
+    useEffect(() => {
+        if (!autoSyncDone) {
+            autoSyncDone = true;
+            handleSync();
+        }
+    }, [handleSync]);
 
     const formatRelative = (iso: string) => {
         const diffMs = Date.now() - new Date(iso).getTime();
