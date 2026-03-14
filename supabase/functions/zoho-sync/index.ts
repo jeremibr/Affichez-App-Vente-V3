@@ -139,40 +139,25 @@ Deno.serve(async (req: Request) => {
           const rawStatus = ((est.status as string) ?? '').toLowerCase();
           const zohoId = String(est.estimate_id);
 
-          if (rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
+          if (rawStatus === 'accepted' || rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
             const repName = (est.salesperson_name as string)?.trim() || null;
             const deptLabel = (est.cf_d_partement ?? est.department) as string;
             const department = DEPT_MAP[deptLabel];
+            const saleDate = (est.accepted_date as string) || (est.cf_date_acceptation_unformatted as string) || (est.date as string);
+            const amountHT = Math.round((Number(est.total) / 1.14975) * 100) / 100;
+            const status = rawStatus === 'accepted' ? 'accepted' : 'invoiced';
             if (department) {
               toUpsert.push({
                 zoho_id: zohoId,
-                sale_date: est.date,
+                sale_date: saleDate,
                 client_name: est.customer_name,
-                amount: est.total,
+                amount: amountHT,
                 quote_number: est.estimate_number,
                 rep_name: repName,
                 zoho_department_label: String(deptLabel),
                 department,
                 office: org.office,
-                status: 'invoiced',
-              });
-            }
-          } else if (rawStatus === 'accepted') {
-            const repName = (est.salesperson_name as string)?.trim() || null;
-            const deptLabel = (est.cf_d_partement ?? est.department) as string;
-            const department = DEPT_MAP[deptLabel];
-            if (department) {
-              toUpsert.push({
-                zoho_id: zohoId,
-                sale_date: est.date,
-                client_name: est.customer_name,
-                amount: est.total,
-                quote_number: est.estimate_number,
-                rep_name: repName,
-                zoho_department_label: String(deptLabel),
-                department,
-                office: org.office,
-                status: 'accepted',
+                status,
               });
             }
           } else {
