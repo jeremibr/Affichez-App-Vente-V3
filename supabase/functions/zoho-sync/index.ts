@@ -89,11 +89,30 @@ async function logSync(action: string, statusCode: number, message?: string): Pr
 Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-sync-source, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-sync-source, x-full-sync, x-debug-id, content-type',
   };
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const debugId = req.headers.get('x-debug-id');
+  if (debugId) {
+    try {
+      const accessToken = await getAccessToken();
+      const res = await fetch(
+        `https://www.zohoapis.com/books/v3/estimates/${debugId}?organization_id=${ORGS[0].id}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const data = await res.json();
+      return new Response(JSON.stringify(data.estimate ?? data, null, 2), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: String(err) }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   const startTime = Date.now();
@@ -107,17 +126,23 @@ Deno.serve(async (req: Request) => {
   try {
     const accessToken = await getAccessToken();
 
-    // Fetch only the last 35 days of estimates for speed.
-    // date_start is a valid Zoho Books filter (by estimate date).
-    const dateStart = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    // Full sync mode: no date filter, fetches all historical estimates
+    const isFullSync = req.headers.get('x-full-sync') === 'true';
+    const dateStart = isFullSync
+      ? null
+      : new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    // Track every zoho_id Zoho returns — used to detect hard-deleted quotes
+    const seenZohoIds = new Set<string>();
 
     for (const org of ORGS) {
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
+        const dateParam = dateStart ? `&date_start=${dateStart}` : '';
         const url = `https://www.zohoapis.com/books/v3/estimates` +
-          `?organization_id=${org.id}&page=${page}&per_page=200&date_start=${dateStart}`;
+          `?organization_id=${org.id}&page=${page}&per_page=200${dateParam}`;
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -138,12 +163,13 @@ Deno.serve(async (req: Request) => {
         for (const est of estimates) {
           const rawStatus = ((est.status as string) ?? '').toLowerCase();
           const zohoId = String(est.estimate_id);
+          seenZohoIds.add(zohoId);
 
           if (rawStatus === 'accepted' || rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
             const repName = (est.salesperson_name as string)?.trim() || null;
             const deptLabel = (est.cf_d_partement ?? est.department) as string;
             const department = DEPT_MAP[deptLabel];
-            const saleDate = (est.accepted_date as string) || (est.cf_date_acceptation_unformatted as string) || (est.date as string);
+            const saleDate = (est.cf_date_acceptation_unformatted as string) || (est.accepted_date as string) || (est.date as string);
             const amountHT = Math.round((Number(est.total) / 1.14975) * 100) / 100;
             const status = rawStatus === 'accepted' ? 'accepted' : 'invoiced';
             if (department) {
@@ -178,6 +204,22 @@ Deno.serve(async (req: Request) => {
 
         hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
         page++;
+      }
+    }
+
+    // Detect hard-deleted quotes: in Supabase but not returned by Zoho at all.
+    // Query sales created within the same window (created_at is when first synced).
+    const createdAtFilter = dateStart ? `&created_at=gte.${dateStart}` : '';
+    const existingRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/sales?select=zoho_id${createdAtFilter}`,
+      { headers: SB_HEADERS }
+    );
+    if (existingRes.ok) {
+      const existing: { zoho_id: string }[] = await existingRes.json();
+      const orphanIds = existing.map(r => r.zoho_id).filter(id => !seenZohoIds.has(id));
+      if (orphanIds.length > 0) {
+        await deleteBatch(orphanIds);
+        totalDeleted += orphanIds.length;
       }
     }
 
