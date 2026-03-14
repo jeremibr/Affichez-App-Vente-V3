@@ -22,9 +22,7 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
         setLastSyncTime(data?.received_at ?? null);
     }, []);
 
-    useEffect(() => { fetchLastSync(); }, [fetchLastSync]);
-
-    const handleSync = async () => {
+    const handleSync = useCallback(async () => {
         setSyncing(true);
         setBadge(null);
         try {
@@ -46,7 +44,10 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
             }
         } catch { /* details available in Paramètres → Synchronisation */ }
         setSyncing(false);
-    };
+    }, [fetchLastSync, onSyncComplete]);
+
+    // Auto-sync on every page load
+    useEffect(() => { handleSync(); }, [handleSync]);
 
     const formatRelative = (iso: string) => {
         const diffMs = Date.now() - new Date(iso).getTime();

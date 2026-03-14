@@ -52,15 +52,6 @@ async function getAccessToken(): Promise<string> {
 
 // ─── Supabase Helpers ─────────────────────────────────────────────────────────
 
-async function getReps(): Promise<Record<string, string>> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/reps?select=id,name`, {
-    headers: SB_HEADERS,
-  });
-  if (!res.ok) throw new Error('Failed to fetch reps: ' + await res.text());
-  const reps: { id: string; name: string }[] = await res.json();
-  return Object.fromEntries(reps.map(r => [r.name.trim(), r.id]));
-}
-
 async function upsertBatch(batch: object[]): Promise<void> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?on_conflict=zoho_id`, {
     method: 'POST',
@@ -115,7 +106,6 @@ Deno.serve(async (req: Request) => {
 
   try {
     const accessToken = await getAccessToken();
-    const repMap = await getReps();
 
     // Fetch only the last 35 days of estimates for speed.
     // date_start is a valid Zoho Books filter (by estimate date).
@@ -150,17 +140,17 @@ Deno.serve(async (req: Request) => {
           const zohoId = String(est.estimate_id);
 
           if (rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
-            const repId = repMap[(est.salesperson_name as string)?.trim()];
+            const repName = (est.salesperson_name as string)?.trim() || null;
             const deptLabel = (est.cf_d_partement ?? est.department) as string;
             const department = DEPT_MAP[deptLabel];
-            if (repId && department) {
+            if (department) {
               toUpsert.push({
                 zoho_id: zohoId,
                 sale_date: est.date,
                 client_name: est.customer_name,
                 amount: est.total,
                 quote_number: est.estimate_number,
-                rep_id: repId,
+                rep_name: repName,
                 zoho_department_label: String(deptLabel),
                 department,
                 office: org.office,
@@ -168,17 +158,17 @@ Deno.serve(async (req: Request) => {
               });
             }
           } else if (rawStatus === 'accepted') {
-            const repId = repMap[(est.salesperson_name as string)?.trim()];
+            const repName = (est.salesperson_name as string)?.trim() || null;
             const deptLabel = (est.cf_d_partement ?? est.department) as string;
             const department = DEPT_MAP[deptLabel];
-            if (repId && department) {
+            if (department) {
               toUpsert.push({
                 zoho_id: zohoId,
                 sale_date: est.date,
                 client_name: est.customer_name,
                 amount: est.total,
                 quote_number: est.estimate_number,
-                rep_id: repId,
+                rep_name: repName,
                 zoho_department_label: String(deptLabel),
                 department,
                 office: org.office,
