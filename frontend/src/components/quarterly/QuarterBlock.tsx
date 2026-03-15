@@ -19,6 +19,7 @@ export function QuarterBlock({
     const totalCurrent = data.reduce((sum, row) => sum + Number(row.current_avg || 0), 0);
     const totalPrevious = data.reduce((sum, row) => sum + Number(row.previous_avg || 0), 0);
     const totalResultat = totalCurrent - totalPrevious;
+    const totalDeals = data.reduce((sum, row) => sum + Number(row.deal_count || 0), 0);
 
     const getStyle = (val: number) => {
         if (val > 0) return 'text-emerald-600 bg-emerald-50';
@@ -47,6 +48,14 @@ export function QuarterBlock({
                         <tr className="border-b border-slate-100 bg-slate-50/50">
                             <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">
                                 Représentant
+                            </th>
+                            <th
+                                className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                onClick={() => handleSort('deal_count')}
+                            >
+                                <div className="flex items-center justify-end gap-2">
+                                    Devis <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
+                                </div>
                             </th>
                             <th
                                 className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
@@ -87,6 +96,10 @@ export function QuarterBlock({
                                 return (
                                     <tr key={idx} className="hover:bg-slate-50/60 transition-colors group">
                                         <td className="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">{row.rep_name}</td>
+                                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                                            <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
+                                            <span className="text-[10px] text-slate-400 ml-1">devis</span>
+                                        </td>
                                         <td className="px-4 py-3 text-right font-semibold text-slate-800 tabular-nums group-hover:text-brand-main transition-colors whitespace-nowrap">
                                             {formatCurrencyCAD(row.current_avg)}
                                         </td>
@@ -106,6 +119,10 @@ export function QuarterBlock({
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black">
                             <td className="px-5 py-3.5 text-xs uppercase tracking-wider">Total équipe</td>
+                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                <span className="text-sm font-black tabular-nums">{totalDeals}</span>
+                                <span className="text-[10px] text-white/60 ml-1">devis</span>
+                            </td>
                             <td className="px-4 py-3.5 text-right font-black tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalCurrent)}</td>
                             <td className="px-4 py-3.5 text-right text-white/50 tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalPrevious)}</td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">

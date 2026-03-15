@@ -4,6 +4,7 @@ export type SommaireRow = {
     objectif: number;
     actual_amount: number;
     pct_atteint: number;
+    deal_count: number;
 };
 
 export type AvailableWeek = {
@@ -50,4 +51,5 @@ export type YoYRow = {
     current_avg: number;
     previous_avg: number;
     resultat: number;
+    deal_count: number;
 };

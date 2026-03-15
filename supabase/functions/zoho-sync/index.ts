@@ -14,6 +14,8 @@ const DEPT_MAP: Record<string, string> = {
   'DIST. PUBLICITAIRE SOLO': 'DIST. PUBLICITAIRE SOLO',
   'AGENCE PUB': 'NUMERIQUE',
   'NUMÉRIQUE': 'NUMERIQUE',
+  'NUMERIQUE': 'NUMERIQUE',
+  'AGENCE WEB': 'APPLICATION',
   'APPLICATION': 'APPLICATION',
   'SERVICES IA': 'SERVICES IA',
 };
@@ -97,11 +99,13 @@ Deno.serve(async (req: Request) => {
   }
 
   const debugId = req.headers.get('x-debug-id');
+  const debugOrg = req.headers.get('x-debug-org'); // optional: 'QC' or 'MTL'
   if (debugId) {
     try {
       const accessToken = await getAccessToken();
+      const org = debugOrg ? (ORGS.find(o => o.office === debugOrg) ?? ORGS[0]) : ORGS[0];
       const res = await fetch(
-        `https://www.zohoapis.com/books/v3/estimates/${debugId}?organization_id=${ORGS[0].id}`,
+        `https://www.zohoapis.com/books/v3/estimates/${debugId}?organization_id=${org.id}`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       const data = await res.json();
@@ -135,14 +139,21 @@ Deno.serve(async (req: Request) => {
     // Track every zoho_id Zoho returns — used to detect hard-deleted quotes
     const seenZohoIds = new Set<string>();
 
+    // Full sync: loop over statuses to skip drafts/declined (faster, no date filter)
+    // Regular sync: no filter_by (Zoho ignores date_start when combined with filter_by),
+    //               filter by status in code after fetching
+    const statusFilters = isFullSync ? ['Accepted', 'Invoiced'] : [null];
+
     for (const org of ORGS) {
+      for (const statusFilter of statusFilters) {
       let page = 1;
       let hasMore = true;
 
       while (hasMore) {
         const dateParam = dateStart ? `&date_start=${dateStart}` : '';
+        const statusParam = statusFilter ? `&filter_by=Status.${statusFilter}` : '';
         const url = `https://www.zohoapis.com/books/v3/estimates` +
-          `?organization_id=${org.id}&page=${page}&per_page=200${dateParam}`;
+          `?organization_id=${org.id}&page=${page}&per_page=200${statusParam}${dateParam}`;
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
@@ -158,7 +169,6 @@ Deno.serve(async (req: Request) => {
         if (estimates.length === 0) break;
 
         const toUpsert: object[] = [];
-        const toDelete: string[] = [];
 
         for (const est of estimates) {
           const rawStatus = ((est.status as string) ?? '').toLowerCase();
@@ -186,9 +196,6 @@ Deno.serve(async (req: Request) => {
                 status,
               });
             }
-          } else {
-            // declined / draft / sent / expired → remove from sales if it exists
-            toDelete.push(zohoId);
           }
         }
 
@@ -197,29 +204,27 @@ Deno.serve(async (req: Request) => {
           totalUpserted += toUpsert.length;
         }
 
-        if (toDelete.length > 0) {
-          await deleteBatch(toDelete);
-          totalDeleted += toDelete.length;
-        }
-
         hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
         page++;
       }
+      } // end statusFilter loop
     }
 
-    // Detect hard-deleted quotes: in Supabase but not returned by Zoho at all.
-    // Query sales created within the same window (created_at is when first synced).
-    const createdAtFilter = dateStart ? `&created_at=gte.${dateStart}` : '';
-    const existingRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/sales?select=zoho_id${createdAtFilter}`,
-      { headers: SB_HEADERS }
-    );
-    if (existingRes.ok) {
-      const existing: { zoho_id: string }[] = await existingRes.json();
-      const orphanIds = existing.map(r => r.zoho_id).filter(id => !seenZohoIds.has(id));
-      if (orphanIds.length > 0) {
-        await deleteBatch(orphanIds);
-        totalDeleted += orphanIds.length;
+    // Orphan detection: only safe on full sync because regular syncs use a date window
+    // (Zoho filters by estimate date, Supabase by acceptance date — windows don't align,
+    // causing valid quotes to be falsely deleted on regular syncs).
+    if (isFullSync) {
+      const existingRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/sales?select=zoho_id`,
+        { headers: SB_HEADERS }
+      );
+      if (existingRes.ok) {
+        const existing: { zoho_id: string }[] = await existingRes.json();
+        const orphanIds = existing.map(r => r.zoho_id).filter(id => !seenZohoIds.has(id));
+        if (orphanIds.length > 0) {
+          await deleteBatch(orphanIds);
+          totalDeleted += orphanIds.length;
+        }
       }
     }
 

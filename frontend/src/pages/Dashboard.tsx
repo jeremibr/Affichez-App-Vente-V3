@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User } from 'lucide-react';
+import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
@@ -55,6 +55,8 @@ export default function Dashboard() {
         setLoading(true);
         const officeParam = selectedOffice === 'Toutes' ? null : selectedOffice;
         const statusParam = selectedStatus === 'Toutes' ? null : selectedStatus;
+        const deptParam = selectedDept === 'Toutes' ? null : selectedDept;
+        const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
 
         const [
             { data: grandData },
@@ -69,9 +71,9 @@ export default function Dashboard() {
             supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 5 }),
-            supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam })
+            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam }),
+            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 5, p_month: monthParam, p_dept: deptParam }),
+            supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam })
         ]);
 
         setGrandTotalData(grandData || []);
@@ -82,7 +84,7 @@ export default function Dashboard() {
         setTopClients(clientData || []);
         setLeaderboard(leaderData || []);
         setLoading(false);
-    }, [year, selectedOffice, selectedStatus]);
+    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth]);
 
     useEffect(() => {
         fetchData();
@@ -134,14 +136,20 @@ export default function Dashboard() {
             ) : (
                 <>
                     {/* KPI Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <KPICard
                             title="Chiffre d'affaires YTD"
                             value={formatCurrencyCAD(kpis?.ytd_total || 0)}
-                            subText={`${kpis?.ytd_count || 0} devis conclus`}
+                            subText="Revenus cumulés"
                             icon={TrendingUp}
                             trend={kpis?.pct_of_target}
                             trendLabel="de l'objectif"
+                        />
+                        <KPICard
+                            title="Total Devis"
+                            value={String(kpis?.ytd_count || 0)}
+                            subText="Devis conclus (filtres)"
+                            icon={FileText}
                         />
                         <KPICard
                             title="Vente moyenne"
@@ -191,7 +199,7 @@ export default function Dashboard() {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
-                                            <p className="text-[10px] text-slate-400">{rep.deal_count} deals</p>
+                                            <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">devis</span></p>
                                         </div>
                                     </div>
                                 ))}
@@ -214,7 +222,7 @@ export default function Dashboard() {
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(c.total_amount)}</p>
-                                            <p className="text-[10px] text-slate-400">{c.deal_count} devis</p>
+                                            <p className="text-sm font-bold text-slate-500 tabular-nums">{c.deal_count} <span className="text-[10px] font-normal text-slate-400">devis</span></p>
                                         </div>
                                     </div>
                                 ))}
