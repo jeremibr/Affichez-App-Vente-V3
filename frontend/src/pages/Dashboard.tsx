@@ -101,6 +101,7 @@ export default function Dashboard() {
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (
+        <>
         <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
@@ -318,6 +319,7 @@ export default function Dashboard() {
                 </table>
             </Modal>
         )}
+        </>
     );
 }
 
