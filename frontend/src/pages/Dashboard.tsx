@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText } from 'lucide-react';
+import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
@@ -43,6 +43,8 @@ export default function Dashboard() {
     const [selectedMonth, setSelectedMonth] = useState<number | 'Toutes'>('Toutes');
 
     const [loading, setLoading] = useState(true);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [showClients, setShowClients] = useState(false);
     const [grandTotalData, setGrandTotalData] = useState<SommaireRow[]>([]);
     const [deptData, setDeptData] = useState<SommaireRow[]>([]);
     const [prevGrandTotalData, setPrevGrandTotalData] = useState<SommaireRow[]>([]);
@@ -72,7 +74,7 @@ export default function Dashboard() {
             supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
             supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 5, p_month: monthParam, p_dept: deptParam }),
+            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam }),
             supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam })
         ]);
 
@@ -181,6 +183,11 @@ export default function Dashboard() {
                                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <Trophy className="w-4 h-4 text-amber-500" /> Leaderboard Reps
                                 </h3>
+                                {leaderboard.length > 5 && (
+                                    <button onClick={() => setShowLeaderboard(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                        Voir tout ({leaderboard.length}) <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
                             <div className="divide-y divide-slate-50">
                                 {leaderboard.slice(0, 5).map((rep, idx) => (
@@ -208,13 +215,18 @@ export default function Dashboard() {
 
                         {/* Top Clients */}
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-100">
+                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <User className="w-4 h-4 text-blue-500" /> Top 5 Clients
                                 </h3>
+                                {topClients.length > 5 && (
+                                    <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                        Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
                             <div className="divide-y divide-slate-50">
-                                {topClients.map((c) => (
+                                {topClients.slice(0, 5).map((c) => (
                                     <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                                         <div className="max-w-[200px]">
                                             <p className="text-sm font-semibold text-slate-700 truncate" title={c.client_name}>{c.client_name}</p>
@@ -242,6 +254,91 @@ export default function Dashboard() {
                     </div>
                 </>
             )}
+        </div>
+
+        {/* Leaderboard Modal */}
+        {showLeaderboard && (
+            <Modal title="Leaderboard Reps" onClose={() => setShowLeaderboard(false)}>
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentant</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Devis</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy./devis</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {leaderboard.map((rep, idx) => (
+                            <tr key={rep.rep_name} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="px-4 py-2.5">
+                                    <span className={cn(
+                                        "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                        idx === 0 ? "bg-amber-100 text-amber-600" : idx === 1 ? "bg-slate-100 text-slate-500" : idx === 2 ? "bg-orange-50 text-orange-400" : "bg-slate-50 text-slate-300"
+                                    )}>{idx + 1}</span>
+                                </td>
+                                <td className="px-4 py-2.5 font-semibold text-slate-700">{rep.rep_name}</td>
+                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">{rep.office}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{rep.deal_count}</td>
+                                <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums text-xs">{formatCurrencyCAD(rep.avg_deal)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Modal>
+        )}
+
+        {/* Top Clients Modal */}
+        {showClients && (
+            <Modal title="Tous les clients" onClose={() => setShowClients(false)}>
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Client</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
+                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Devis</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {topClients.map((c, idx) => (
+                            <tr key={c.client_name} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="px-4 py-2.5 text-xs font-bold text-slate-300 tabular-nums">{idx + 1}</td>
+                                <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[240px] truncate" title={c.client_name}>{c.client_name}</td>
+                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">{c.office}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{c.deal_count}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </Modal>
+        )}
+    );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+            <div
+                className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+                    <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+                    <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
+                <div className="overflow-y-auto">
+                    {children}
+                </div>
+            </div>
         </div>
     );
 }
