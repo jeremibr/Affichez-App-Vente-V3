@@ -13,6 +13,15 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
         return `https://books.zoho.com/app/${orgId}#/quotes/${item.zoho_id}`;
     };
 
+    const DEPT_COLORS: Record<string, string> = {
+        'MULTI-ANNONCEURS':       'bg-blue-50 text-blue-700 border-blue-100',
+        'PROMOTIONNEL':           'bg-purple-50 text-purple-700 border-purple-100',
+        'DIST. PUBLICITAIRE SOLO':'bg-orange-50 text-orange-700 border-orange-100',
+        'NUMERIQUE':              'bg-cyan-50 text-cyan-700 border-cyan-100',
+        'APPLICATION':            'bg-emerald-50 text-emerald-700 border-emerald-100',
+        'SERVICES IA':            'bg-rose-50 text-rose-700 border-rose-100',
+    };
+
     return (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
@@ -92,7 +101,10 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                                     <td className="px-5 py-3.5 font-mono text-[10px] text-slate-400 whitespace-nowrap">{item.quote_number}</td>
                                     <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap font-medium">{item.rep_name}</td>
                                     <td className="px-5 py-3.5">
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-500 whitespace-nowrap border border-slate-200/50">
+                                        <span className={cn(
+                                            "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap border",
+                                            DEPT_COLORS[item.department] ?? 'bg-slate-100 text-slate-500 border-slate-200/50'
+                                        )}>
                                             {item.department}
                                         </span>
                                     </td>

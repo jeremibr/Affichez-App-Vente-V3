@@ -40,7 +40,7 @@ export function SommaireTable({
     const rowsWithData = useMemo<SommaireTableRow[]>(() => {
         return displayMonths.map(monthObj => {
             const row = data.find(d => d.month === monthObj.value) || {
-                month: monthObj.value, objectif: 0, actual_amount: 0, pct_atteint: 0
+                month: monthObj.value, objectif: 0, actual_amount: 0, pct_atteint: 0, deal_count: 0
             };
             const prevRow = prevYearData?.find(d => d.month === monthObj.value);
             const prevYearAmt = Number(prevRow?.actual_amount || 0);
