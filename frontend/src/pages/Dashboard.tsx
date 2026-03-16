@@ -119,7 +119,7 @@ export default function Dashboard() {
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tableau de Bord</h1>
                     <p className="text-sm text-slate-400 mt-0.5">Performance et indicateurs clés de vente</p>
                 </div>
-                <SyncButton onSyncComplete={fetchData} />
+                <SyncButton onSyncComplete={() => fetchDataRef.current()} />
             </div>
 
             {/* Combined Filter Bar */}
