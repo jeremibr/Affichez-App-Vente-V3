@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
@@ -88,11 +88,21 @@ export default function Dashboard() {
         setLoading(false);
     }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth]);
 
+    // Always keep a current reference so the Realtime callback never goes stale
+    const fetchDataRef = useRef(fetchData);
+    useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
+    // Re-fetch whenever filters change
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Realtime subscription — set up once, always calls the latest fetchData via ref
     useEffect(() => {
-        fetchData();
-        const sub = supabase.channel('db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, fetchData).subscribe();
+        const sub = supabase
+            .channel('db-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchDataRef.current())
+            .subscribe();
         return () => { supabase.removeChannel(sub); };
-    }, [fetchData]);
+    }, []);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
