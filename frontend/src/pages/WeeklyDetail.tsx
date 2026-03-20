@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, formatShortDate } from '../lib/utils';
-import { Loader2, Calendar, TrendingUp, Briefcase, Users } from 'lucide-react';
+import { Loader2, Calendar, TrendingUp, Briefcase, Users, FileDown } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
 import type { AvailableWeek, ZoneA_SummaryRow, ZoneA_DeptTotal, ZoneB_DetailRow } from '../types/database';
 import { ZoneAPivotTable } from '../components/weekly/ZoneAPivotTable';
@@ -9,6 +9,7 @@ import { ZoneBTable } from '../components/weekly/ZoneBTable';
 import { DEPARTMENTS, OFFICES, SALE_STATUSES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { generateWeeklyPdf } from '../utils/weeklyPdfExport';
 
 export default function WeeklyDetail() {
     const [year, setYear] = useState<number>(2026);
@@ -134,6 +135,28 @@ export default function WeeklyDetail() {
     const repOptions = useMemo(() => [{ value: 'Tous', label: 'Tous les reps' }, ...uniqueReps.map(r => ({ value: r, label: r }))], [uniqueReps]);
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
+    const [exporting, setExporting] = useState(false);
+    const handleExportPdf = async () => {
+        if (!selectedWeek || filteredLineItems.length === 0) return;
+        setExporting(true);
+        const weekObj = availableWeeks.find(w => w.week_start === selectedWeek);
+        const weekEnd = weekObj?.week_end || selectedWeek;
+        try {
+            await generateWeeklyPdf({
+                weekStart: selectedWeek,
+                weekEnd,
+                grandTotal: filteredGrandTotal,
+                avgTicket,
+                devisCount: filteredLineItems.length,
+                repPivotRows,
+                deptTotals: filteredDeptTotals,
+                lineItems: filteredLineItems,
+                filters: { office: selectedOffice, status: selectedStatus, dept: selectedDept, rep: selectedRep },
+            });
+        } catch (e) { console.error('PDF export failed', e); }
+        setExporting(false);
+    };
+
     return (
         <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
             {/* Header */}
@@ -144,7 +167,19 @@ export default function WeeklyDetail() {
                         {selectedWeek ? <>Performance pour la semaine du <span className="text-brand-main font-bold">{formatShortDate(selectedWeek)}</span></> : 'Sélectionnez une période'}
                     </p>
                 </div>
-                <SyncButton onSyncComplete={() => { fetchAvailableWeeks(false); if (selectedWeek) fetchWeekData(selectedWeek, false); }} />
+                <div className="flex items-center gap-3">
+                    {selectedWeek && filteredLineItems.length > 0 && (
+                        <button
+                            onClick={handleExportPdf}
+                            disabled={exporting}
+                            className="flex items-center gap-2 bg-brand-dark text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm hover:bg-slate-800 transition-all disabled:opacity-60"
+                        >
+                            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                            Exporter PDF
+                        </button>
+                    )}
+                    <SyncButton onSyncComplete={() => { fetchAvailableWeeks(false); if (selectedWeek) fetchWeekData(selectedWeek, false); }} />
+                </div>
             </div>
 
             {/* Combined Filters */}
