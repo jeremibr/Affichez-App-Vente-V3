@@ -10,14 +10,6 @@ const WHITE: [number, number, number] = [255, 255, 255];
 const LIGHT_BG: [number, number, number] = [243, 243, 243];     // #f3f3f3
 const TABLE_HEAD_BG: [number, number, number] = [235, 235, 235]; // slightly darker for contrast
 
-const DEPT_COLORS: Record<string, [number, number, number]> = {
-    'MULTI-ANNONCEURS':       [59, 130, 246],   // blue
-    'PROMOTIONNEL':           [168, 85, 247],    // purple
-    'DIST. PUBLICITAIRE SOLO':[249, 115, 22],    // orange
-    'NUMERIQUE':              [6, 182, 212],     // cyan
-    'APPLICATION':            [16, 185, 129],    // emerald
-    'SERVICES IA':            [244, 63, 94],     // rose
-};
 
 function fmtCAD(n: number): string {
     return new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: 2 }).format(n).replace('CA', '').trim();
@@ -206,13 +198,6 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
                 1: { halign: 'right', fontStyle: 'bold' },
                 2: { halign: 'right' },
             },
-            didParseCell: (hookData) => {
-                if (hookData.section === 'body' && hookData.column.index === 0) {
-                    const dept = String(hookData.cell.raw);
-                    const color = DEPT_COLORS[dept];
-                    if (color) hookData.cell.styles.textColor = color;
-                }
-            },
             tableWidth: pageW - margin * 2,
         });
 
@@ -286,22 +271,6 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
             4: { cellWidth: 32 },
             5: { cellWidth: 32, fontSize: 5.5 },
             6: { cellWidth: 16, halign: 'center', fontSize: 5.5 },
-        },
-        didParseCell: (hookData) => {
-            if (hookData.section === 'body') {
-                // Color department column
-                if (hookData.column.index === 5) {
-                    const dept = String(hookData.cell.raw);
-                    const color = DEPT_COLORS[dept];
-                    if (color) hookData.cell.styles.textColor = color;
-                }
-                // Color status
-                if (hookData.column.index === 6) {
-                    const status = String(hookData.cell.raw);
-                    hookData.cell.styles.textColor = status === 'Facturé' ? [16, 185, 129] : [245, 158, 11];
-                    hookData.cell.styles.fontStyle = 'bold';
-                }
-            }
         },
         tableWidth: pageW - margin * 2,
     });
