@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import type { ZoneB_DetailRow, ZoneA_DeptTotal } from '../types/database';
 
 const BRAND_ORANGE: [number, number, number] = [227, 136, 0];   // #e38800
-const DARK: [number, number, number] = [15, 23, 42];            // #0f172a
+const DARK: [number, number, number] = [0, 0, 0];               // black
 const SLATE_700: [number, number, number] = [51, 65, 85];
 const SLATE_400: [number, number, number] = [148, 163, 184];
 const WHITE: [number, number, number] = [255, 255, 255];
