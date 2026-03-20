@@ -3,10 +3,12 @@ import autoTable from 'jspdf-autotable';
 import type { ZoneB_DetailRow, ZoneA_DeptTotal } from '../types/database';
 
 const BRAND_ORANGE: [number, number, number] = [227, 136, 0];   // #e38800
-const DARK: [number, number, number] = [0, 0, 0];               // black
+const BLACK: [number, number, number] = [0, 0, 0];
 const SLATE_700: [number, number, number] = [51, 65, 85];
 const SLATE_400: [number, number, number] = [148, 163, 184];
 const WHITE: [number, number, number] = [255, 255, 255];
+const LIGHT_BG: [number, number, number] = [243, 243, 243];     // #f3f3f3
+const TABLE_HEAD_BG: [number, number, number] = [235, 235, 235]; // slightly darker for contrast
 
 const DEPT_COLORS: Record<string, [number, number, number]> = {
     'MULTI-ANNONCEURS':       [59, 130, 246],   // blue
@@ -56,7 +58,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     // ─── Helper: add page footer ───
     const addFooter = () => {
         const footerY = pageH - 8;
-        doc.setFillColor(...DARK);
+        doc.setFillColor(...LIGHT_BG);
         doc.rect(0, footerY - 2, pageW, 10, 'F');
         doc.setFontSize(7);
         doc.setTextColor(...SLATE_400);
@@ -65,8 +67,11 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     };
 
     // ─── HEADER BAR ───
-    doc.setFillColor(...DARK);
+    doc.setFillColor(...LIGHT_BG);
     doc.rect(0, 0, pageW, 28, 'F');
+    // Orange accent line under header
+    doc.setFillColor(...BRAND_ORANGE);
+    doc.rect(0, 28, pageW, 1, 'F');
 
     if (logoImg) {
         const logoH = 12;
@@ -80,7 +85,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     }
 
     doc.setFontSize(14);
-    doc.setTextColor(...WHITE);
+    doc.setTextColor(...BLACK);
     doc.setFont('helvetica', 'bold');
     doc.text('Rapport Hebdomadaire', pageW - margin, 12, { align: 'right' });
     doc.setFontSize(10);
@@ -117,7 +122,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
 
     // ─── LEADERBOARD TABLE ───
     doc.setFontSize(10);
-    doc.setTextColor(...DARK);
+    doc.setTextColor(...BLACK);
     doc.setFont('helvetica', 'bold');
     doc.text('Leaderboard de la semaine', margin, y + 1);
     y += 4;
@@ -146,8 +151,8 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
             fmtCAD(rep.avg),
         ]),
         headStyles: {
-            fillColor: DARK,
-            textColor: WHITE,
+            fillColor: TABLE_HEAD_BG,
+            textColor: BLACK,
             fontSize: 7,
             fontStyle: 'bold',
             cellPadding: 2,
@@ -160,7 +165,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         alternateRowStyles: { fillColor: [248, 250, 252] },
         columnStyles: {
             0: { cellWidth: 10, halign: 'center', fontStyle: 'bold', textColor: SLATE_400 },
-            2: { halign: 'right', fontStyle: 'bold', textColor: DARK },
+            2: { halign: 'right', fontStyle: 'bold', textColor: BLACK },
             3: { halign: 'right', fontStyle: 'bold' },
             4: { halign: 'right', textColor: SLATE_400 },
         },
@@ -180,7 +185,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     // ─── DEPARTMENT BREAKDOWN (inline) ───
     if (data.deptTotals.length > 0) {
         doc.setFontSize(10);
-        doc.setTextColor(...DARK);
+        doc.setTextColor(...BLACK);
         doc.setFont('helvetica', 'bold');
         doc.text('Répartition par département', margin, y + 1);
         y += 4;
@@ -193,7 +198,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
                 .sort((a, b) => b.total_amount - a.total_amount)
                 .map(d => [d.department, fmtCAD(d.total_amount), String(d.num_sales)]),
             foot: [['Total', fmtCAD(data.grandTotal), String(data.devisCount)]],
-            headStyles: { fillColor: DARK, textColor: WHITE, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
+            headStyles: { fillColor: TABLE_HEAD_BG, textColor: BLACK, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
             bodyStyles: { fontSize: 7, cellPadding: 2, textColor: SLATE_700 },
             footStyles: { fillColor: BRAND_ORANGE, textColor: WHITE, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
             alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -224,7 +229,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
 
     // ─── DETAILED QUOTES TABLE ───
     doc.setFontSize(10);
-    doc.setTextColor(...DARK);
+    doc.setTextColor(...BLACK);
     doc.setFont('helvetica', 'bold');
     doc.text('Liste détaillée des devis', margin, y + 1);
     y += 4;
@@ -254,8 +259,8 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
             '',
         ]],
         headStyles: {
-            fillColor: DARK,
-            textColor: WHITE,
+            fillColor: TABLE_HEAD_BG,
+            textColor: BLACK,
             fontSize: 6.5,
             fontStyle: 'bold',
             cellPadding: 2,
@@ -276,7 +281,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         columnStyles: {
             0: { cellWidth: 24 },
             1: { cellWidth: 60 },
-            2: { halign: 'right', fontStyle: 'bold', textColor: DARK },
+            2: { halign: 'right', fontStyle: 'bold', textColor: BLACK },
             3: { cellWidth: 28, fontSize: 5.5, textColor: SLATE_400 },
             4: { cellWidth: 32 },
             5: { cellWidth: 32, fontSize: 5.5 },
@@ -335,7 +340,7 @@ function drawKpiCard(
         doc.setFont('helvetica', 'bold');
         doc.text(label.toUpperCase(), x + 5, y + 7);
         doc.setFontSize(14);
-        doc.setTextColor(...DARK);
+        doc.setTextColor(...BLACK);
         doc.text(value, x + 5, y + 17);
     }
 }
