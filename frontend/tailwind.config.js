@@ -10,7 +10,7 @@ export default {
         brand: {
           // New: clean dark/light palette with orange accent retained
           main: '#e38800',
-          dark: '#0f172a',   // slate-900 – deep modern dark
+          dark: '#000000',   // pure black
           mid: '#334155',    // slate-700
           muted: '#94a3b8',  // slate-400
           subtle: '#f1f5f9', // slate-100
