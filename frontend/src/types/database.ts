@@ -40,7 +40,7 @@ export type ZoneB_DetailRow = {
     department: string;
     zoho_department_label: string;
     office: 'QC' | 'MTL';
-    status: 'accepted' | 'invoiced';
+    status: 'accepted' | 'invoiced' | 'declined';
     zoho_id: string;
 };
 

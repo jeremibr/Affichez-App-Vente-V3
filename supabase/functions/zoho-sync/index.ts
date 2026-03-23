@@ -63,6 +63,19 @@ async function upsertBatch(batch: object[]): Promise<void> {
   if (!res.ok) throw new Error('Supabase upsert failed: ' + await res.text());
 }
 
+// Updates status to 'declined' for existing rows only — never inserts new rows.
+// Safe to call even if some zoho_ids don't exist in the DB (PATCH is a no-op for missing rows).
+async function declineBatch(zohoIds: string[]): Promise<void> {
+  if (zohoIds.length === 0) return;
+  const param = zohoIds.map(id => `"${id}"`).join(',');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?zoho_id=in.(${param})`, {
+    method: 'PATCH',
+    headers: SB_HEADERS,
+    body: JSON.stringify({ status: 'declined' }),
+  });
+  if (!res.ok) throw new Error('Supabase decline patch failed: ' + await res.text());
+}
+
 async function deleteBatch(zohoIds: string[]): Promise<void> {
   if (zohoIds.length === 0) return;
   const param = zohoIds.join(',');
@@ -169,6 +182,7 @@ Deno.serve(async (req: Request) => {
         if (estimates.length === 0) break;
 
         const toUpsert: object[] = [];
+        const toDecline: string[] = [];
 
         for (const est of estimates) {
           const rawStatus = ((est.status as string) ?? '').toLowerCase();
@@ -196,12 +210,20 @@ Deno.serve(async (req: Request) => {
                 status,
               });
             }
+          } else if (rawStatus === 'declined' || rawStatus === 'void') {
+            // Only update existing rows — PATCH never inserts, so quotes that were
+            // declined before ever being accepted won't be created in the DB.
+            toDecline.push(zohoId);
           }
         }
 
         if (toUpsert.length > 0) {
           await upsertBatch(toUpsert);
           totalUpserted += toUpsert.length;
+        }
+
+        if (toDecline.length > 0) {
+          await declineBatch(toDecline);
         }
 
         hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
