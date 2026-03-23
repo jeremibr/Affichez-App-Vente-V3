@@ -67,7 +67,7 @@ async function upsertBatch(batch: object[]): Promise<void> {
 // Safe to call even if some zoho_ids don't exist in the DB (PATCH is a no-op for missing rows).
 async function declineBatch(zohoIds: string[]): Promise<void> {
   if (zohoIds.length === 0) return;
-  const param = zohoIds.map(id => `"${id}"`).join(',');
+  const param = zohoIds.join(',');
   const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?zoho_id=in.(${param})`, {
     method: 'PATCH',
     headers: SB_HEADERS,
