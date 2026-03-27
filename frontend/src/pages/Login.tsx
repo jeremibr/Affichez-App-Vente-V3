@@ -77,6 +77,6 @@ export default function Login() {
 
 function ZohoIcon() {
     return (
-        <img src="/zoho-logo.svg" alt="Zoho" className="w-5 h-5 object-contain" style={{ mixBlendMode: 'screen' }} />
+        <img src="/zoho-logo.svg" alt="Zoho" className="w-28 h-8 object-contain" style={{ mixBlendMode: 'screen' }} />
     );
 }
