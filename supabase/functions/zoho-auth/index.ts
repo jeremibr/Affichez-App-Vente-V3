@@ -56,6 +56,9 @@ Deno.serve(async (req: Request) => {
       headers: { Authorization: `Zoho-oauthtoken ${tokenData.access_token}` },
     });
     const userData = await userRes.json();
+    console.error('Zoho userinfo status:', userRes.status);
+    console.error('Zoho userinfo response:', JSON.stringify(userData));
+    console.error('Zoho token data keys:', JSON.stringify(Object.keys(tokenData)));
     const email = (userData.Email ?? userData.email ?? '').toLowerCase().trim();
 
     if (!email) {
