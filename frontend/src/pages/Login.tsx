@@ -77,10 +77,6 @@ export default function Login() {
 
 function ZohoIcon() {
     return (
-        <svg width="18" height="18" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="40" height="40" rx="6" fill="white" />
-            <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle"
-                style={{ font: 'bold 16px sans-serif', fill: '#e05a1a' }}>Z</text>
-        </svg>
+        <img src="/zoho-logo.svg" alt="Zoho" className="w-5 h-5 object-contain" style={{ mixBlendMode: 'screen' }} />
     );
 }
