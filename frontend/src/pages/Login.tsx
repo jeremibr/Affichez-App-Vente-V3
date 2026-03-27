@@ -1,101 +1,86 @@
-import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
+const ZOHO_CLIENT_ID = import.meta.env.VITE_ZOHO_CLIENT_ID as string;
+const SUPABASE_URL   = import.meta.env.VITE_SUPABASE_URL as string;
+const REDIRECT_URI   = `${SUPABASE_URL}/functions/v1/zoho-auth`;
+
+const ERROR_MESSAGES: Record<string, string> = {
+    denied:         "Connexion annulée.",
+    not_authorized: "Votre compte n'est pas autorisé. Contactez l'administrateur.",
+    token_failed:   "Erreur d'authentification Zoho. Réessayez.",
+    no_email:       "Impossible de récupérer votre courriel Zoho.",
+    session_failed: "Erreur lors de la création de session. Réessayez.",
+    server_error:   "Erreur serveur. Réessayez dans un moment.",
+};
+
 export default function Login() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading]  = useState(false);
+    const [searchParams]         = useSearchParams();
+    const authError              = searchParams.get('auth_error');
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    useEffect(() => {
+        if (authError) window.history.replaceState({}, '', window.location.pathname);
+    }, [authError]);
+
+    const handleZohoLogin = () => {
         setLoading(true);
-        setError(null);
-
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-        if (error) {
-            setError('Courriel ou mot de passe invalide.');
-            setLoading(false);
-        }
-        // On success, AuthContext picks up the session and App re-renders automatically
+        const params = new URLSearchParams({
+            client_id:     ZOHO_CLIENT_ID,
+            response_type: 'code',
+            scope:         'openid email profile',
+            redirect_uri:  REDIRECT_URI,
+            access_type:   'online',
+            prompt:        'consent',
+        });
+        window.location.href = `https://accounts.zoho.com/oauth/v2/auth?${params}`;
     };
 
     return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
 
-                {/* Logo */}
                 <div className="flex justify-center mb-8">
-                    <img
-                        src="/logo-long.png"
-                        alt="Affichez"
-                        className="h-9 w-auto object-contain"
-                    />
+                    <img src="/logo-long.png" alt="Affichez" className="h-9 w-auto object-contain" />
                 </div>
 
-                {/* Card */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/60 p-8">
-                    <div className="mb-6">
+                    <div className="mb-7">
                         <h1 className="text-xl font-bold text-slate-900">Bon retour</h1>
-                        <p className="text-sm text-slate-400 mt-1">Connectez-vous à votre tableau de bord.</p>
+                        <p className="text-sm text-slate-400 mt-1">Connectez-vous avec votre compte Zoho.</p>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                                Courriel
-                            </label>
-                            <input
-                                type="email"
-                                autoComplete="email"
-                                required
-                                value={email}
-                                onChange={e => setEmail(e.target.value)}
-                                placeholder="vous@affichez.ca"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:border-brand-main/50 transition-all"
-                            />
+                    {authError && (
+                        <div className="mb-5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                            {ERROR_MESSAGES[authError] ?? "Une erreur est survenue. Réessayez."}
                         </div>
+                    )}
 
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-                                Mot de passe
-                            </label>
-                            <input
-                                type="password"
-                                autoComplete="current-password"
-                                required
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                placeholder="••••••••••••"
-                                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:border-brand-main/50 transition-all"
-                            />
-                        </div>
-
-                        {error && (
-                            <p className="text-xs font-medium text-red-500 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                                {error}
-                            </p>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full flex items-center justify-center gap-2 bg-brand-main text-white py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60 mt-2"
-                        >
-                            {loading
-                                ? <><Loader2 className="w-4 h-4 animate-spin" /> Connexion...</>
-                                : 'Se connecter'
-                            }
-                        </button>
-                    </form>
+                    <button
+                        onClick={handleZohoLogin}
+                        disabled={loading}
+                        className="w-full flex items-center justify-center gap-3 bg-black text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-800 transition-all disabled:opacity-60"
+                    >
+                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ZohoIcon />}
+                        {loading ? 'Redirection...' : 'Se connecter avec Zoho'}
+                    </button>
                 </div>
 
                 <p className="text-center text-xs text-slate-300 mt-6">
-                    © {new Date().getFullYear()} Affichez — Usage interne seulement
+                    {new Date().getFullYear()} Affichez — Usage interne seulement
                 </p>
             </div>
         </div>
+    );
+}
+
+function ZohoIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="6" fill="white" />
+            <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle"
+                style={{ font: 'bold 16px sans-serif', fill: '#e05a1a' }}>Z</text>
+        </svg>
     );
 }
