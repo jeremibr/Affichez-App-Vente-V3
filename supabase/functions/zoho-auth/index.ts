@@ -51,18 +51,21 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${APP_URL}?auth_error=token_failed`, 302);
     }
 
-    // ─── 2. Get user email from Zoho ─────────────────────────────────────────
-    const userRes = await fetch('https://accounts.zoho.com/oauth/user/info', {
-      headers: { Authorization: `Zoho-oauthtoken ${tokenData.access_token}` },
-    });
-    const userData = await userRes.json();
-    console.error('Zoho userinfo status:', userRes.status);
-    console.error('Zoho userinfo response:', JSON.stringify(userData));
-    console.error('Zoho token data keys:', JSON.stringify(Object.keys(tokenData)));
-    const email = (userData.Email ?? userData.email ?? '').toLowerCase().trim();
+    // ─── 2. Extract email from OIDC id_token (JWT) ───────────────────────────
+    // Zoho returns an id_token JWT when openid scope is requested.
+    // The /oauth/user/info endpoint requires AaaServer.profile.READ scope — skip it.
+    let email = '';
+    try {
+      const idToken = tokenData.id_token as string;
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      email = (payload.email ?? payload.Email ?? '').toLowerCase().trim();
+      console.log('Zoho id_token claims:', JSON.stringify(payload));
+    } catch (e) {
+      console.error('Failed to decode id_token:', e);
+    }
 
     if (!email) {
-      console.error('No email in Zoho user info:', JSON.stringify(userData));
+      console.error('No email in Zoho id_token');
       return Response.redirect(`${APP_URL}?auth_error=no_email`, 302);
     }
 
