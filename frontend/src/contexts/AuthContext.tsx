@@ -28,7 +28,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [repName, setRepName] = useState<string | null>(null);
 
     const loadPermissions = async () => {
-        const { data } = await supabase.rpc('get_my_permissions');
+        // Race the RPC against a 4-second timeout so a slow/hanging call
+        // never blocks the app from rendering.
+        const rpc = supabase.rpc('get_my_permissions');
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
+
+        const result = await Promise.race([rpc, timeout]);
+        const data = result && 'data' in result ? result.data : null;
+
         if (data) {
             setIsAdmin(data.role === 'admin');
             setCanAccessFactures(data.role === 'admin' || data.can_access_factures === true);
@@ -37,23 +44,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
-        supabase.auth.getSession().then(async ({ data: { session } }) => {
-            setUser(session?.user ?? null);
-            if (session?.user) await loadPermissions();
-            setLoading(false);
-        });
+        let mounted = true;
+
+        const initialize = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!mounted) return;
+                setUser(session?.user ?? null);
+                if (session?.user) await loadPermissions();
+            } catch (e) {
+                console.error('[auth] init error:', e);
+            } finally {
+                if (mounted) setLoading(false);
+            }
+        };
+
+        initialize();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (!mounted) return;
             setUser(session?.user ?? null);
-            if (session?.user) await loadPermissions();
-            else {
+            if (session?.user) {
+                await loadPermissions();
+            } else {
                 setIsAdmin(false);
                 setCanAccessFactures(false);
                 setRepName(null);
             }
         });
 
-        return () => subscription.unsubscribe();
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const signOut = async () => { await supabase.auth.signOut(); };
