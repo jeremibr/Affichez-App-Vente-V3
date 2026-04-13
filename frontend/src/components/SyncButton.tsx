@@ -1,15 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-
-// Module-level flag: survives React navigation, resets on full browser refresh
-let autoSyncDone = false;
 import { Loader2, RefreshCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+// Per-function flag: survives React navigation, resets on full browser refresh
+const autoSyncDone = new Set<string>();
+
 interface SyncButtonProps {
+    functionName?: string;
+    logPattern?: string;
     onSyncComplete?: () => void;
 }
 
-export function SyncButton({ onSyncComplete }: SyncButtonProps) {
+export function SyncButton({
+    functionName = 'zoho-sync',
+    logPattern = 'sync%',
+    onSyncComplete,
+}: SyncButtonProps) {
     const [syncing, setSyncing] = useState(false);
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
     const [badge, setBadge] = useState<{ upserted: number; deleted: number } | null>(null);
@@ -18,19 +24,19 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
         const { data } = await supabase
             .from('webhook_log')
             .select('received_at')
-            .like('action', 'sync%')
+            .like('action', logPattern)
             .order('received_at', { ascending: false })
             .limit(1)
             .single();
         setLastSyncTime(data?.received_at ?? null);
-    }, []);
+    }, [logPattern]);
 
     const handleSync = useCallback(async () => {
         setSyncing(true);
         setBadge(null);
         try {
             const res = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-sync`,
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`,
                 {
                     method: 'POST',
                     headers: {
@@ -47,15 +53,15 @@ export function SyncButton({ onSyncComplete }: SyncButtonProps) {
             }
         } catch { /* details available in Paramètres → Synchronisation */ }
         setSyncing(false);
-    }, [fetchLastSync, onSyncComplete]);
+    }, [functionName, fetchLastSync, onSyncComplete]);
 
-    // Auto-sync once on full page load only — nothing happens on tab/page navigation
+    // Auto-sync once per function on full page load — resets on browser refresh
     useEffect(() => {
-        if (!autoSyncDone) {
-            autoSyncDone = true;
+        if (!autoSyncDone.has(functionName)) {
+            autoSyncDone.add(functionName);
             handleSync();
         }
-    }, [handleSync]);
+    }, [functionName, handleSync]);
 
     const formatRelative = (iso: string) => {
         const diffMs = Date.now() - new Date(iso).getTime();

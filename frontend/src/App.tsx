@@ -7,9 +7,12 @@ import WeeklyDetail from './pages/WeeklyDetail';
 import QuarterlyAverages from './pages/QuarterlyAverages';
 import SettingsPage from './pages/Settings';
 import Login from './pages/Login';
+import FDashboard from './pages/FDashboard';
+import FWeeklyDetail from './pages/FWeeklyDetail';
+import FQuarterlyAverages from './pages/FQuarterlyAverages';
 
 function AppRoutes() {
-    const { user, loading } = useAuth();
+    const { user, loading, canAccessFactures } = useAuth();
 
     if (loading) {
         return (
@@ -26,10 +29,20 @@ function AppRoutes() {
     return (
         <Routes>
             <Route path="/" element={<Layout />}>
+                {/* ─── Devis module ─── */}
                 <Route index element={<Dashboard />} />
                 <Route path="weekly" element={<WeeklyDetail />} />
                 <Route path="quarterly" element={<QuarterlyAverages />} />
                 <Route path="settings" element={<SettingsPage />} />
+
+                {/* ─── Factures module (requires canAccessFactures) ─── */}
+                {canAccessFactures && (
+                    <>
+                        <Route path="factures" element={<FDashboard />} />
+                        <Route path="factures/weekly" element={<FWeeklyDetail />} />
+                        <Route path="factures/quarterly" element={<FQuarterlyAverages />} />
+                    </>
+                )}
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

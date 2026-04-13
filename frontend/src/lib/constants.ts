@@ -30,3 +30,10 @@ export const SALE_STATUSES = [
     { value: 'accepted', label: 'Accepté' },
     { value: 'invoiced', label: 'Facturé' }
 ] as const;
+
+export const INVOICE_STATUSES = [
+    { value: 'paid',     label: 'Payé' },
+    { value: 'partial',  label: 'Partiel' },
+    { value: 'sent',     label: 'Envoyé' },
+    { value: 'overdue',  label: 'En retard' },
+] as const;

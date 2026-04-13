@@ -1,22 +1,26 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, LineChart, Settings, Menu, LogOut } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, LineChart, Settings, Menu, LogOut, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
-const navigation = [
+const devisNav = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Détail Hebdomadaire', href: '/weekly', icon: CalendarDays },
     { name: 'Moyennes Trimestrielles', href: '/quarterly', icon: LineChart },
-    { name: 'Paramètres', href: '/settings', icon: Settings },
+];
+
+const facturesNav = [
+    { name: 'Dashboard', href: '/factures', icon: LayoutDashboard },
+    { name: 'Détail Hebdomadaire', href: '/factures/weekly', icon: CalendarDays },
+    { name: 'Moyennes Trimestrielles', href: '/factures/quarterly', icon: LineChart },
 ];
 
 export default function Layout() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
-    const { user, signOut } = useAuth();
+    const { user, signOut, isAdmin, canAccessFactures } = useAuth();
 
-    // Derive display name from email: "jeremi@affichez.ca" → "Jérémi"
     const displayName = user?.email
         ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1)
         : '';
@@ -35,31 +39,78 @@ export default function Layout() {
             )}>
                 {/* Logo */}
                 <div className="h-16 px-6 flex items-center shrink-0 border-b border-slate-100">
-                    <img
-                        src="/logo-long.png"
-                        alt="Affichez"
-                        className="h-7 w-auto object-contain"
-                    />
+                    <img src="/logo-long.png" alt="Affichez" className="h-7 w-auto object-contain" />
                 </div>
 
                 {/* Nav */}
-                <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-                    {navigation.map((item) => (
-                        <NavLink
-                            key={item.href}
-                            to={item.href}
-                            end={item.href === '/'}
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                                isActive
-                                    ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
-                                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-4">
+
+                    {/* ─── Devis section ─── */}
+                    <div>
+                        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                            Devis
+                        </p>
+                        <div className="space-y-0.5">
+                            {devisNav.map((item) => (
+                                <NavLink
+                                    key={item.href}
+                                    to={item.href}
+                                    end={item.href === '/'}
+                                    className={({ isActive }) => cn(
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                                        isActive
+                                            ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
+                                            : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                    )}
+                                >
+                                    <item.icon className="w-4 h-4 shrink-0" />
+                                    {item.name}
+                                </NavLink>
+                            ))}
+                            {isAdmin && (
+                                <NavLink
+                                    to="/settings"
+                                    className={({ isActive }) => cn(
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                                        isActive
+                                            ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
+                                            : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                    )}
+                                >
+                                    <Settings className="w-4 h-4 shrink-0" />
+                                    Paramètres
+                                </NavLink>
                             )}
-                        >
-                            <item.icon className="w-4 h-4 shrink-0" />
-                            {item.name}
-                        </NavLink>
-                    ))}
+                        </div>
+                    </div>
+
+                    {/* ─── Factures section (conditional) ─── */}
+                    {canAccessFactures && (
+                        <div>
+                            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+                                <FileText className="w-3 h-3" />
+                                Factures
+                            </p>
+                            <div className="space-y-0.5">
+                                {facturesNav.map((item) => (
+                                    <NavLink
+                                        key={item.href}
+                                        to={item.href}
+                                        end={item.href === '/factures'}
+                                        className={({ isActive }) => cn(
+                                            "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                                            isActive
+                                                ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
+                                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                        )}
+                                    >
+                                        <item.icon className="w-4 h-4 shrink-0" />
+                                        {item.name}
+                                    </NavLink>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </nav>
 
                 {/* Footer */}
@@ -93,8 +144,6 @@ export default function Layout() {
 
             {/* ─── Main ─── */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-                {/* Mobile topbar */}
                 <header className="md:hidden h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 sticky top-0 z-30">
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
@@ -105,7 +154,6 @@ export default function Layout() {
                     <img src="/logo-long.png" alt="Affichez" className="h-6 w-auto object-contain" />
                     <div className="w-9" />
                 </header>
-
                 <main className="flex-1 overflow-auto">
                     <Outlet />
                 </main>

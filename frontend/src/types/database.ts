@@ -53,3 +53,17 @@ export type YoYRow = {
     resultat: number;
     deal_count: number;
 };
+
+export type InvDetailRow = {
+    invoice_date: string;
+    client_name: string;
+    amount: number;
+    invoice_number: string;
+    rep_name: string;
+    department: string;
+    zoho_department_label: string;
+    office: 'QC' | 'MTL';
+    status: 'sent' | 'viewed' | 'paid' | 'partial' | 'overdue' | 'void' | 'avoir';
+    is_avoir: boolean;
+    zoho_id: string;
+};

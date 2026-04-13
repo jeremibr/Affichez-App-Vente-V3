@@ -1,17 +1,32 @@
 import { ExternalLink } from 'lucide-react';
 import { formatCurrencyCAD, formatShortDate, cn } from '../../lib/utils';
-import type { ZoneB_DetailRow } from '../../types/database';
+import type { ZoneB_DetailRow, InvDetailRow } from '../../types/database';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
 
-export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
-    const { sortedData, sortConfig, handleSort } = useSort(lineItems, 'sale_date', 'desc');
+type AnyDetailRow = ZoneB_DetailRow | InvDetailRow;
+
+interface ZoneBTableProps {
+    lineItems: AnyDetailRow[];
+    module?: 'devis' | 'factures';
+}
+
+export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
+    const dateKey = (module === 'factures' ? 'invoice_date' : 'sale_date') as keyof AnyDetailRow;
+    const { sortedData, sortConfig, handleSort } = useSort(lineItems as AnyDetailRow[], dateKey, 'desc');
     const totalAmount = lineItems.reduce((sum, item) => sum + Number(item.amount), 0);
 
-    const getZohoUrl = (item: ZoneB_DetailRow) => {
+    const getZohoUrl = (item: AnyDetailRow) => {
         const orgId = item.office === 'MTL' ? '815683274' : '48244978';
-        return `https://books.zoho.com/app/${orgId}#/quotes/${item.zoho_id}`;
+        const path = module === 'factures' ? 'invoices' : 'quotes';
+        return `https://books.zoho.com/app/${orgId}#/${path}/${item.zoho_id}`;
     };
+
+    const getDate = (item: AnyDetailRow) =>
+        module === 'factures' ? (item as InvDetailRow).invoice_date : (item as ZoneB_DetailRow).sale_date;
+
+    const getNumber = (item: AnyDetailRow) =>
+        module === 'factures' ? (item as InvDetailRow).invoice_number : (item as ZoneB_DetailRow).quote_number;
 
     const DEPT_COLORS: Record<string, string> = {
         'MULTI-ANNONCEURS':       'bg-blue-50 text-blue-700 border-blue-100',
@@ -25,7 +40,9 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
     return (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Liste détaillée des devis</h2>
+                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+                    {module === 'factures' ? 'Liste détaillée des factures' : 'Liste détaillée des devis'}
+                </h2>
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">
                     {lineItems.length} transactions
                 </span>
@@ -36,10 +53,10 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                         <tr className="border-b border-slate-100 bg-slate-50/50">
                             <th
                                 className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
-                                onClick={() => handleSort('sale_date')}
+                                onClick={() => handleSort(dateKey)}
                             >
                                 <div className="flex items-center gap-2">
-                                    Date <SortIcon order={sortConfig.key === 'sale_date' ? sortConfig.order : null} />
+                                    Date <SortIcon order={sortConfig.key === dateKey ? sortConfig.order : null} />
                                 </div>
                             </th>
                             <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
@@ -57,7 +74,7 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                                 </div>
                             </th>
                             <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-                                # Devis
+                                {module === 'factures' ? '# Facture' : '# Devis'}
                             </th>
                             <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
                                 Représentant
@@ -79,26 +96,32 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                                 </td>
                             </tr>
                         ) : (
-                            sortedData.map((item, idx) => (
-                                <tr key={`${item.quote_number}-${idx}`} className="hover:bg-slate-50/60 transition-colors group">
-                                    <td className="px-5 py-3.5 text-slate-400 whitespace-nowrap text-[11px] font-medium">{formatShortDate(item.sale_date)}</td>
+                            sortedData.map((item, idx) => {
+                                const isAvoir = module === 'factures' && (item as InvDetailRow).is_avoir;
+                                return (
+                                <tr key={`${getNumber(item)}-${idx}`} className={cn("hover:bg-slate-50/60 transition-colors group", isAvoir && "bg-rose-50/30")}>
+                                    <td className="px-5 py-3.5 text-slate-400 whitespace-nowrap text-[11px] font-medium">{formatShortDate(getDate(item))}</td>
                                     <td className="px-5 py-3.5">
+                                        {module === 'factures' ? (
+                                            <InvStatusBadge status={(item as InvDetailRow).status} isAvoir={isAvoir} />
+                                        ) : (
                                         <span className={cn(
                                             "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter",
-                                            item.status === 'invoiced'
+                                            (item as ZoneB_DetailRow).status === 'invoiced'
                                                 ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
                                                 : "bg-amber-50 text-amber-600 border border-amber-100"
                                         )}>
-                                            {item.status === 'invoiced' ? 'Facturé' : 'Accepté'}
+                                            {(item as ZoneB_DetailRow).status === 'invoiced' ? 'Facturé' : 'Accepté'}
                                         </span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3.5 font-bold text-slate-800 max-w-[200px] truncate" title={item.client_name}>
                                         {item.client_name}
                                     </td>
-                                    <td className="px-5 py-3.5 text-right font-black text-slate-900 tabular-nums whitespace-nowrap group-hover:text-brand-main transition-colors">
+                                    <td className={cn("px-5 py-3.5 text-right font-black tabular-nums whitespace-nowrap transition-colors", isAvoir ? "text-rose-600" : "text-slate-900 group-hover:text-brand-main")}>
                                         {formatCurrencyCAD(item.amount)}
                                     </td>
-                                    <td className="px-5 py-3.5 font-mono text-[10px] text-slate-400 whitespace-nowrap">{item.quote_number}</td>
+                                    <td className="px-5 py-3.5 font-mono text-[10px] text-slate-400 whitespace-nowrap">{getNumber(item)}</td>
                                     <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap font-medium">{item.rep_name}</td>
                                     <td className="px-5 py-3.5">
                                         <span className={cn(
@@ -120,7 +143,8 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                                         </a>
                                     </td>
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                     {sortedData.length > 0 && (
@@ -137,5 +161,30 @@ export function ZoneBTable({ lineItems }: { lineItems: ZoneB_DetailRow[] }) {
                 </table>
             </div>
         </div>
+    );
+}
+
+const INV_STATUS_STYLES: Record<string, string> = {
+    paid:    'bg-emerald-50 text-emerald-600 border-emerald-100',
+    partial: 'bg-blue-50 text-blue-600 border-blue-100',
+    sent:    'bg-amber-50 text-amber-600 border-amber-100',
+    viewed:  'bg-amber-50 text-amber-600 border-amber-100',
+    overdue: 'bg-rose-50 text-rose-600 border-rose-100',
+    avoir:   'bg-rose-100 text-rose-700 border-rose-200',
+};
+const INV_STATUS_LABELS: Record<string, string> = {
+    paid: 'Payé', partial: 'Partiel', sent: 'Envoyé',
+    viewed: 'Envoyé', overdue: 'En retard', avoir: 'Avoir',
+};
+
+function InvStatusBadge({ status, isAvoir }: { status: string; isAvoir: boolean }) {
+    const key = isAvoir ? 'avoir' : status;
+    return (
+        <span className={cn(
+            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter border",
+            INV_STATUS_STYLES[key] ?? 'bg-slate-100 text-slate-500 border-slate-200'
+        )}>
+            {INV_STATUS_LABELS[key] ?? key}
+        </span>
     );
 }

@@ -134,7 +134,10 @@ Deno.serve(async (req: Request) => {
 
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';
-  const action = isManual ? 'sync_manual' : 'sync_auto';
+  const isFullSync = req.headers.get('x-full-sync') === 'true';
+  const action = isManual
+    ? (isFullSync ? 'sync_manual_full' : 'sync_manual')
+    : 'sync_auto';
 
   let totalUpserted = 0;
   let totalDeleted = 0;
@@ -144,7 +147,6 @@ Deno.serve(async (req: Request) => {
     const accessToken = await getAccessToken();
 
     // Full sync mode: no date filter, fetches all historical estimates
-    const isFullSync = req.headers.get('x-full-sync') === 'true';
     const dateStart = isFullSync
       ? null
       : new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);

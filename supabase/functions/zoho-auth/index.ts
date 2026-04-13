@@ -10,6 +10,23 @@ const SERVICE_ROLE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const APP_URL            = Deno.env.get('APP_URL') ?? 'http://localhost:5173';
 const REDIRECT_URI       = `${SUPABASE_URL}/functions/v1/zoho-auth`;
 
+// Allowed redirect origins — includes localhost so local dev works without any config change
+const ALLOWED_ORIGINS = new Set([
+  APP_URL,
+  'http://localhost:5173',
+  'http://localhost:4173', // vite preview
+]);
+
+function resolveRedirectBase(state: string | null): string {
+  if (!state) return APP_URL;
+  try {
+    const origin = new URL(state).origin;
+    return ALLOWED_ORIGINS.has(origin) ? origin : APP_URL;
+  } catch {
+    return APP_URL;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -21,15 +38,16 @@ Deno.serve(async (req: Request) => {
   }
 
   const url = new URL(req.url);
+  const redirectBase = resolveRedirectBase(url.searchParams.get('state'));
 
   // ─── Error from Zoho (user denied) ───────────────────────────────────────────
   if (url.searchParams.get('error')) {
-    return Response.redirect(`${APP_URL}?auth_error=denied`, 302);
+    return Response.redirect(`${redirectBase}?auth_error=denied`, 302);
   }
 
   const code = url.searchParams.get('code');
   if (!code) {
-    return Response.redirect(`${APP_URL}?auth_error=no_code`, 302);
+    return Response.redirect(`${redirectBase}?auth_error=no_code`, 302);
   }
 
   try {
@@ -48,7 +66,7 @@ Deno.serve(async (req: Request) => {
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) {
       console.error('Token exchange failed:', JSON.stringify(tokenData));
-      return Response.redirect(`${APP_URL}?auth_error=token_failed`, 302);
+      return Response.redirect(`${redirectBase}?auth_error=token_failed`, 302);
     }
 
     // ─── 2. Extract email from OIDC id_token (JWT) ───────────────────────────
@@ -66,7 +84,7 @@ Deno.serve(async (req: Request) => {
 
     if (!email) {
       console.error('No email in Zoho id_token');
-      return Response.redirect(`${APP_URL}?auth_error=no_email`, 302);
+      return Response.redirect(`${redirectBase}?auth_error=no_email`, 302);
     }
 
     // ─── 3. Access control ───────────────────────────────────────────────────
@@ -78,41 +96,57 @@ Deno.serve(async (req: Request) => {
       .from('allowed_users')
       .select('*', { count: 'exact', head: true });
 
+    let userRow: { role: string; can_access_factures: boolean; rep_name: string | null } | null = null;
+
     if (count && count > 0) {
       const { data: allowed } = await admin
         .from('allowed_users')
-        .select('email')
+        .select('email, role, can_access_factures, rep_name')
         .eq('email', email)
         .maybeSingle();
 
       if (!allowed) {
-        return Response.redirect(`${APP_URL}?auth_error=not_authorized`, 302);
+        return Response.redirect(`${redirectBase}?auth_error=not_authorized`, 302);
       }
+      userRow = allowed as typeof userRow;
     } else {
       // Domain fallback
       const domain = email.split('@')[1] ?? '';
       if (domain !== 'affichez.ca') {
-        return Response.redirect(`${APP_URL}?auth_error=not_authorized`, 302);
+        return Response.redirect(`${redirectBase}?auth_error=not_authorized`, 302);
       }
     }
 
     // ─── 4. Generate Supabase magic link (creates user account if needed) ────
+    const userMeta = {
+      role:                userRow?.role ?? 'member',
+      can_access_factures: userRow?.can_access_factures ?? false,
+      rep_name:            userRow?.rep_name ?? null,
+    };
+
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email,
-      options: { redirectTo: APP_URL },
+      options: { redirectTo: redirectBase, data: userMeta },
     });
 
     if (linkError || !linkData?.properties?.action_link) {
       console.error('generateLink failed:', linkError?.message);
-      return Response.redirect(`${APP_URL}?auth_error=session_failed`, 302);
+      return Response.redirect(`${redirectBase}?auth_error=session_failed`, 302);
     }
 
-    // ─── 5. Redirect user → Supabase verifies token → redirects to APP_URL ──
+    // ─── 4b. Also update metadata for existing users ──────────────────────────
+    // generateLink `data` only sets metadata for new users — patch existing ones too.
+    const userId = linkData.user?.id;
+    if (userId) {
+      await admin.auth.admin.updateUserById(userId, { user_metadata: userMeta });
+    }
+
+    // ─── 5. Redirect user → Supabase verifies token → redirects to redirectBase ──
     return Response.redirect(linkData.properties.action_link, 302);
 
   } catch (err) {
     console.error('zoho-auth error:', err);
-    return Response.redirect(`${APP_URL}?auth_error=server_error`, 302);
+    return Response.redirect(`${redirectBase}?auth_error=server_error`, 302);
   }
 });

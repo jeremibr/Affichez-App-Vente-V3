@@ -33,6 +33,7 @@ export default function Login() {
             redirect_uri:  REDIRECT_URI,
             access_type:   'online',
             prompt:        'consent',
+            state:         window.location.origin,
         });
         window.location.href = `https://accounts.zoho.com/oauth/v2/auth?${params}`;
     };

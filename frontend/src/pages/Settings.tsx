@@ -3,121 +3,88 @@ import { supabase } from '../lib/supabase';
 import {
     Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
-    Zap, Loader2
+    Zap, Loader2, Users, Trash2, Plus, FileText
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
+import { useAuth } from '../contexts/AuthContext';
 
-type Tab = 'objectives' | 'quarters' | 'logs' | 'sync';
+type Tab = 'objectives' | 'quarters' | 'sync' | 'logs' | 'users';
 
-interface Objective {
-    id: string;
-    year: number;
-    month: number;
-    department: string;
-    target_amount: number;
-}
-
-interface Quarter {
-    id: string;
-    year: number;
-    quarter: number;
-    start_date: string;
-    end_date: string;
-    num_weeks: number;
-}
-
-interface WebhookLog {
-    id: string;
-    received_at: string;
-    action: string;
-    status_code: number;
-    zoho_id: string | null;
-    error_message: string | null;
-}
-
-const tabItems: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: 'objectives', label: 'Objectifs', icon: Target },
-    { id: 'quarters', label: 'Trimestres', icon: Calendar },
-    { id: 'sync', label: 'Synchronisation', icon: Zap },
-    { id: 'logs', label: 'Historique', icon: History },
-];
+interface Objective { id: string; year: number; month: number; department: string; target_amount: number; }
+interface Quarter { id: string; year: number; quarter: number; start_date: string; end_date: string; num_weeks: number; }
+interface WebhookLog { id: string; received_at: string; action: string; status_code: number; zoho_id: string | null; error_message: string | null; }
+interface AllowedUser { email: string; name: string | null; role: string; can_access_factures: boolean; rep_name: string | null; }
 
 export default function Settings() {
+    const { isAdmin } = useAuth();
     const [activeTab, setActiveTab] = useState<Tab>('objectives');
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+    const tabItems: { id: Tab; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
+        { id: 'objectives', label: 'Objectifs', icon: Target },
+        { id: 'quarters', label: 'Trimestres', icon: Calendar },
+        { id: 'sync', label: 'Synchronisation', icon: Zap },
+        { id: 'logs', label: 'Historique', icon: History },
+        { id: 'users', label: 'Utilisateurs', icon: Users, adminOnly: true },
+    ];
+
     useEffect(() => {
-        if (message) {
-            const timer = setTimeout(() => setMessage(null), 4000);
-            return () => clearTimeout(timer);
-        }
+        if (message) { const t = setTimeout(() => setMessage(null), 4000); return () => clearTimeout(t); }
     }, [message]);
+
+    const visibleTabs = tabItems.filter(t => !t.adminOnly || isAdmin);
 
     return (
         <div className="p-6 md:p-8 max-w-screen-xl mx-auto">
-            {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Paramètres</h1>
-                <p className="text-sm text-slate-400 mt-0.5">Gérez les objectifs, les trimestres et la synchronisation.</p>
+                <p className="text-sm text-slate-400 mt-0.5">Gérez les objectifs, les trimestres, la synchronisation et les utilisateurs.</p>
             </div>
 
-            {/* Toast message */}
             {message && (
-                <div className={cn(
-                    "flex items-center gap-3 p-4 rounded-xl border mb-6 text-sm font-medium",
-                    message.type === 'success'
-                        ? "bg-emerald-50 border-emerald-100 text-emerald-800"
-                        : "bg-red-50 border-red-100 text-red-800"
-                )}>
-                    {message.type === 'success'
-                        ? <CheckCircle2 className="w-4 h-4 shrink-0" />
-                        : <AlertCircle className="w-4 h-4 shrink-0" />}
+                <div className={cn("flex items-center gap-3 p-4 rounded-xl border mb-6 text-sm font-medium",
+                    message.type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-800" : "bg-red-50 border-red-100 text-red-800")}>
+                    {message.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
                     {message.text}
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit">
-                {tabItems.map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={cn(
-                            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                            activeTab === tab.id
-                                ? "bg-white text-slate-900 shadow-card"
-                                : "text-slate-500 hover:text-slate-700"
-                        )}
-                    >
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit flex-wrap">
+                {visibleTabs.map(tab => (
+                    <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                            activeTab === tab.id ? "bg-white text-slate-900 shadow-card" : "text-slate-500 hover:text-slate-700")}>
                         <tab.icon className="w-4 h-4" />
                         {tab.label}
                     </button>
                 ))}
             </div>
 
-            {/* Content */}
             {activeTab === 'objectives' && <ObjectivesManager setMessage={setMessage} />}
             {activeTab === 'quarters' && <QuartersViewer />}
             {activeTab === 'sync' && <SyncManager />}
             {activeTab === 'logs' && <WebhookLogs />}
+            {activeTab === 'users' && isAdmin && <UsersManager setMessage={setMessage} />}
         </div>
     );
 }
 
-// ─── Objectives Manager ───────────────────────────────────────────────────────
+// ─── Objectives Manager (Devis + Factures) ────────────────────────────────────
 function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' | 'error', text: string }) => void }) {
+    const [module, setModule] = useState<'devis' | 'factures'>('devis');
     const [year, setYear] = useState(new Date().getFullYear());
     const [objectives, setObjectives] = useState<Objective[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const table = module === 'devis' ? 'objectives' : 'objectives_factures';
 
-    useEffect(() => { fetchObjectives(); }, [year]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { fetchObjectives(); }, [year, module]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchObjectives = async () => {
         setLoading(true);
-        const { data, error } = await supabase.from('objectives').select('*').eq('year', year);
+        const { data, error } = await supabase.from(table).select('*').eq('year', year);
         if (error) console.error(error);
         else setObjectives(data || []);
         setLoading(false);
@@ -136,9 +103,9 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
     const saveAll = async () => {
         setSaving(true);
         const toSave = objectives.map(o => ({ year, month: o.month, department: o.department, target_amount: o.target_amount }));
-        const { error: delError } = await supabase.from('objectives').delete().eq('year', year);
+        const { error: delError } = await supabase.from(table).delete().eq('year', year);
         if (delError) { setMessage({ type: 'error', text: 'Erreur lors du nettoyage.' }); setSaving(false); return; }
-        const { error: insError } = await supabase.from('objectives').insert(toSave);
+        const { error: insError } = await supabase.from(table).insert(toSave);
         if (insError) setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde.' });
         else { setMessage({ type: 'success', text: 'Objectifs sauvegardés.' }); fetchObjectives(); }
         setSaving(false);
@@ -149,21 +116,25 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
     return (
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-base font-semibold text-slate-800">Objectifs par département</h2>
-                    <Select
-                        value={String(year)}
-                        onChange={(val) => setYear(Number(val))}
-                        options={yearOptions}
-                        variant="accent"
-                        className="w-24"
-                    />
+                    {/* Module toggle */}
+                    <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
+                        <button onClick={() => setModule('devis')}
+                            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
+                                module === 'devis' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700")}>
+                            Devis
+                        </button>
+                        <button onClick={() => setModule('factures')}
+                            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
+                                module === 'factures' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700")}>
+                            <FileText className="w-3 h-3" /> Factures
+                        </button>
+                    </div>
+                    <Select value={String(year)} onChange={(val) => setYear(Number(val))} options={yearOptions} variant="accent" className="w-24" />
                 </div>
-                <button
-                    onClick={saveAll}
-                    disabled={saving}
-                    className="flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-50"
-                >
+                <button onClick={saveAll} disabled={saving}
+                    className="flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-50">
                     {saving ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Enregistrer
                 </button>
@@ -193,13 +164,11 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
                                         const obj = objectives.find(o => o.month === monthNum && o.department === dept);
                                         return (
                                             <td key={dept} className="px-3 py-2">
-                                                <input
-                                                    type="number"
+                                                <input type="number"
                                                     className="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:bg-white transition-all"
                                                     value={obj?.target_amount || ''}
                                                     placeholder="0"
-                                                    onChange={e => handleUpdate(monthNum, dept, e.target.value)}
-                                                />
+                                                    onChange={e => handleUpdate(monthNum, dept, e.target.value)} />
                                             </td>
                                         );
                                     })}
@@ -221,11 +190,7 @@ function QuartersViewer() {
 
     useEffect(() => {
         supabase.from('fiscal_quarters').select('*').order('year', { ascending: false }).order('quarter')
-            .then(({ data, error }) => {
-                if (error) console.error(error);
-                else setQuarters(data || []);
-                setLoading(false);
-            });
+            .then(({ data, error }) => { if (error) console.error(error); else setQuarters(data || []); setLoading(false); });
     }, []);
 
     return (
@@ -242,13 +207,9 @@ function QuartersViewer() {
                             <div className="text-xs text-slate-400 mt-0.5">{q.num_weeks} semaines</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-sm font-medium text-slate-700">
-                                {formatShortDate(q.start_date)}
-                            </div>
+                            <div className="text-sm font-medium text-slate-700">{formatShortDate(q.start_date)}</div>
                             <ChevronRight className="w-4 h-4 text-slate-300 mx-auto my-0.5" />
-                            <div className="text-sm font-medium text-slate-700">
-                                {formatShortDate(q.end_date)}
-                            </div>
+                            <div className="text-sm font-medium text-slate-700">{formatShortDate(q.end_date)}</div>
                         </div>
                     </div>
                 ))}
@@ -258,15 +219,36 @@ function QuartersViewer() {
 }
 
 // ─── Sync Manager ─────────────────────────────────────────────────────────────
-interface SyncResult {
-    upserted: number;
-    deleted: number;
-    errors: string[];
-    duration_ms: number;
-}
+interface SyncResult { upserted: number; deleted?: number; voided?: number; errors: string[]; duration_ms: number; }
 
 function SyncManager() {
+    return (
+        <div className="space-y-8 max-w-3xl">
+            <SyncCard
+                title="Synchronisation Devis (Zoho Books)"
+                description="Importe les devis Acceptés et Facturés depuis QC + MTL. Les devis refusés sont mis à jour automatiquement."
+                endpoint="zoho-sync"
+                actionLabel="sync_manual"
+            />
+            <SyncCard
+                title="Synchronisation Factures (Zoho Books)"
+                description="Importe les factures Payées, Partielles, Envoyées et En retard depuis QC + MTL. Inclut les factures d'avoir (crédits)."
+                endpoint="zoho-invoice-sync"
+                actionLabel="sync_invoices_manual"
+            />
+            <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                <span>
+                    Synchronisation automatique planifiée chaque jour à <strong className="text-slate-700">6h00</strong> (heure de Montréal) via pg_cron.
+                </span>
+            </div>
+        </div>
+    );
+}
+
+function SyncCard({ title, description, endpoint, actionLabel }: { title: string; description: string; endpoint: string; actionLabel: string }) {
     const [syncing, setSyncing] = useState(false);
+    const [fullSyncing, setFullSyncing] = useState(false);
     const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
     const [syncError, setSyncError] = useState<string | null>(null);
     const [lastSync, setLastSync] = useState<WebhookLog | null>(null);
@@ -275,51 +257,41 @@ function SyncManager() {
 
     const fetchSyncLogs = async () => {
         setLogsLoading(true);
-        const { data } = await supabase
-            .from('webhook_log')
-            .select('*')
-            .like('action', 'sync%')
-            .order('received_at', { ascending: false })
-            .limit(15);
+        const { data } = await supabase.from('webhook_log').select('*')
+            .like('action', actionLabel.replace('_manual', '%'))
+            .order('received_at', { ascending: false }).limit(8);
         const logs = data || [];
         setRecentLogs(logs);
         setLastSync(logs[0] ?? null);
         setLogsLoading(false);
     };
 
-    useEffect(() => { fetchSyncLogs(); }, []);
+    useEffect(() => { fetchSyncLogs(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleSync = async () => {
-        setSyncing(true);
-        setSyncResult(null);
-        setSyncError(null);
+    const runSync = async (fullSync: boolean) => {
+        if (fullSync) setFullSyncing(true); else setSyncing(true);
+        setSyncResult(null); setSyncError(null);
         try {
-            const res = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-sync`,
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                        'x-sync-source': 'manual',
-                    },
-                }
-            );
+            const headers: Record<string, string> = {
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'x-sync-source': 'manual',
+            };
+            if (fullSync) headers['x-full-sync'] = 'true';
+            const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
+                method: 'POST', headers,
+            });
             const data = await res.json();
-            if (!res.ok) {
-                setSyncError(data.error ?? 'Erreur inconnue');
-            } else {
-                setSyncResult(data as SyncResult);
-                fetchSyncLogs();
-            }
-        } catch (err) {
-            setSyncError(err instanceof Error ? err.message : 'Erreur réseau');
-        }
-        setSyncing(false);
+            if (!res.ok) setSyncError(data.error ?? 'Erreur inconnue');
+            else { setSyncResult(data as SyncResult); fetchSyncLogs(); }
+        } catch (err) { setSyncError(err instanceof Error ? err.message : 'Erreur réseau'); }
+        if (fullSync) setFullSyncing(false); else setSyncing(false);
     };
 
+    const handleSync = () => runSync(false);
+    const handleFullSync = () => runSync(true);
+
     const formatRelative = (iso: string) => {
-        const diffMs = Date.now() - new Date(iso).getTime();
-        const diffMin = Math.floor(diffMs / 60000);
+        const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
         if (diffMin < 1) return 'il y a quelques secondes';
         if (diffMin < 60) return `il y a ${diffMin} min`;
         const diffH = Math.floor(diffMin / 60);
@@ -328,126 +300,83 @@ function SyncManager() {
     };
 
     return (
-        <div className="space-y-6 max-w-3xl">
-            {/* Sync card */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-brand-main" />
-                            Synchronisation Zoho Books
-                        </h2>
-                        <p className="text-xs text-slate-400 mt-1">
-                            Importe les devis Acceptés et Facturés depuis les deux organisations (QC + MTL).
-                            Les devis refusés sont supprimés automatiquement.
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-brand-main" />{title}
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">{description}</p>
+                    {lastSync && (
+                        <p className="text-xs text-slate-500 mt-2 font-medium">
+                            Dernière sync : <span className="text-slate-700">{formatRelative(lastSync.received_at)}</span>
+                            {' '}— <span className="font-mono text-[11px] text-slate-400">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
                         </p>
-                        {lastSync && (
-                            <p className="text-xs text-slate-500 mt-2 font-medium">
-                                Dernière sync :{' '}
-                                <span className="text-slate-700">{formatRelative(lastSync.received_at)}</span>
-                                {' '}—{' '}
-                                <span className="font-mono text-[11px] text-slate-400">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
-                            </p>
-                        )}
-                    </div>
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="shrink-0 flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60"
-                    >
-                        {syncing
-                            ? <><Loader2 className="w-4 h-4 animate-spin" /> Synchronisation...</>
-                            : <><RefreshCcw className="w-4 h-4" /> Synchroniser</>
-                        }
+                    )}
+                </div>
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                    <button onClick={handleSync} disabled={syncing || fullSyncing}
+                        className="flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60">
+                        {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> Sync...</> : <><RefreshCcw className="w-4 h-4" /> Synchroniser</>}
+                    </button>
+                    <button onClick={handleFullSync} disabled={syncing || fullSyncing}
+                        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-main transition-colors disabled:opacity-50"
+                        title="Importe tout l'historique sans filtre de date (plus lent)">
+                        {fullSyncing ? <><Loader2 className="w-3 h-3 animate-spin" /> Sync complète...</> : <><RefreshCcw className="w-3 h-3" /> Sync complète (historique)</>}
                     </button>
                 </div>
-
-                {/* Result */}
-                {syncResult && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap">
-                        <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
-                            <CheckCircle2 className="w-4 h-4" />
-                            {syncResult.upserted} upsertés
-                        </div>
-                        <div className="text-slate-300">|</div>
-                        <div className="text-sm font-semibold text-slate-500">
-                            {syncResult.deleted} supprimés
-                        </div>
-                        <div className="text-slate-300">|</div>
-                        <div className="text-xs text-slate-400 font-mono">
-                            {(syncResult.duration_ms / 1000).toFixed(1)}s
-                        </div>
-                        {syncResult.errors.length > 0 && (
-                            <div className="w-full mt-2 text-xs text-red-600 bg-red-50 rounded-lg p-2">
-                                {syncResult.errors.join(' · ')}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {syncError && (
-                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-red-600">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        {syncError}
-                    </div>
-                )}
             </div>
 
-            {/* Auto-sync info */}
-            <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
-                <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <span>
-                    Synchronisation automatique planifiée chaque jour à <strong className="text-slate-700">6h00</strong> (heure de Montréal) via pg_cron.
-                    Les données sont au maximum décalées de <strong className="text-slate-700">24 heures</strong>.
-                </span>
-            </div>
-
-            {/* Recent sync history */}
-            <div>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-slate-700">Historique des synchronisations</h3>
-                    <button onClick={fetchSyncLogs} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Actualiser">
-                        <RefreshCcw className="w-3.5 h-3.5" />
-                    </button>
+            {syncResult && (
+                <div className="pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
+                        <CheckCircle2 className="w-4 h-4" />{syncResult.upserted} upsertés
+                    </div>
+                    {syncResult.deleted !== undefined && <><div className="text-slate-300">|</div><div className="text-sm font-semibold text-slate-500">{syncResult.deleted} supprimés</div></>}
+                    {syncResult.voided !== undefined && <><div className="text-slate-300">|</div><div className="text-sm font-semibold text-slate-500">{syncResult.voided} annulés</div></>}
+                    <div className="text-slate-300">|</div>
+                    <div className="text-xs text-slate-400 font-mono">{(syncResult.duration_ms / 1000).toFixed(1)}s</div>
+                    {syncResult.errors.length > 0 && (
+                        <div className="w-full text-xs text-red-600 bg-red-50 rounded-lg p-2">{syncResult.errors.join(' · ')}</div>
+                    )}
                 </div>
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="border-b border-slate-100">
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Date</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Type</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Statut</th>
-                                <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Détails</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50">
+            )}
+            {syncError && (
+                <div className="pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-red-600">
+                    <AlertCircle className="w-4 h-4 shrink-0" />{syncError}
+                </div>
+            )}
+
+            {/* Recent history */}
+            <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historique récent</h3>
+                    <button onClick={fetchSyncLogs} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><RefreshCcw className="w-3 h-3" /></button>
+                </div>
+                <div className="bg-slate-50 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                        <tbody className="divide-y divide-slate-100">
                             {logsLoading ? (
-                                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic text-sm">Chargement...</td></tr>
+                                <tr><td className="px-4 py-3 text-center text-slate-400 italic">Chargement...</td></tr>
                             ) : recentLogs.length === 0 ? (
-                                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400 italic text-sm">Aucune synchronisation effectuée.</td></tr>
+                                <tr><td className="px-4 py-3 text-center text-slate-400 italic">Aucune synchronisation.</td></tr>
                             ) : recentLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-5 py-3 text-xs text-slate-400">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
-                                    <td className="px-5 py-3">
-                                        <span className={cn(
-                                            "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
-                                            log.action === 'sync_manual' ? "bg-brand-main/10 text-brand-main" : "bg-slate-100 text-slate-500"
-                                        )}>
-                                            {log.action === 'sync_manual' ? 'Manuel' : 'Auto'}
+                                <tr key={log.id} className="hover:bg-slate-100/60">
+                                    <td className="px-4 py-2.5 text-slate-400">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
+                                    <td className="px-4 py-2.5">
+                                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
+                                            log.action.includes('full') ? "bg-purple-100 text-purple-600" :
+                                            log.action.includes('manual') ? "bg-brand-main/10 text-brand-main" :
+                                            "bg-slate-200 text-slate-500")}>
+                                            {log.action.includes('full') ? 'Complète' : log.action.includes('manual') ? 'Manuel' : 'Auto'}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-3">
-                                        <span className={cn(
-                                            "inline-flex items-center gap-1 text-xs font-semibold",
-                                            log.status_code === 200 ? "text-emerald-600" : "text-red-500"
-                                        )}>
-                                            {log.status_code === 200 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                                            {log.status_code}
+                                    <td className="px-4 py-2.5">
+                                        <span className={cn("flex items-center gap-1 font-semibold", log.status_code === 200 ? "text-emerald-600" : "text-red-500")}>
+                                            {log.status_code === 200 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}{log.status_code}
                                         </span>
                                     </td>
-                                    <td className="px-5 py-3 text-xs text-slate-400 max-w-xs truncate">
-                                        {log.error_message || '—'}
-                                    </td>
+                                    <td className="px-4 py-2.5 text-slate-400 max-w-[200px] truncate">{log.error_message || '—'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -465,8 +394,7 @@ function WebhookLogs() {
 
     const fetchLogs = async () => {
         const { data, error } = await supabase.from('webhook_log').select('*').order('received_at', { ascending: false }).limit(20);
-        if (error) console.error(error);
-        else setLogs(data || []);
+        if (error) console.error(error); else setLogs(data || []);
         setLoading(false);
     };
 
@@ -476,11 +404,8 @@ function WebhookLogs() {
         <div className="space-y-4 max-w-4xl">
             <div className="flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-800">Historique Webhook (20 derniers)</h2>
-                <button onClick={fetchLogs} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors" title="Actualiser">
-                    <RefreshCcw className="w-4 h-4" />
-                </button>
+                <button onClick={fetchLogs} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><RefreshCcw className="w-4 h-4" /></button>
             </div>
-
             <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                 <table className="w-full text-sm">
                     <thead>
@@ -488,7 +413,7 @@ function WebhookLogs() {
                             <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Date</th>
                             <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Événement</th>
                             <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Status</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Devis #</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Réf.</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -500,12 +425,8 @@ function WebhookLogs() {
                             <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
                                 <td className="px-5 py-3 text-slate-400 text-xs">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
                                 <td className="px-5 py-3">
-                                    <span className={cn(
-                                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold",
-                                        log.action === 'upserted' ? "bg-emerald-50 text-emerald-700"
-                                            : log.action === 'deleted' ? "bg-red-50 text-red-700"
-                                                : "bg-slate-100 text-slate-600"
-                                    )}>
+                                    <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold",
+                                        log.action === 'upserted' ? "bg-emerald-50 text-emerald-700" : log.action === 'deleted' ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600")}>
                                         {log.action}
                                     </span>
                                 </td>
@@ -516,19 +437,168 @@ function WebhookLogs() {
                     </tbody>
                 </table>
             </div>
+        </div>
+    );
+}
 
-            {logs.some(l => l.error_message) && (
-                <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
-                    <h3 className="text-sm font-semibold text-red-800 flex items-center gap-2 mb-2">
-                        <AlertCircle className="w-4 h-4" /> Erreurs récentes :
-                    </h3>
-                    <ul className="text-xs text-red-700 space-y-1 ml-6 list-disc">
-                        {logs.filter(l => l.error_message).map(l => (
-                            <li key={l.id}>{l.error_message} (ID: {l.zoho_id})</li>
-                        ))}
-                    </ul>
+// ─── Users Manager (admin only) ───────────────────────────────────────────────
+function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'error', text: string }) => void }) {
+    const [users, setUsers] = useState<AllowedUser[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState<AllowedUser>({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' });
+    const [saving, setSaving] = useState(false);
+
+    const fetchUsers = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('allowed_users').select('*').order('email');
+        if (error) console.error(error); else setUsers(data || []);
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchUsers(); }, []);
+
+    const handleSave = async () => {
+        if (!form.email.trim()) return;
+        setSaving(true);
+        const payload = {
+            email: form.email.trim().toLowerCase(),
+            name: form.name?.trim() || null,
+            role: form.role,
+            can_access_factures: form.can_access_factures,
+            rep_name: form.rep_name?.trim() || null,
+        };
+        const { error } = await supabase.from('allowed_users').upsert(payload, { onConflict: 'email' });
+        if (error) setMessage({ type: 'error', text: 'Erreur: ' + error.message });
+        else { setMessage({ type: 'success', text: 'Utilisateur sauvegardé.' }); setShowForm(false); setForm({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' }); fetchUsers(); }
+        setSaving(false);
+    };
+
+    const handleDelete = async (email: string) => {
+        if (!confirm(`Supprimer l'accès pour ${email} ?`)) return;
+        const { error } = await supabase.from('allowed_users').delete().eq('email', email);
+        if (error) setMessage({ type: 'error', text: 'Erreur: ' + error.message });
+        else { setMessage({ type: 'success', text: 'Utilisateur supprimé.' }); fetchUsers(); }
+    };
+
+    const handleEdit = (user: AllowedUser) => {
+        setForm({ ...user, name: user.name ?? '', rep_name: user.rep_name ?? '' });
+        setShowForm(true);
+    };
+
+    return (
+        <div className="space-y-6 max-w-4xl">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h2 className="text-base font-semibold text-slate-800">Gestion des utilisateurs</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">Contrôlez qui peut se connecter et accéder au module Factures.</p>
+                </div>
+                <button onClick={() => { setForm({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' }); setShowForm(true); }}
+                    className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all">
+                    <Plus className="w-4 h-4" /> Ajouter
+                </button>
+            </div>
+
+            {/* Add/Edit Form */}
+            {showForm && (
+                <div className="bg-white border border-brand-main/20 rounded-2xl p-5 shadow-card space-y-4">
+                    <h3 className="text-sm font-bold text-slate-800">{form.email && users.find(u => u.email === form.email) ? 'Modifier' : 'Nouvel'} utilisateur</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Courriel *</label>
+                            <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="jean@affichez.ca" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Nom</label>
+                            <input type="text" value={form.name ?? ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="Jean Dupont" />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Rôle</label>
+                            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30">
+                                <option value="member">Membre</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Nom Représentant (Zoho)</label>
+                            <input type="text" value={form.rep_name ?? ''} onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
+                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="Jean Dupont (exact, case-sensitive)" />
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input type="checkbox" id="factures-access" checked={form.can_access_factures}
+                            onChange={e => setForm(f => ({ ...f, can_access_factures: e.target.checked }))}
+                            className="w-4 h-4 accent-brand-main rounded" />
+                        <label htmlFor="factures-access" className="text-sm font-medium text-slate-700 cursor-pointer">Accès au module Factures</label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={handleSave} disabled={saving || !form.email.trim()}
+                            className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-main/90 transition-all disabled:opacity-50">
+                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer
+                        </button>
+                        <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all">Annuler</button>
+                    </div>
                 </div>
             )}
+
+            {/* Users Table */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                <table className="w-full text-sm">
+                    <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Courriel</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Nom</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Rôle</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest">Factures</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Rep Zoho</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {loading ? (
+                            <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400 italic">Chargement...</td></tr>
+                        ) : users.length === 0 ? (
+                            <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400 italic">Aucun utilisateur enregistré.</td></tr>
+                        ) : users.map(user => (
+                            <tr key={user.email} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="px-5 py-3 text-slate-700 font-medium">{user.email}</td>
+                                <td className="px-5 py-3 text-slate-500">{user.name || '—'}</td>
+                                <td className="px-5 py-3">
+                                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
+                                        user.role === 'admin' ? "bg-brand-main/10 text-brand-main" : "bg-slate-100 text-slate-500")}>
+                                        {user.role}
+                                    </span>
+                                </td>
+                                <td className="px-5 py-3 text-center">
+                                    {user.can_access_factures
+                                        ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
+                                        : <span className="text-slate-300 text-xs">—</span>}
+                                </td>
+                                <td className="px-5 py-3 text-slate-400 text-xs font-mono">{user.rep_name || '—'}</td>
+                                <td className="px-5 py-3 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                        <button onClick={() => handleEdit(user)}
+                                            className="p-1.5 text-slate-400 hover:text-brand-main hover:bg-amber-50 rounded-lg transition-all text-xs font-bold">
+                                            Éditer
+                                        </button>
+                                        <button onClick={() => handleDelete(user.email)}
+                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+            <p className="text-xs text-slate-400 px-1">
+                * Le nom Représentant doit correspondre exactement au champ <code className="font-mono">salesperson_name</code> dans Zoho Books (sensible à la casse).
+                Les membres avec Accès Factures ne voient que leurs propres données.
+            </p>
         </div>
     );
 }
