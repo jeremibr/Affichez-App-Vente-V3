@@ -20,66 +20,35 @@ const AuthContext = createContext<AuthContextType>({
     repName: null,
 });
 
+function permissionsFromUser(user: User | null) {
+    const meta = user?.user_metadata ?? {};
+    const isAdmin = meta.role === 'admin';
+    return {
+        isAdmin,
+        canAccessFactures: isAdmin || meta.can_access_factures === true,
+        repName: (meta.rep_name as string | null) ?? null,
+    };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [canAccessFactures, setCanAccessFactures] = useState(false);
-    const [repName, setRepName] = useState<string | null>(null);
-
-    const loadPermissions = async () => {
-        // Race the RPC against a 4-second timeout so a slow/hanging call
-        // never blocks the app from rendering.
-        const rpc = supabase.rpc('get_my_permissions');
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000));
-
-        const result = await Promise.race([rpc, timeout]);
-        const data = result && 'data' in result ? result.data : null;
-
-        if (data) {
-            setIsAdmin(data.role === 'admin');
-            setCanAccessFactures(data.role === 'admin' || data.can_access_factures === true);
-            setRepName(data.rep_name ?? null);
-        }
-    };
 
     useEffect(() => {
-        let mounted = true;
-
-        const initialize = async () => {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!mounted) return;
-                setUser(session?.user ?? null);
-                if (session?.user) await loadPermissions();
-            } catch (e) {
-                console.error('[auth] init error:', e);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-
-        initialize();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            if (!mounted) return;
+        supabase.auth.getSession().then(({ data: { session } }) => {
             setUser(session?.user ?? null);
-            if (session?.user) {
-                await loadPermissions();
-            } else {
-                setIsAdmin(false);
-                setCanAccessFactures(false);
-                setRepName(null);
-            }
+            setLoading(false);
         });
 
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
 
     const signOut = async () => { await supabase.auth.signOut(); };
+    const { isAdmin, canAccessFactures, repName } = permissionsFromUser(user);
 
     return (
         <AuthContext.Provider value={{ user, loading, signOut, isAdmin, canAccessFactures, repName }}>
