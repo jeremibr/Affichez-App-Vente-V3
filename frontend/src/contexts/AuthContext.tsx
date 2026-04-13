@@ -11,12 +11,6 @@ interface AuthContextType {
     repName: string | null;
 }
 
-interface UserPermissions {
-    isAdmin: boolean;
-    canAccessFactures: boolean;
-    repName: string | null;
-}
-
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
@@ -26,58 +20,46 @@ const AuthContext = createContext<AuthContextType>({
     repName: null,
 });
 
-async function fetchPermissions(email: string): Promise<UserPermissions> {
-    const { data } = await supabase
-        .from('allowed_users')
-        .select('role, can_access_factures, rep_name')
-        .eq('email', email.toLowerCase())
-        .maybeSingle();
-
-    if (!data) {
-        // Domain fallback: @affichez.ca gets basic member access
-        return { isAdmin: false, canAccessFactures: false, repName: null };
-    }
-    const isAdmin = data.role === 'admin';
-    return {
-        isAdmin,
-        canAccessFactures: isAdmin || data.can_access_factures === true,
-        repName: data.rep_name ?? null,
-    };
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [permissions, setPermissions] = useState<UserPermissions>({
-        isAdmin: false,
-        canAccessFactures: false,
-        repName: null,
-    });
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [canAccessFactures, setCanAccessFactures] = useState(false);
+    const [repName, setRepName] = useState<string | null>(null);
+
+    const loadPermissions = async () => {
+        const { data } = await supabase.rpc('get_my_permissions');
+        if (data) {
+            setIsAdmin(data.role === 'admin');
+            setCanAccessFactures(data.role === 'admin' || data.can_access_factures === true);
+            setRepName(data.rep_name ?? null);
+        }
+    };
 
     useEffect(() => {
         supabase.auth.getSession().then(async ({ data: { session } }) => {
-            const u = session?.user ?? null;
-            setUser(u);
-            if (u?.email) setPermissions(await fetchPermissions(u.email));
+            setUser(session?.user ?? null);
+            if (session?.user) await loadPermissions();
             setLoading(false);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            const u = session?.user ?? null;
-            setUser(u);
-            if (u?.email) setPermissions(await fetchPermissions(u.email));
-            else setPermissions({ isAdmin: false, canAccessFactures: false, repName: null });
+            setUser(session?.user ?? null);
+            if (session?.user) await loadPermissions();
+            else {
+                setIsAdmin(false);
+                setCanAccessFactures(false);
+                setRepName(null);
+            }
         });
 
         return () => subscription.unsubscribe();
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const signOut = async () => {
-        await supabase.auth.signOut();
-    };
+    const signOut = async () => { await supabase.auth.signOut(); };
 
     return (
-        <AuthContext.Provider value={{ user, loading, signOut, ...permissions }}>
+        <AuthContext.Provider value={{ user, loading, signOut, isAdmin, canAccessFactures, repName }}>
             {children}
         </AuthContext.Provider>
     );
