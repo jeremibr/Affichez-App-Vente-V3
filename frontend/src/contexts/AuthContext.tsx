@@ -28,7 +28,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [repName, setRepName] = useState<string | null>(null);
 
     const loadPermissions = async () => {
-        const { data } = await supabase.rpc('get_my_permissions');
+        const { data, error } = await supabase.rpc('get_my_permissions');
+        console.log('[auth] get_my_permissions =>', { data, error });
         if (data) {
             setIsAdmin(data.role === 'admin');
             setCanAccessFactures(data.role === 'admin' || data.can_access_factures === true);
@@ -38,12 +39,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         supabase.auth.getSession().then(async ({ data: { session } }) => {
+            console.log('[auth] getSession =>', session?.user?.email ?? 'no session');
             setUser(session?.user ?? null);
             if (session?.user) await loadPermissions();
             setLoading(false);
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            console.log('[auth] onAuthStateChange =>', _event, session?.user?.email ?? 'no user');
             setUser(session?.user ?? null);
             if (session?.user) await loadPermissions();
             else {
