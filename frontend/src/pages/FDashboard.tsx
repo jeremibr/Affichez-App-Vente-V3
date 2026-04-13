@@ -235,6 +235,7 @@ export default function FDashboard() {
                             prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
                             year={year}
                             selectedMonth={selectedMonth}
+                            dealLabel="factures"
                         />
                     </div>
                 </>

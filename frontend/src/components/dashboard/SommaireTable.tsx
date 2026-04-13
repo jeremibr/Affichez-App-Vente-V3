@@ -21,13 +21,15 @@ export function SommaireTable({
     data,
     prevYearData,
     year,
-    selectedMonth
+    selectedMonth,
+    dealLabel = 'devis',
 }: {
     title: string;
     data: SommaireRow[];
     prevYearData?: SommaireRow[];
     year: number;
     selectedMonth?: number | 'Toutes';
+    dealLabel?: string;
 }) {
     const displayMonths = useMemo(
         () => selectedMonth && selectedMonth !== 'Toutes'
@@ -109,7 +111,7 @@ export function SommaireTable({
                                 onClick={() => handleSort('deal_count')}
                             >
                                 <div className="flex items-center justify-end gap-2">
-                                    Devis <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
+                                    {dealLabel.charAt(0).toUpperCase() + dealLabel.slice(1)} <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
                                 </div>
                             </th>
                             <th className="px-5 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-widest w-1/4 select-none">
@@ -161,7 +163,7 @@ export function SommaireTable({
                                         {row.deal_count > 0 ? (
                                             <>
                                                 <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
-                                                <span className="text-[10px] text-slate-400 ml-1">devis</span>
+                                                <span className="text-[10px] text-slate-400 ml-1">{dealLabel}</span>
                                             </>
                                         ) : (
                                             <span className="text-slate-200 text-xs">—</span>
@@ -210,7 +212,7 @@ export function SommaireTable({
                             <td className="px-5 py-4 text-xs uppercase tracking-wider">Total</td>
                             <td className="px-5 py-4 text-right whitespace-nowrap">
                                 <span className="text-sm font-black tabular-nums">{totalDeals}</span>
-                                <span className="text-[10px] text-white/60 ml-1">devis</span>
+                                <span className="text-[10px] text-white/60 ml-1">{dealLabel}</span>
                             </td>
                             <td className="px-5 py-4 text-right text-white/50 tabular-nums text-sm">{formatCurrencyCAD(totalPrevYear)}</td>
                             <td className="px-5 py-4 text-right font-black tabular-nums">{formatCurrencyCAD(totalActual)}</td>

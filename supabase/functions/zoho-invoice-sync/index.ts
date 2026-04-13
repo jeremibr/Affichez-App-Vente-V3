@@ -20,14 +20,10 @@ const DEPT_MAP: Record<string, string> = {
   'SERVICES IA': 'SERVICES IA',
 };
 
-// Map Zoho invoice statuses → invoice_status_enum
-const STATUS_MAP: Record<string, string> = {
-  sent: 'sent',
-  viewed: 'sent',       // viewed ≈ sent (opened by client)
-  overdue: 'overdue',
-  paid: 'paid',
+// Only these statuses are revenue — everything else is excluded from the sync
+const REVENUE_STATUS_MAP: Record<string, string> = {
+  paid:          'paid',
   partiallypaid: 'partial',
-  void: 'void',
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -69,16 +65,6 @@ async function upsertBatch(batch: object[]): Promise<void> {
   if (!res.ok) throw new Error('Supabase upsert failed: ' + await res.text());
 }
 
-async function voidBatch(zohoIds: string[]): Promise<void> {
-  if (zohoIds.length === 0) return;
-  const param = zohoIds.join(',');
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/invoices?zoho_id=in.(${param})`, {
-    method: 'PATCH',
-    headers: SB_HEADERS,
-    body: JSON.stringify({ status: 'void' }),
-  });
-  if (!res.ok) throw new Error('Supabase void patch failed: ' + await res.text());
-}
 
 async function logSync(action: string, statusCode: number, message?: string): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/webhook_log`, {
@@ -104,11 +90,10 @@ async function syncInvoices(
   org: { id: string; office: string },
   accessToken: string,
   dateStart: string | null,
-  isFullSync: boolean,
-): Promise<{ upserted: number; voided: number; errors: string[] }> {
-  const statusFilters = isFullSync ? ['Sent', 'Overdue', 'Paid', 'PartiallyPaid'] : [null];
+): Promise<{ upserted: number; errors: string[] }> {
+  // Only ever sync Paid and PartiallyPaid — sent/overdue/void are not revenue
+  const statusFilters = ['Paid', 'PartiallyPaid'];
   let upserted = 0;
-  let voided = 0;
   const errors: string[] = [];
 
   for (const statusFilter of statusFilters) {
@@ -117,13 +102,12 @@ async function syncInvoices(
 
     while (hasMore) {
       const dateParam = dateStart ? `&date_start=${dateStart}` : '';
-      const statusParam = statusFilter ? `&filter_by=Status.${statusFilter}` : '';
       const url = `https://www.zohoapis.com/books/v3/invoices` +
-        `?organization_id=${org.id}&page=${page}&per_page=200${statusParam}${dateParam}`;
+        `?organization_id=${org.id}&page=${page}&per_page=200&filter_by=Status.${statusFilter}${dateParam}`;
 
       const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!response.ok) {
-        errors.push(`${org.office} invoices p.${page}: ${await response.text()}`);
+        errors.push(`${org.office} invoices(${statusFilter}) p.${page}: ${await response.text()}`);
         break;
       }
 
@@ -132,27 +116,19 @@ async function syncInvoices(
       if (invoices.length === 0) break;
 
       const toUpsert: object[] = [];
-      const toVoid: string[] = [];
 
       for (const inv of invoices) {
         const rawStatus = ((inv.status as string) ?? '').toLowerCase().replace(/_/g, '');
-        const zohoId = String(inv.invoice_id);
-
-        if (rawStatus === 'void') {
-          toVoid.push(zohoId);
-          continue;
-        }
-
-        const mappedStatus = STATUS_MAP[rawStatus];
-        if (!mappedStatus) continue; // skip draft or unknown
+        const mappedStatus = REVENUE_STATUS_MAP[rawStatus];
+        if (!mappedStatus) continue; // safety guard
 
         const dept = extractDept(inv);
-        if (!dept) continue; // skip if no recognisable department
+        if (!dept) continue;
 
         const amountHT = Math.round((Number(inv.total) / 1.14975) * 100) / 100;
 
         toUpsert.push({
-          zoho_id: zohoId,
+          zoho_id: String(inv.invoice_id),
           invoice_number: inv.invoice_number,
           client_name: inv.customer_name,
           amount: amountHT,
@@ -167,14 +143,13 @@ async function syncInvoices(
       }
 
       if (toUpsert.length > 0) { await upsertBatch(toUpsert); upserted += toUpsert.length; }
-      if (toVoid.length > 0) { await voidBatch(toVoid); voided += toVoid.length; }
 
       hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
       page++;
     }
   }
 
-  return { upserted, voided, errors };
+  return { upserted, errors };
 }
 
 // ─── Fetch Credit Notes (Factures d'avoir) ────────────────────────────────────
@@ -258,7 +233,6 @@ Deno.serve(async (req: Request) => {
     : 'sync_invoices_auto';
 
   let totalUpserted = 0;
-  let totalVoided = 0;
   const allErrors: string[] = [];
 
   try {
@@ -268,9 +242,8 @@ Deno.serve(async (req: Request) => {
       : new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     for (const org of ORGS) {
-      const invResult = await syncInvoices(org, accessToken, dateStart, isFullSync);
+      const invResult = await syncInvoices(org, accessToken, dateStart);
       totalUpserted += invResult.upserted;
-      totalVoided += invResult.voided;
       allErrors.push(...invResult.errors);
 
       const cnResult = await syncCreditNotes(org, accessToken, dateStart);
@@ -279,7 +252,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const durationMs = Date.now() - startTime;
-    const result = { upserted: totalUpserted, voided: totalVoided, errors: allErrors, duration_ms: durationMs };
+    const result = { upserted: totalUpserted, errors: allErrors, duration_ms: durationMs };
     const logMsg = allErrors.length > 0 ? allErrors.join(' | ') : undefined;
 
     await logSync(action, 200, logMsg);

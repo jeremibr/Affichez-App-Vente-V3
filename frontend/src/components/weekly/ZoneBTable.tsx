@@ -91,7 +91,7 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                                 <td colSpan={8} className="px-5 py-20 text-center">
                                     <div className="flex flex-col items-center gap-2">
                                         <span className="text-2xl opacity-20">📂</span>
-                                        <p className="text-sm text-slate-400 font-medium">Aucun devis trouvé pour ces critères.</p>
+                                        <p className="text-sm text-slate-400 font-medium">Aucun{module === 'factures' ? 'e facture' : ' devis'} trouvé{module === 'factures' ? 'e' : ''} pour ces critères.</p>
                                     </div>
                                 </td>
                             </tr>
