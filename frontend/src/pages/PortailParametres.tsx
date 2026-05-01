@@ -310,6 +310,27 @@ export default function PortailParametres({ propRepName }: Props) {
                 />
             </div>
 
+            {/* ── Module tabs ── */}
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+                {(['devis', 'factures'] as const).map(m => (
+                    <button
+                        key={m}
+                        onClick={() => setDeptModule(m)}
+                        className={cn(
+                            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all',
+                            module === m
+                                ? 'bg-white text-slate-900 shadow-sm'
+                                : 'text-slate-500 hover:text-slate-700'
+                        )}
+                    >
+                        {m === 'devis'
+                            ? <ClipboardList className={cn('w-4 h-4', module === m ? 'text-blue-500' : 'text-slate-400')} />
+                            : <FileText className={cn('w-4 h-4', module === m ? 'text-amber-500' : 'text-slate-400')} />}
+                        {m === 'devis' ? 'Objectifs Devis' : 'Objectifs Factures'}
+                    </button>
+                ))}
+            </div>
+
             {/* ── Quick-fill panel ── */}
             <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-100 p-5">
                 <div className="flex items-center gap-2 mb-4">
@@ -320,27 +341,6 @@ export default function PortailParametres({ propRepName }: Props) {
                         <p className="text-sm font-bold text-slate-800">Remplissage automatique</p>
                         <p className="text-xs text-slate-400">Entrez un objectif annuel et choisissez comment le répartir</p>
                     </div>
-                </div>
-
-                {/* Module selector inside quick-fill */}
-                <div className="flex items-center gap-2 mb-4">
-                    {(['devis', 'factures'] as const).map(m => (
-                        <button
-                            key={m}
-                            onClick={() => setDeptModule(m)}
-                            className={cn(
-                                'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border',
-                                module === m
-                                    ? m === 'devis'
-                                        ? 'bg-blue-50 text-blue-600 border-blue-200'
-                                        : 'bg-amber-50 text-amber-600 border-amber-200'
-                                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                            )}
-                        >
-                            {m === 'devis' ? <ClipboardList className="w-3 h-3" /> : <FileText className="w-3 h-3" />}
-                            {m === 'devis' ? 'Devis' : 'Factures'}
-                        </button>
-                    ))}
                 </div>
 
                 <div className="flex flex-wrap items-end gap-4">
