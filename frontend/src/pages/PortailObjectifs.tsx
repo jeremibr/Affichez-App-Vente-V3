@@ -286,9 +286,9 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                 <thead>
                                     <tr className="border-b border-slate-100 bg-slate-50/60">
                                         <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé {year}</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest border-l border-slate-100">{prevYear}</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">{prevYear}</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">{year}</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest border-l border-slate-100">Objectif</th>
                                         <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[130px]">Atteinte</th>
                                     </tr>
                                 </thead>
@@ -309,18 +309,18 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
-                                                    {row.target > 0 ? formatCurrencyCAD(row.target) : <span className="text-slate-200">—</span>}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
-                                                    {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-slate-200">—</span>}
-                                                </td>
-                                                <td className="px-4 py-3 text-right tabular-nums text-slate-400 border-l border-slate-100">
+                                                <td className="px-4 py-3 text-right tabular-nums text-slate-400">
                                                     {row.prevActual > 0 ? (
                                                         <span className="text-xs font-medium">{formatCurrencyCAD(row.prevActual)}</span>
                                                     ) : (
                                                         <span className="text-slate-200">—</span>
                                                     )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
+                                                    {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-slate-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700 border-l border-slate-100">
+                                                    {row.target > 0 ? formatCurrencyCAD(row.target) : <span className="text-slate-200">—</span>}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Progress actual={row.actual} target={row.target} />
@@ -332,18 +332,18 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                 <tfoot>
                                     <tr className="border-t-2 border-slate-200 bg-slate-50/80">
                                         <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Total {year}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                            {totals.target > 0 ? formatCurrencyCAD(totals.target) : <span className="text-slate-300">—</span>}
+                                        <td className="px-4 py-3 text-right tabular-nums">
+                                            {totals.prevActual > 0 ? (
+                                                <span className="text-sm font-semibold text-slate-500">{formatCurrencyCAD(totals.prevActual)}</span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
                                             {totals.actual > 0 ? formatCurrencyCAD(totals.actual) : <span className="text-slate-300">—</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-right tabular-nums border-l border-slate-100">
-                                            {totals.prevActual > 0 ? (
-                                                <span className="text-sm font-semibold text-slate-500 tabular-nums">{formatCurrencyCAD(totals.prevActual)}</span>
-                                            ) : (
-                                                <span className="text-slate-300">—</span>
-                                            )}
+                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums border-l border-slate-100">
+                                            {totals.target > 0 ? formatCurrencyCAD(totals.target) : <span className="text-slate-300">—</span>}
                                         </td>
                                         <td className="px-4 py-3"><Progress actual={totals.actual} target={totals.target} /></td>
                                     </tr>

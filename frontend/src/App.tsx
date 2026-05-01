@@ -37,8 +37,8 @@ function AppRoutes() {
     return (
         <Routes>
             <Route path="/" element={<Layout />}>
-                {/* ─── Devis module (admin only landing) ─── */}
-                <Route index element={isAdmin ? <Dashboard /> : <Navigate to="/portail" replace />} />
+                {/* ─── Devis module — accessible to all authenticated users ─── */}
+                <Route index element={<Dashboard />} />
                 <Route path="weekly" element={<WeeklyDetail />} />
                 <Route path="quarterly" element={<QuarterlyAverages />} />
                 <Route path="settings" element={<SettingsPage />} />

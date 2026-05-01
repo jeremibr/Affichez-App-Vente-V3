@@ -300,9 +300,9 @@ export default function PortailParametres({ propRepName }: Props) {
 
             {/* Rep picker — shown when admin has no rep context from prop or view-as-rep */}
             {isAdmin && !propRepName && !viewAsRep && (
-                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <User className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="text-sm font-semibold text-slate-600 shrink-0">Représentant :</span>
+                <div className="flex items-center gap-3 p-4 bg-brand-main/8 rounded-2xl border border-brand-main/15">
+                    <User className="w-4 h-4 text-brand-main shrink-0" />
+                    <span className="text-sm font-semibold text-brand-main shrink-0">Représentant :</span>
                     <Select
                         value={adminPickedRep}
                         onChange={setAdminPickedRep}
@@ -310,7 +310,7 @@ export default function PortailParametres({ propRepName }: Props) {
                             { value: '', label: 'Sélectionner un rep...' },
                             ...repList.map(r => ({ value: r, label: r })),
                         ]}
-                        variant={adminPickedRep ? 'accent' : 'default'}
+                        variant="accent"
                         className="w-56"
                     />
                 </div>

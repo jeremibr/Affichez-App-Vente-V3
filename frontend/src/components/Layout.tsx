@@ -207,7 +207,7 @@ export default function Layout() {
 
             {/* Main nav */}
             <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
-                {(viewAsRep ? sections.filter(s => s.key === 'portail') : sections).map(s => (
+                {sections.map(s => (
                     <SectionHeader
                         key={s.key}
                         sectionKey={s.key}
