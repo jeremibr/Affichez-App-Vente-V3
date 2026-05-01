@@ -139,7 +139,7 @@ export default function FWeeklyDetail() {
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -190,7 +190,7 @@ export default function FWeeklyDetail() {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-3 gap-3 md:gap-6">
                         <div className="bg-brand-main rounded-2xl p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
                             <div>
                                 <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Total Hebdomadaire</p>

@@ -98,27 +98,27 @@ export function SommaireTable({
                 <span className="text-xs text-slate-400 font-medium">{displayMonths.length === 1 ? displayMonths[0].label : `${year}`}</span>
             </div>
 
-            {/* Table – no x-scroll needed, fixed layout */}
-            <div className="w-full">
+            {/* Table with horizontal scroll on mobile */}
+            <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest sticky left-0 bg-white z-10 whitespace-nowrap">
                                 Période
                             </th>
                             <th
-                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group whitespace-nowrap"
                                 onClick={() => handleSort('deal_count')}
                             >
                                 <div className="flex items-center justify-end gap-2">
                                     {dealLabel.charAt(0).toUpperCase() + dealLabel.slice(1)} <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
                                 </div>
                             </th>
-                            <th className="px-5 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-widest w-1/4 select-none">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-widest select-none whitespace-nowrap">
                                 {year - 1}
                             </th>
                             <th
-                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group whitespace-nowrap"
                                 onClick={() => handleSort('actual_amount')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -126,7 +126,7 @@ export function SommaireTable({
                                 </div>
                             </th>
                             <th
-                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group whitespace-nowrap"
                                 onClick={() => handleSort('delta')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -134,7 +134,7 @@ export function SommaireTable({
                                 </div>
                             </th>
                             <th
-                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group whitespace-nowrap"
                                 onClick={() => handleSort('objectif')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -142,7 +142,7 @@ export function SommaireTable({
                                 </div>
                             </th>
                             <th
-                                className="px-5 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest cursor-pointer hover:bg-slate-50 transition-colors group whitespace-nowrap"
                                 onClick={() => handleSort('pct_atteint')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -158,8 +158,8 @@ export function SommaireTable({
 
                             return (
                                 <tr key={row.month} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-slate-700">{row.label}</td>
-                                    <td className="px-5 py-3 text-right whitespace-nowrap">
+                                    <td className="px-3 md:px-5 py-2 md:py-3 font-medium text-slate-700 sticky left-0 bg-white z-10 whitespace-nowrap">{row.label}</td>
+                                    <td className="px-3 md:px-5 py-2 md:py-3 text-right whitespace-nowrap">
                                         {row.deal_count > 0 ? (
                                             <>
                                                 <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
@@ -169,15 +169,15 @@ export function SommaireTable({
                                             <span className="text-slate-200 text-xs">—</span>
                                         )}
                                     </td>
-                                    <td className={cn("px-5 py-3 text-right tabular-nums", row.prevYear > 0 ? "text-slate-400" : "text-slate-300")}>{formatCurrencyCAD(row.prevYear)}</td>
-                                    <td className={cn("px-5 py-3 text-right tabular-nums font-medium", hasData ? "text-slate-800" : "text-slate-300")}>
+                                    <td className={cn("px-3 md:px-5 py-2 md:py-3 text-right tabular-nums whitespace-nowrap", row.prevYear > 0 ? "text-slate-400" : "text-slate-300")}>{formatCurrencyCAD(row.prevYear)}</td>
+                                    <td className={cn("px-3 md:px-5 py-2 md:py-3 text-right tabular-nums font-medium whitespace-nowrap", hasData ? "text-slate-800" : "text-slate-300")}>
                                         {formatCurrencyCAD(row.actual_amount)}
                                     </td>
-                                    <td className="px-5 py-3 text-right">
+                                    <td className="px-3 md:px-5 py-2 md:py-3 text-right">
                                         {row.prevYear > 0 ? (
                                             <div className="flex flex-col items-end gap-0.5">
                                                 <span className={cn(
-                                                    "text-xs font-semibold tabular-nums",
+                                                    "text-xs font-semibold tabular-nums whitespace-nowrap",
                                                     row.delta > 0 ? "text-emerald-600" : row.delta < 0 ? "text-red-500" : "text-slate-400"
                                                 )}>
                                                     {row.delta > 0 ? '+' : ''}{formatCurrencyCAD(row.delta)}
@@ -193,8 +193,8 @@ export function SommaireTable({
                                             <span className="text-slate-200 text-xs">—</span>
                                         )}
                                     </td>
-                                    <td className="px-5 py-3 text-right text-slate-400 tabular-nums text-xs">{formatCurrencyCAD(row.objectif)}</td>
-                                    <td className="px-5 py-3 text-right">
+                                    <td className="px-3 md:px-5 py-2 md:py-3 text-right text-slate-400 tabular-nums text-xs whitespace-nowrap">{formatCurrencyCAD(row.objectif)}</td>
+                                    <td className="px-3 md:px-5 py-2 md:py-3 text-right">
                                         {hasData ? (
                                             <span className={cn("inline-block px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums", getPctStyle(pct))}>
                                                 {formatPercentage(pct)}
@@ -209,18 +209,18 @@ export function SommaireTable({
                     </tbody>
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black border-t-2 border-brand-main">
-                            <td className="px-5 py-4 text-xs uppercase tracking-wider">Total</td>
-                            <td className="px-5 py-4 text-right whitespace-nowrap">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total</td>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right whitespace-nowrap">
                                 <span className="text-sm font-black tabular-nums">{totalDeals}</span>
                                 <span className="text-[10px] text-white/60 ml-1">{dealLabel}</span>
                             </td>
-                            <td className="px-5 py-4 text-right text-white/50 tabular-nums text-sm">{formatCurrencyCAD(totalPrevYear)}</td>
-                            <td className="px-5 py-4 text-right font-black tabular-nums">{formatCurrencyCAD(totalActual)}</td>
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right text-white/50 tabular-nums text-sm whitespace-nowrap">{formatCurrencyCAD(totalPrevYear)}</td>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right font-black tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalActual)}</td>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right">
                                 {totalPrevYear > 0 ? (
                                     <div className="flex flex-col items-end gap-0.5">
                                         <span className={cn(
-                                            "text-xs font-bold tabular-nums",
+                                            "text-xs font-bold tabular-nums whitespace-nowrap",
                                             totalDelta > 0 ? "text-emerald-300" : totalDelta < 0 ? "text-rose-200" : "text-white/50"
                                         )}>
                                             {totalDelta > 0 ? '+' : ''}{formatCurrencyCAD(totalDelta)}
@@ -238,8 +238,8 @@ export function SommaireTable({
                                     <span className="text-white/30">—</span>
                                 )}
                             </td>
-                            <td className="px-5 py-4 text-right text-white/70 tabular-nums text-xs">{formatCurrencyCAD(totalObjectif)}</td>
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right text-white/70 tabular-nums text-xs whitespace-nowrap">{formatCurrencyCAD(totalObjectif)}</td>
+                            <td className="px-3 md:px-5 py-3 md:py-4 text-right">
                                 <span className={cn(
                                     "inline-block px-2 py-1 rounded-md text-xs font-black tabular-nums border border-white/20",
                                     totalPct >= 90 ? "bg-emerald-500 text-white" : "bg-amber-400 text-brand-main"

@@ -93,10 +93,17 @@ export default function FDashboard() {
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
     useEffect(() => { fetchData(); }, [fetchData]);
     useEffect(() => {
+        // Debounce realtime reloads: batch upserts fire many events in quick
+        // succession — wait 3s of silence before re-fetching so the page doesn't
+        // thrash while a sync is running.
+        let timer: ReturnType<typeof setTimeout>;
         const sub = supabase.channel('inv-db-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => fetchDataRef.current())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => fetchDataRef.current(), 3000);
+            })
             .subscribe();
-        return () => { supabase.removeChannel(sub); };
+        return () => { clearTimeout(timer); supabase.removeChannel(sub); };
     }, []);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
@@ -108,19 +115,20 @@ export default function FDashboard() {
 
     return (
         <>
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
                         Factures — Tableau de Bord
                         {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
                     </h1>
-                    <p className="text-sm text-slate-400 mt-0.5">Performance de facturation et indicateurs clés</p>
+                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance de facturation et indicateurs clés</p>
                 </div>
                 <SyncButton
                     functionName="zoho-invoice-sync"
                     logPattern="sync_invoices%"
                     onSyncComplete={() => fetchDataRef.current()}
+                   
                 />
             </div>
 
@@ -154,8 +162,8 @@ export default function FDashboard() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Revenus facturés cumulés" icon={TrendingUp} trend={kpis?.pct_of_target} trendLabel="de l'objectif" />
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Revenus facturés cumulés" icon={TrendingUp} trend={kpis?.pct_of_target} />
                         <KPICard title="Nb Factures" value={String(kpis?.ytd_count || 0)} subText="Factures (filtres actifs)" icon={FileText} />
                         <KPICard title="Montant Moyen" value={formatCurrencyCAD(kpis?.avg_deal_size || 0)} subText="Par facture" icon={Briefcase} />
                         <KPICard title="Objectif Annuel" value={formatCurrencyCAD(kpis?.annual_target || 0)} subText="Planifié pour l'année" icon={Target} />
@@ -167,7 +175,7 @@ export default function FDashboard() {
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                         {/* Leaderboard */}
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -316,23 +324,23 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     );
 }
 
-function KPICard({ title, value, subText, icon: Icon, trend, trendLabel }: { title: string; value: string; subText: string; icon: React.ElementType; trend?: number; trendLabel?: string }) {
+function KPICard({ title, value, subText, icon: Icon, trend }: { title: string; value: string; subText: string; icon: React.ElementType; trend?: number }) {
     return (
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
-            <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
-                    <Icon className="w-5 h-5" />
+        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 {trend !== undefined && (
-                    <div className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full", trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
-                        {trend}% {trendLabel}
+                    <div className={cn("text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 rounded-full", trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
+                        {trend}%
                     </div>
                 )}
             </div>
             <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{title}</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-                <p className="text-[11px] text-slate-400 mt-1 font-medium italic">{subText}</p>
+                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
+                <p className="text-base md:text-2xl font-bold text-slate-900 mt-0.5 md:mt-1 tabular-nums">{value}</p>
+                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );

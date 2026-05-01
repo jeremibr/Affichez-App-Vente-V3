@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AdminViewProvider } from './contexts/AdminViewContext';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import WeeklyDetail from './pages/WeeklyDetail';
@@ -10,9 +11,15 @@ import Login from './pages/Login';
 import FDashboard from './pages/FDashboard';
 import FWeeklyDetail from './pages/FWeeklyDetail';
 import FQuarterlyAverages from './pages/FQuarterlyAverages';
+import AdminReps from './pages/AdminReps';
+import Paye from './pages/Paye';
+import PortailDevis from './pages/PortailDevis';
+import PortailFactures from './pages/PortailFactures';
+import PortailPaye from './pages/PortailPaye';
+import PortailObjectifs from './pages/PortailObjectifs';
 
 function AppRoutes() {
-    const { user, loading, canAccessFactures } = useAuth();
+    const { user, loading, canAccessFactures, isAdmin } = useAuth();
 
     if (loading) {
         return (
@@ -43,6 +50,20 @@ function AppRoutes() {
                         <Route path="factures/quarterly" element={<FQuarterlyAverages />} />
                     </>
                 )}
+
+                {/* ─── Mon Portail — personal view for every rep ─── */}
+                <Route path="portail" element={<PortailDevis />} />
+                <Route path="portail/factures" element={<PortailFactures />} />
+                <Route path="portail/paye" element={<PortailPaye />} />
+                <Route path="portail/objectifs" element={<PortailObjectifs />} />
+
+                {/* ─── Admin-only ─── */}
+                {isAdmin && (
+                    <>
+                        <Route path="reps" element={<AdminReps />} />
+                        <Route path="paye" element={<Paye />} />
+                    </>
+                )}
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -53,7 +74,9 @@ export default function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <AppRoutes />
+                <AdminViewProvider>
+                    <AppRoutes />
+                </AdminViewProvider>
             </AuthProvider>
         </BrowserRouter>
     );

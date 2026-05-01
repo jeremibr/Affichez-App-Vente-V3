@@ -87,7 +87,7 @@ export function ZoneAPivotTable({
                     </tbody>
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black">
-                            <td className="px-5 py-4 text-xs uppercase tracking-wider">Total</td>
+                            <td className="px-5 py-4 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total</td>
                             <td className="px-4 py-4 text-right font-black tabular-nums whitespace-nowrap">
                                 {formatCurrencyCAD(grandTotal)}
                             </td>

@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { Loader2, RefreshCcw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-// Per-function flag: survives React navigation, resets on full browser refresh
-const autoSyncDone = new Set<string>();
-
 interface SyncButtonProps {
     functionName?: string;
     logPattern?: string;
@@ -31,6 +28,9 @@ export function SyncButton({
         setLastSyncTime(data?.received_at ?? null);
     }, [logPattern]);
 
+    // Load last sync timestamp on mount
+    useEffect(() => { fetchLastSync(); }, [fetchLastSync]);
+
     const handleSync = useCallback(async () => {
         setSyncing(true);
         setBadge(null);
@@ -47,21 +47,13 @@ export function SyncButton({
             );
             const data = await res.json();
             if (res.ok) {
-                setBadge({ upserted: data.upserted, deleted: data.deleted });
-                fetchLastSync();
+                setBadge({ upserted: data.upserted ?? 0, deleted: data.deleted ?? 0 });
                 onSyncComplete?.();
+                await fetchLastSync();
             }
         } catch { /* details available in Paramètres → Synchronisation */ }
         setSyncing(false);
-    }, [functionName, fetchLastSync, onSyncComplete]);
-
-    // Auto-sync once per function on full page load — resets on browser refresh
-    useEffect(() => {
-        if (!autoSyncDone.has(functionName)) {
-            autoSyncDone.add(functionName);
-            handleSync();
-        }
-    }, [functionName, handleSync]);
+    }, [functionName, onSyncComplete, fetchLastSync]);
 
     const formatRelative = (iso: string) => {
         const diffMs = Date.now() - new Date(iso).getTime();

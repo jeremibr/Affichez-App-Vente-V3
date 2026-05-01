@@ -37,10 +37,10 @@ export default function Settings() {
     const visibleTabs = tabItems.filter(t => !t.adminOnly || isAdmin);
 
     return (
-        <div className="p-6 md:p-8 max-w-screen-xl mx-auto">
+        <div className="p-4 md:p-8 max-w-screen-xl mx-auto">
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Paramètres</h1>
-                <p className="text-sm text-slate-400 mt-0.5">Gérez les objectifs, les trimestres, la synchronisation et les utilisateurs.</p>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Paramètres</h1>
+                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Objectifs, trimestres, synchronisation et utilisateurs.</p>
             </div>
 
             {message && (
@@ -51,7 +51,7 @@ export default function Settings() {
                 </div>
             )}
 
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit flex-wrap">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 overflow-x-auto max-w-full">
                 {visibleTabs.map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                         className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
@@ -448,6 +448,13 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState<AllowedUser>({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' });
     const [saving, setSaving] = useState(false);
+    const [repOptions, setRepOptions] = useState<string[]>([]);
+
+    useEffect(() => {
+        supabase.rpc('get_distinct_rep_names').then(({ data }) => {
+            if (data) setRepOptions((data as { rep_name: string }[]).map(r => r.rep_name));
+        });
+    }, []);
 
     const fetchUsers = async () => {
         setLoading(true);
@@ -523,9 +530,15 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                             </select>
                         </div>
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Nom Représentant (Zoho)</label>
-                            <input type="text" value={form.rep_name ?? ''} onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
-                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="Jean Dupont (exact, case-sensitive)" />
+                            <label className="block text-xs font-semibold text-slate-500 mb-1">Représentant Zoho</label>
+                            <select
+                                value={form.rep_name ?? ''}
+                                onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
+                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30"
+                            >
+                                <option value="">— Aucun —</option>
+                                {repOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -596,8 +609,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                 </table>
             </div>
             <p className="text-xs text-slate-400 px-1">
-                * Le nom Représentant doit correspondre exactement au champ <code className="font-mono">salesperson_name</code> dans Zoho Books (sensible à la casse).
-                Les membres avec Accès Factures ne voient que leurs propres données.
+                * Le menu déroulant Représentant est alimenté par les noms présents dans Zoho Books (synchronisés). Les membres avec Accès Factures ne voient que leurs propres données.
             </p>
         </div>
     );

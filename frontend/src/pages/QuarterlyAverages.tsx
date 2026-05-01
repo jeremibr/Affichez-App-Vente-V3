@@ -46,12 +46,12 @@ export default function QuarterlyAverages() {
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
-                    <p className="text-sm text-slate-400 mt-0.5">Analyse comparative des performances moyennes par trimestre.</p>
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
+                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
                 </div>
                 <SyncButton onSyncComplete={fetchAverages} />
             </div>

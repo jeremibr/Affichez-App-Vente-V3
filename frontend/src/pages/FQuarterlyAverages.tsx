@@ -51,7 +51,7 @@ export default function FQuarterlyAverages() {
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">

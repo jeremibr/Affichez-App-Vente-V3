@@ -46,7 +46,7 @@ export function QuarterBlock({
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/50 z-10">
                                 Représentant
                             </th>
                             <th
@@ -95,7 +95,7 @@ export function QuarterBlock({
                                 const res = Number(row.resultat);
                                 return (
                                     <tr key={idx} className="hover:bg-slate-50/60 transition-colors group">
-                                        <td className="px-5 py-3 font-medium text-slate-700 whitespace-nowrap">{row.rep_name}</td>
+                                        <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-slate-700 whitespace-nowrap sticky left-0 bg-white z-10">{row.rep_name}</td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
                                             <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
                                             <span className="text-[10px] text-slate-400 ml-1">devis</span>
@@ -118,7 +118,7 @@ export function QuarterBlock({
                     </tbody>
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black">
-                            <td className="px-5 py-3.5 text-xs uppercase tracking-wider">Total équipe</td>
+                            <td className="px-3 md:px-5 py-3 md:py-3.5 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total équipe</td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-sm font-black tabular-nums">{totalDeals}</span>
                                 <span className="text-[10px] text-white/60 ml-1">devis</span>

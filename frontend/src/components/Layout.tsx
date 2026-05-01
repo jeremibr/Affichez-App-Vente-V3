@@ -1,183 +1,287 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, CalendarDays, LineChart, Settings, Menu, LogOut, FileText, ClipboardList, ChevronDown } from 'lucide-react';
+import { Outlet, NavLink, useLocation } from 'react-router-dom';
+import {
+    LayoutDashboard, CalendarDays, LineChart, Settings,
+    Menu, LogOut, FileText, ClipboardList, Wallet,
+    DollarSign, ChevronDown, UserCircle,
+    Target, Eye, Building2,
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useAdminView } from '../contexts/AdminViewContext';
+import { useRepList } from '../hooks/useRepList';
+import { Select } from './Select';
 
-const modules = {
-    devis: {
-        label: 'Devis',
-        icon: ClipboardList,
-        root: '/',
-        nav: [
-            { name: 'Dashboard',              href: '/',          icon: LayoutDashboard },
-            { name: 'Détail Hebdomadaire',    href: '/weekly',    icon: CalendarDays },
-            { name: 'Moyennes Trimestrielles',href: '/quarterly', icon: LineChart },
-        ],
-    },
-    factures: {
-        label: 'Factures',
-        icon: FileText,
-        root: '/factures',
-        nav: [
-            { name: 'Dashboard',              href: '/factures',          icon: LayoutDashboard },
-            { name: 'Détail Hebdomadaire',    href: '/factures/weekly',   icon: CalendarDays },
-            { name: 'Moyennes Trimestrielles',href: '/factures/quarterly',icon: LineChart },
-        ],
-    },
-} as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-type ModuleKey = keyof typeof modules;
+interface NavItem {
+    name: string;
+    href: string;
+    icon: React.ElementType;
+    end?: boolean;
+    isLabel?: boolean; // renders as a non-clickable group header
+}
+
+interface Section {
+    key: string;
+    label: string;
+    icon: React.ElementType;
+    activeColor: string;
+    items: NavItem[];
+}
+
+// ─── Route → section mapping ──────────────────────────────────────────────────
+
+function getSectionKey(pathname: string): string {
+    if (pathname.startsWith('/portail')) return 'portail';
+    if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
+    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings')) return 'admin';
+    return 'ensemble';
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Layout() {
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [modulePickerOpen, setModulePickerOpen] = useState(false);
     const location = useLocation();
-    const navigate = useNavigate();
     const { user, signOut, isAdmin, canAccessFactures } = useAuth();
+    const { viewAsRep, setViewAsRep } = useAdminView();
+    const repList = useRepList();
 
-    // Derive active module from current route
-    const activeModule: ModuleKey = location.pathname.startsWith('/factures') ? 'factures' : 'devis';
-    const mod = modules[activeModule];
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [openSections, setOpenSections] = useState<Set<string>>(
+        () => new Set([getSectionKey(location.pathname)])
+    );
+    // Auto-open section on navigation
+    useEffect(() => {
+        const key = getSectionKey(location.pathname);
+        setOpenSections(prev => prev.has(key) ? prev : new Set([...prev, key]));
+    }, [location.pathname]);
+
+    // Close mobile menu on route change
+    useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);
 
     const displayName = user?.email
         ? user.email.split('@')[0].charAt(0).toUpperCase() + user.email.split('@')[0].slice(1)
         : '';
 
-    useEffect(() => { setIsMobileMenuOpen(false); }, [location]);
-    useEffect(() => {
-        if (!modulePickerOpen) return;
-        const close = () => setModulePickerOpen(false);
-        window.addEventListener('click', close);
-        return () => window.removeEventListener('click', close);
-    }, [modulePickerOpen]);
+    // ─── Section definitions ─────────────────────────────────────────────────
 
-    const switchModule = (key: ModuleKey) => {
-        setModulePickerOpen(false);
-        navigate(modules[key].root);
+    const sections: Section[] = [
+        {
+            key: 'ensemble',
+            label: 'Équipe Affichez',
+            icon: Building2,
+            activeColor: 'text-blue-500',
+            items: [
+                { name: 'Devis',           href: '',                    icon: ClipboardList,   isLabel: true },
+                { name: 'Tableau de bord', href: '/',                   icon: LayoutDashboard, end: true },
+                { name: 'Par semaine',     href: '/weekly',             icon: CalendarDays },
+                { name: 'Par trimestre',   href: '/quarterly',          icon: LineChart },
+                ...(canAccessFactures ? [
+                    { name: 'Factures',        href: '',                    icon: FileText,        isLabel: true },
+                    { name: 'Tableau de bord', href: '/factures',           icon: LayoutDashboard, end: true },
+                    { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
+                    { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
+                ] : []),
+            ],
+        },
+        {
+            key: 'portail',
+            label: 'Mon Portail',
+            icon: UserCircle,
+            activeColor: 'text-brand-main',
+            items: [
+                { name: 'Mes Devis',       href: '/portail',          icon: ClipboardList, end: true },
+                { name: 'Mes Factures',    href: '/portail/factures', icon: FileText },
+                { name: 'Mes Objectifs',   href: '/portail/objectifs', icon: Target },
+                { name: 'Ma Paye',         href: '/portail/paye',      icon: Wallet },
+            ],
+        },
+    ];
+
+    const adminItems: NavItem[] = [
+        { name: 'Commissions',   href: '/paye',     icon: DollarSign },
+        { name: 'Paramètres',    href: '/settings', icon: Settings },
+    ];
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    const toggle = (key: string) =>
+        setOpenSections(prev => {
+            const next = new Set(prev);
+            next.has(key) ? next.delete(key) : next.add(key);
+            return next;
+        });
+
+    const isSectionActive = (items: NavItem[]) =>
+        items.some(item =>
+            !item.isLabel && item.href &&
+            (item.end ? location.pathname === item.href : location.pathname.startsWith(item.href))
+        );
+
+    // ─── Sub-items list ───────────────────────────────────────────────────────
+
+    const SubItems = ({ items, open }: { items: NavItem[]; open: boolean }) => (
+        <div className={cn(
+            "overflow-hidden transition-all duration-200 ease-in-out",
+            open ? "max-h-[500px]" : "max-h-0"
+        )}>
+            <div className="ml-3 pl-3 border-l-2 border-slate-100 mt-0.5 mb-1 space-y-0.5">
+                {items.map((item, i) =>
+                    item.isLabel ? (
+                        <p key={`label-${i}`} className="px-3 pt-2.5 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest first:pt-1">
+                            {item.name}
+                        </p>
+                    ) : (
+                        <NavLink
+                            key={item.href}
+                            to={item.href}
+                            end={item.end}
+                            className={({ isActive }) => cn(
+                                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+                                isActive
+                                    ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
+                                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                            )}
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <item.icon className={cn(
+                                        "w-4 h-4 shrink-0",
+                                        isActive ? "text-white/90" : "text-slate-400"
+                                    )} />
+                                    {item.name}
+                                </>
+                            )}
+                        </NavLink>
+                    )
+                )}
+            </div>
+        </div>
+    );
+
+    // ─── Section header ───────────────────────────────────────────────────────
+
+    const SectionHeader = ({
+        sectionKey, label, icon: Icon, activeColor, items,
+    }: { sectionKey: string; label: string; icon: React.ElementType; activeColor: string; items: NavItem[] }) => {
+        const open = openSections.has(sectionKey);
+        const active = isSectionActive(items);
+
+        return (
+            <div>
+                <button
+                    onClick={() => toggle(sectionKey)}
+                    className={cn(
+                        "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all select-none",
+                        active
+                            ? "text-slate-900"
+                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                    )}
+                >
+                    <Icon className={cn(
+                        "w-4 h-4 shrink-0 transition-colors",
+                        active ? activeColor : "text-slate-400"
+                    )} />
+                    <span className="flex-1 text-left">{label}</span>
+                    <ChevronDown className={cn(
+                        "w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-200",
+                        open && "rotate-180"
+                    )} />
+                </button>
+                <SubItems items={items} open={open} />
+            </div>
+        );
     };
 
-    const ModuleIcon = mod.icon;
+    // ─── Sidebar content ──────────────────────────────────────────────────────
+
+    const sidebar = (
+        <div className="flex flex-col h-full bg-white">
+
+            {/* Logo */}
+            <div className="h-16 px-6 flex items-center shrink-0 border-b border-slate-100">
+                <img src="/logo-long.png" alt="Affichez" className="h-7 w-auto object-contain" />
+            </div>
+
+            {/* Main nav */}
+            <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
+                {sections.map(s => (
+                    <SectionHeader
+                        key={s.key}
+                        sectionKey={s.key}
+                        label={s.label}
+                        icon={s.icon}
+                        activeColor={s.activeColor}
+                        items={s.items}
+                    />
+                ))}
+            </nav>
+
+            {/* Bottom: Admin + rep switcher + user */}
+            <div className="shrink-0 border-t border-slate-100 px-3 py-3 space-y-0.5">
+
+                {/* Admin section */}
+                {isAdmin && (
+                    <div>
+                        <button
+                            onClick={() => toggle('admin')}
+                            className={cn(
+                                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all select-none",
+                                isSectionActive(adminItems)
+                                    ? "text-slate-900"
+                                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                            )}
+                        >
+                            <Settings className={cn(
+                                "w-4 h-4 shrink-0",
+                                isSectionActive(adminItems) ? "text-slate-500" : "text-slate-400"
+                            )} />
+                            <span className="flex-1 text-left">Administration</span>
+                            <ChevronDown className={cn(
+                                "w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-200",
+                                openSections.has('admin') && "rotate-180"
+                            )} />
+                        </button>
+                        <SubItems items={adminItems} open={openSections.has('admin')} />
+                    </div>
+                )}
+
+                {/* User row */}
+                <div className="flex items-center gap-3 px-3 py-2 mt-1 rounded-xl hover:bg-slate-50 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-brand-main/10 text-brand-main flex items-center justify-center text-xs font-bold shrink-0">
+                        {displayName.charAt(0)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-700 truncate">{displayName}</p>
+                        <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
+                    </div>
+                    <button
+                        onClick={signOut}
+                        title="Se déconnecter"
+                        className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0"
+                    >
+                        <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
+    // ─── Layout ───────────────────────────────────────────────────────────────
 
     return (
         <div className="min-h-screen bg-slate-50 flex font-sans">
 
-            {/* ─── Sidebar ─── */}
+            {/* Sidebar */}
             <aside className={cn(
-                "fixed md:sticky top-0 left-0 z-50 h-screen w-64 bg-white border-r border-slate-100 flex flex-col shrink-0 transition-transform duration-300",
+                "fixed md:sticky top-0 left-0 z-50 h-screen w-60 border-r border-slate-100 shrink-0 transition-transform duration-300",
                 isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
             )}>
-                {/* Logo */}
-                <div className="h-16 px-6 flex items-center shrink-0 border-b border-slate-100">
-                    <img src="/logo-long.png" alt="Affichez" className="h-7 w-auto object-contain" />
-                </div>
-
-                {/* Module switcher */}
-                {canAccessFactures && (
-                    <div className="px-3 pt-4 pb-1">
-                        <div className="relative">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setModulePickerOpen(v => !v); }}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/60 transition-all group"
-                            >
-                                <div className="w-7 h-7 rounded-lg bg-brand-main/10 flex items-center justify-center shrink-0">
-                                    <ModuleIcon className="w-3.5 h-3.5 text-brand-main" />
-                                </div>
-                                <span className="flex-1 text-left text-sm font-semibold text-slate-700">{mod.label}</span>
-                                <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", modulePickerOpen && "rotate-180")} />
-                            </button>
-
-                            {modulePickerOpen && (
-                                <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl border border-slate-200 shadow-lg shadow-slate-200/60 overflow-hidden z-10">
-                                    {(Object.entries(modules) as [ModuleKey, typeof modules[ModuleKey]][]).map(([key, m]) => {
-                                        const Icon = m.icon;
-                                        return (
-                                            <button
-                                                key={key}
-                                                onClick={(e) => { e.stopPropagation(); switchModule(key); }}
-                                                className={cn(
-                                                    "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors",
-                                                    key === activeModule
-                                                        ? "bg-brand-main/5 text-brand-main"
-                                                        : "text-slate-600 hover:bg-slate-50"
-                                                )}
-                                            >
-                                                <div className={cn(
-                                                    "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
-                                                    key === activeModule ? "bg-brand-main/10" : "bg-slate-100"
-                                                )}>
-                                                    <Icon className="w-3.5 h-3.5" />
-                                                </div>
-                                                {m.label}
-                                                {key === activeModule && (
-                                                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand-main" />
-                                                )}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* Nav links */}
-                <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-                    {mod.nav.map((item) => (
-                        <NavLink
-                            key={item.href}
-                            to={item.href}
-                            end={item.href === '/' || item.href === '/factures'}
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                                isActive
-                                    ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
-                                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                            )}
-                        >
-                            <item.icon className="w-4 h-4 shrink-0" />
-                            {item.name}
-                        </NavLink>
-                    ))}
-                </nav>
-
-                {/* Bottom: Settings + user */}
-                <div className="px-3 pb-4 shrink-0 space-y-1 border-t border-slate-100 pt-3">
-                    {isAdmin && (
-                        <NavLink
-                            to="/settings"
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
-                                isActive
-                                    ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
-                                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
-                            )}
-                        >
-                            <Settings className="w-4 h-4 shrink-0" />
-                            Paramètres
-                        </NavLink>
-                    )}
-
-                    <div className="flex items-center gap-3 px-3 py-2 mt-1">
-                        <div className="w-7 h-7 rounded-full bg-brand-main/10 text-brand-main flex items-center justify-center text-xs font-bold shrink-0">
-                            {displayName.charAt(0)}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-slate-700 truncate">{displayName}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
-                        </div>
-                        <button
-                            onClick={signOut}
-                            title="Se déconnecter"
-                            className="p-1.5 rounded-lg text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all shrink-0"
-                        >
-                            <LogOut className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                </div>
+                {sidebar}
             </aside>
 
-            {/* Mobile overlay */}
+            {/* Mobile backdrop */}
             {isMobileMenuOpen && (
                 <div
                     className="fixed inset-0 bg-black/30 z-40 md:hidden backdrop-blur-sm"
@@ -185,8 +289,10 @@ export default function Layout() {
                 />
             )}
 
-            {/* ─── Main ─── */}
+            {/* Main content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+                {/* Mobile header */}
                 <header className="md:hidden h-14 bg-white border-b border-slate-100 flex items-center justify-between px-4 sticky top-0 z-30">
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
@@ -197,6 +303,25 @@ export default function Layout() {
                     <img src="/logo-long.png" alt="Affichez" className="h-6 w-auto object-contain" />
                     <div className="w-9" />
                 </header>
+
+                {/* Admin view-as bar */}
+                {isAdmin && repList.length > 0 && (
+                    <div className="shrink-0 bg-white border-b border-slate-100 px-3 md:px-4 py-2 flex items-center gap-2 md:gap-3">
+                        <Eye className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-500 shrink-0">Vue :</span>
+                        <Select
+                            value={viewAsRep ?? ''}
+                            onChange={v => setViewAsRep(v || null)}
+                            options={[
+                                { value: '', label: 'Admin (ma vue)' },
+                                ...repList.map(r => ({ value: r, label: r })),
+                            ]}
+                            variant={viewAsRep ? 'accent' : 'default'}
+                            className="w-40 md:w-48 min-w-0"
+                        />
+                    </div>
+                )}
+
                 <main className="flex-1 overflow-auto">
                     <Outlet />
                 </main>

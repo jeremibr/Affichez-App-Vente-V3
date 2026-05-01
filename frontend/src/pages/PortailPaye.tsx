@@ -1,0 +1,476 @@
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Wallet, Trash2, Loader2, Percent, Plus, User } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { formatCurrencyCAD, cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { useAdminView } from '../contexts/AdminViewContext';
+import { FilterBar, FilterGroup } from '../components/FilterBar';
+import { Select } from '../components/Select';
+import { fetchCommRate } from '../utils/commRates';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface PayEntry {
+    id: string;
+    rep_name: string;
+    year: number;
+    pay_date: string;
+    base_salary: number | null;
+    commission: number | null;
+    expenses: number | null;
+    holidays: number | null;
+    vacation: number | null;
+    note: string;
+    sort_order: number;
+}
+
+interface PayMeta {
+    previous_year_balance: number;
+    annual_bonus: number;
+    commission_prev_year: number;
+    bank_balance: number;
+}
+
+const EMPTY_META: PayMeta = {
+    previous_year_balance: 0,
+    annual_bonus: 0,
+    commission_prev_year: 0,
+    bank_balance: 0,
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function n(v: number | null | undefined): number { return v ?? 0; }
+
+function fmt(v: number | null): string {
+    if (v === null || v === undefined || v === 0) return '';
+    return String(v);
+}
+
+// ─── Props ────────────────────────────────────────────────────────────────────
+
+interface Props { propRepName?: string; }
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function PortailPaye({ propRepName }: Props) {
+    const { repName: authRepName, isAdmin } = useAuth();
+    const { viewAsRep } = useAdminView();
+    const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
+
+    // Admins can always edit; reps see read-only view
+    const canEdit = isAdmin;
+
+    const [year, setYear]       = useState(2026);
+    const [loading, setLoading] = useState(true);
+    const [entries, setEntries] = useState<PayEntry[]>([]);
+    const [meta, setMeta]       = useState<PayMeta>(EMPTY_META);
+    const [commRate, setCommRate] = useState(0.05);
+
+    const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
+
+    // ─── Fetch ───────────────────────────────────────────────────────────────
+
+    const fetchAll = useCallback(async () => {
+        if (!repName) { setLoading(false); return; }
+        setLoading(true);
+        const [entriesRes, metaRes, rate] = await Promise.all([
+            supabase
+                .from('paye_entries')
+                .select('*')
+                .eq('rep_name', repName)
+                .eq('year', year)
+                .order('sort_order', { ascending: true }),
+            supabase
+                .from('paye_meta')
+                .select('*')
+                .eq('rep_name', repName)
+                .eq('year', year)
+                .single(),
+            fetchCommRate(repName),
+        ]);
+        setEntries((entriesRes.data ?? []) as PayEntry[]);
+        setMeta((metaRes.data as PayMeta | null) ?? EMPTY_META);
+        setCommRate(rate);
+        setLoading(false);
+    }, [repName, year]);
+
+    useEffect(() => { fetchAll(); }, [fetchAll]);
+
+    // ─── Entry mutations (admin only) ────────────────────────────────────────
+
+    const addEntry = async () => {
+        if (!repName || !canEdit) return;
+        const sort_order = entries.length;
+        const { data } = await supabase
+            .from('paye_entries')
+            .insert({ rep_name: repName, year, sort_order })
+            .select()
+            .single();
+        if (data) setEntries(prev => [...prev, data as PayEntry]);
+    };
+
+    const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+    const updateField = (id: string, field: keyof PayEntry, raw: string) => {
+        if (!canEdit) return;
+        const numericFields: (keyof PayEntry)[] = ['base_salary', 'commission', 'expenses', 'holidays', 'vacation'];
+        const value = numericFields.includes(field)
+            ? (raw === '' ? null : parseFloat(raw.replace(/[$,\s]/g, '').replace(',', '.')) || null)
+            : raw;
+
+        setEntries(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
+
+        clearTimeout(saveTimers.current[id + field]);
+        saveTimers.current[id + field] = setTimeout(async () => {
+            await supabase
+                .from('paye_entries')
+                .update({ [field]: value, updated_at: new Date().toISOString() })
+                .eq('id', id);
+        }, 600);
+    };
+
+    const deleteEntry = async (id: string) => {
+        if (!canEdit) return;
+        setEntries(prev => prev.filter(e => e.id !== id));
+        await supabase.from('paye_entries').delete().eq('id', id);
+    };
+
+    // ─── Meta mutations (admin only) ──────────────────────────────────────────
+
+    const metaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+    const updateMeta = (field: keyof PayMeta, raw: string) => {
+        if (!canEdit) return;
+        const value = raw === '' ? 0 : parseFloat(raw.replace(/[$,\s]/g, '').replace(',', '.')) || 0;
+        setMeta(prev => ({ ...prev, [field]: value }));
+
+        clearTimeout(metaTimer.current);
+        metaTimer.current = setTimeout(async () => {
+            await supabase
+                .from('paye_meta')
+                .upsert(
+                    { rep_name: repName, year, [field]: value, updated_at: new Date().toISOString() },
+                    { onConflict: 'rep_name,year' }
+                );
+        }, 600);
+    };
+
+    // ─── Totals ───────────────────────────────────────────────────────────────
+
+    const totals = entries.reduce(
+        (acc, e) => ({
+            base_salary: acc.base_salary + n(e.base_salary),
+            commission:  acc.commission  + n(e.commission),
+            expenses:    acc.expenses    + n(e.expenses),
+            holidays:    acc.holidays    + n(e.holidays),
+            vacation:    acc.vacation    + n(e.vacation),
+        }),
+        { base_salary: 0, commission: 0, expenses: 0, holidays: 0, vacation: 0 }
+    );
+    const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
+    const netTotal   = grandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
+
+    const commRateLabel = `${Math.round(commRate * 100)}%`;
+
+    // ─── Render ───────────────────────────────────────────────────────────────
+
+    if (!repName && !isAdmin) {
+        return (
+            <div className="p-4 md:p-8 max-w-screen-2xl mx-auto flex items-center justify-center min-h-[60vh]">
+                <div className="text-center space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
+                        <User className="w-7 h-7 text-slate-300" />
+                    </div>
+                    <h2 className="text-base font-semibold text-slate-700">Portail non configuré</h2>
+                    <p className="text-sm text-slate-400 max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-5 md:space-y-6">
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div>
+                    <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-emerald-500" />
+                        Ma Paye
+                    </h2>
+                    <p className="text-sm text-slate-400 mt-0.5">
+                        {repName || 'Représentant'}
+                        {!canEdit && <span className="ml-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Lecture seule</span>}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-2 bg-brand-main/5 border border-brand-main/20 rounded-xl">
+                    <Percent className="w-3.5 h-3.5 text-brand-main shrink-0" />
+                    <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Commission</p>
+                        <p className="text-base font-bold text-brand-main leading-tight">{commRateLabel}</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Filters */}
+            <FilterBar>
+                <FilterGroup label="Année">
+                    <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
+                </FilterGroup>
+            </FilterBar>
+
+            {/* ─── Meta cards ──────────────────────────────────────────────── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <MetaCard label="Solde Année Précédente"            value={meta.previous_year_balance} onChange={v => updateMeta('previous_year_balance', v)} bg="bg-blue-50 border-blue-100"           text="text-blue-700"    readOnly={!canEdit} />
+                <MetaCard label="Bonus Annuel"                       value={meta.annual_bonus}          onChange={v => updateMeta('annual_bonus', v)}          bg="bg-brand-main/5 border-brand-main/20" text="text-brand-main"  readOnly={!canEdit} />
+                <MetaCard label={`Commission ${year - 1} Facturées`} value={meta.commission_prev_year}  onChange={v => updateMeta('commission_prev_year', v)}   bg="bg-amber-50 border-amber-100"          text="text-amber-700"  readOnly={!canEdit} />
+                <MetaCard label="Montant en Banque"                  value={meta.bank_balance}          onChange={v => updateMeta('bank_balance', v)}           bg="bg-emerald-50 border-emerald-100"      text="text-emerald-700" readOnly={!canEdit} />
+            </div>
+
+            {/* ─── Payroll table ───────────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            Taux commission : <span className="font-bold text-brand-main">{commRateLabel}</span>
+                        </p>
+                    </div>
+                </div>
+
+                {!repName ? (
+                    <div className="flex items-center justify-center py-16">
+                        <p className="text-sm text-slate-400">Sélectionnez un représentant ci-dessus</p>
+                    </div>
+                ) : loading ? (
+                    <div className="flex items-center justify-center py-16 gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                        <span className="text-sm text-slate-400">Chargement...</span>
+                    </div>
+                ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50/40">
+                                <Th align="left"  color="" className="min-w-[160px]">Date</Th>
+                                <Th align="right" color="text-blue-400">Salaire de base</Th>
+                                <Th align="right" color="text-brand-main">Commission</Th>
+                                <Th align="right" color="text-emerald-500">Remb. Dépenses</Th>
+                                <Th align="right" color="text-purple-400">Fériés</Th>
+                                <Th align="right" color="text-teal-500">Vacances</Th>
+                                <Th align="right" color="text-slate-400">Total</Th>
+                                <Th align="left"  color="text-slate-300" className="min-w-[130px]">Note</Th>
+                                {canEdit && <th className="w-8" />}
+                            </tr>
+                        </thead>
+
+                        <tbody className="divide-y divide-slate-50">
+                            {entries.length === 0 && (
+                                <tr>
+                                    <td colSpan={canEdit ? 9 : 8} className="px-5 py-12 text-center text-sm text-slate-300 italic">
+                                        Aucune paie enregistrée pour {year}
+                                    </td>
+                                </tr>
+                            )}
+                            {entries.map((entry, idx) => {
+                                const rowTotal = n(entry.base_salary) + n(entry.commission) + n(entry.expenses) + n(entry.holidays) + n(entry.vacation);
+                                return (
+                                    <tr key={entry.id} className={cn("group transition-colors hover:bg-brand-main/[0.02]", idx % 2 === 1 && "bg-slate-50/30")}>
+                                        <td className="px-4 py-2.5">
+                                            {canEdit ? (
+                                                <input
+                                                    type="text"
+                                                    value={entry.pay_date}
+                                                    onChange={e => updateField(entry.id, 'pay_date', e.target.value)}
+                                                    placeholder="ex: 8 janvier 2026"
+                                                    className="w-full bg-transparent text-slate-700 font-medium placeholder:text-slate-200 focus:outline-none text-sm"
+                                                />
+                                            ) : (
+                                                <span className="text-slate-700 font-medium text-sm">{entry.pay_date || '—'}</span>
+                                            )}
+                                        </td>
+                                        {canEdit ? (
+                                            <>
+                                                <NumInput value={fmt(entry.base_salary)} onChange={v => updateField(entry.id, 'base_salary', v)} color="text-blue-700" />
+                                                <NumInput value={fmt(entry.commission)}  onChange={v => updateField(entry.id, 'commission', v)}  color="text-brand-main" />
+                                                <NumInput value={fmt(entry.expenses)}    onChange={v => updateField(entry.id, 'expenses', v)}    color="text-emerald-600" />
+                                                <NumInput value={fmt(entry.holidays)}    onChange={v => updateField(entry.id, 'holidays', v)}    color="text-purple-600" />
+                                                <NumInput value={fmt(entry.vacation)}    onChange={v => updateField(entry.id, 'vacation', v)}    color="text-teal-600" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                <NumDisplay value={entry.base_salary} color="text-blue-700" />
+                                                <NumDisplay value={entry.commission}  color="text-brand-main" />
+                                                <NumDisplay value={entry.expenses}    color="text-emerald-600" />
+                                                <NumDisplay value={entry.holidays}    color="text-purple-600" />
+                                                <NumDisplay value={entry.vacation}    color="text-teal-600" />
+                                            </>
+                                        )}
+                                        <td className="px-4 py-2.5 text-right font-bold text-slate-800 tabular-nums">
+                                            {rowTotal > 0 ? formatCurrencyCAD(rowTotal) : <span className="text-slate-200">—</span>}
+                                        </td>
+                                        <td className="px-4 py-2.5">
+                                            {canEdit ? (
+                                                <input
+                                                    type="text"
+                                                    value={entry.note}
+                                                    onChange={e => updateField(entry.id, 'note', e.target.value)}
+                                                    placeholder="Note..."
+                                                    className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-200 focus:outline-none italic"
+                                                />
+                                            ) : (
+                                                <span className="text-xs text-slate-400 italic">{entry.note || ''}</span>
+                                            )}
+                                        </td>
+                                        {canEdit && (
+                                            <td className="px-2 py-2.5">
+                                                <button
+                                                    onClick={() => deleteEntry(entry.id)}
+                                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        )}
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+
+                        <tfoot>
+                            {/* Add row — admin only */}
+                            {canEdit && (
+                                <tr className="border-t border-slate-100">
+                                    <td colSpan={9} className="px-4 py-2">
+                                        <button
+                                            onClick={addEntry}
+                                            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-brand-main transition-colors font-medium"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Nouvelle ligne
+                                        </button>
+                                    </td>
+                                </tr>
+                            )}
+                            {/* Totals */}
+                            <tr className="border-t-2 border-slate-200 bg-slate-50/80">
+                                <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">SOMME</td>
+                                <TotalCell value={totals.base_salary} color="text-blue-700" />
+                                <TotalCell value={totals.commission}  color="text-brand-main" />
+                                <TotalCell value={totals.expenses}    color="text-emerald-600" />
+                                <TotalCell value={totals.holidays}    color="text-purple-600" />
+                                <TotalCell value={totals.vacation}    color="text-teal-600" />
+                                <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums text-base">
+                                    {formatCurrencyCAD(grandTotal)}
+                                </td>
+                                <td colSpan={canEdit ? 2 : 1} />
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                )}
+            </div>
+
+            {/* ─── Net total banner ────────────────────────────────────────── */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card px-4 md:px-6 py-4 md:py-5 flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Total Net — {year}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-slate-900 mt-1 tabular-nums">{formatCurrencyCAD(netTotal)}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Paies{n(meta.previous_year_balance) !== 0 ? ` + Solde ${year - 1}` : ''}{n(meta.annual_bonus) !== 0 ? ' + Bonus' : ''}
+                    </p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-right">
+                    <p className="text-xs text-slate-400">Total des paies</p>
+                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(grandTotal)}</p>
+                    {n(meta.previous_year_balance) !== 0 && (<>
+                        <p className="text-xs text-slate-400">Solde {year - 1}</p>
+                        <p className="text-sm font-bold text-blue-600 tabular-nums">{formatCurrencyCAD(n(meta.previous_year_balance))}</p>
+                    </>)}
+                    {n(meta.annual_bonus) !== 0 && (<>
+                        <p className="text-xs text-slate-400">Bonus annuel</p>
+                        <p className="text-sm font-bold text-brand-main tabular-nums">{formatCurrencyCAD(n(meta.annual_bonus))}</p>
+                    </>)}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Th({ children, align, color, className }: {
+    children?: React.ReactNode; align: 'left' | 'right'; color: string; className?: string;
+}) {
+    return (
+        <th className={cn(
+            "px-4 py-3 text-[10px] font-bold uppercase tracking-widest",
+            align === 'right' ? 'text-right' : 'text-left',
+            color, className
+        )}>
+            {children}
+        </th>
+    );
+}
+
+function NumInput({ value, onChange, color }: { value: string; onChange: (v: string) => void; color: string }) {
+    return (
+        <td className="px-4 py-2.5">
+            <input
+                type="text"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                placeholder="—"
+                className={cn(
+                    "w-full bg-transparent text-right font-semibold placeholder:text-slate-200 focus:outline-none tabular-nums text-sm min-w-[90px]",
+                    color
+                )}
+            />
+        </td>
+    );
+}
+
+function NumDisplay({ value, color }: { value: number | null; color: string }) {
+    return (
+        <td className={cn("px-4 py-2.5 text-right font-semibold tabular-nums text-sm", color)}>
+            {value ? formatCurrencyCAD(value) : <span className="text-slate-200">—</span>}
+        </td>
+    );
+}
+
+function TotalCell({ value, color }: { value: number; color: string }) {
+    return (
+        <td className={cn("px-4 py-3 text-right font-bold tabular-nums", color)}>
+            {value > 0 ? formatCurrencyCAD(value) : <span className="text-slate-300">—</span>}
+        </td>
+    );
+}
+
+function MetaCard({ label, value, onChange, bg, text, readOnly }: {
+    label: string; value: number; onChange: (v: string) => void; bg: string; text: string; readOnly?: boolean;
+}) {
+    const [draft, setDraft] = useState(value === 0 ? '' : String(value));
+
+    useEffect(() => { setDraft(value === 0 ? '' : String(value)); }, [value]);
+
+    return (
+        <div className={cn("p-3 md:p-4 rounded-2xl border", bg)}>
+            <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight mb-1.5 md:mb-2">{label}</p>
+            {readOnly ? (
+                <p className={cn("text-base md:text-xl font-bold tabular-nums", text)}>
+                    {value ? formatCurrencyCAD(value) : <span className="text-slate-300">—</span>}
+                </p>
+            ) : (
+                <input
+                    type="text"
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    onBlur={() => onChange(draft)}
+                    placeholder="0,00$"
+                    className={cn("text-base md:text-xl font-bold w-full bg-transparent focus:outline-none placeholder:text-slate-300 tabular-nums", text)}
+                />
+            )}
+        </div>
+    );
+}

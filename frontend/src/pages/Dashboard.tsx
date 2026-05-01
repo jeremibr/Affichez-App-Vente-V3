@@ -112,12 +112,12 @@ export default function Dashboard() {
 
     return (
         <>
-        <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-8">
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             {/* Header */}
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Tableau de Bord</h1>
-                    <p className="text-sm text-slate-400 mt-0.5">Performance et indicateurs clés de vente</p>
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Tableau de Bord</h1>
+                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance et indicateurs clés de vente</p>
                 </div>
                 <SyncButton onSyncComplete={() => fetchDataRef.current()} />
             </div>
@@ -149,7 +149,7 @@ export default function Dashboard() {
             ) : (
                 <>
                     {/* KPI Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                         <KPICard
                             title="Chiffre d'affaires YTD"
                             value={formatCurrencyCAD(kpis?.ytd_total || 0)}
@@ -187,7 +187,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Detailed Insights Section */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                         {/* Leaderboard */}
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -338,7 +338,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
             <div
-                className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+                className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
@@ -347,7 +347,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
                         <X className="w-4 h-4" />
                     </button>
                 </div>
-                <div className="overflow-y-auto">
+                <div className="overflow-y-auto overflow-x-auto">
                     {children}
                 </div>
             </div>
@@ -355,35 +355,35 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     );
 }
 
-function KPICard({ title, value, subValue, subText, icon: Icon, trend, trendLabel, dual }: any) {
+function KPICard({ title, value, subValue, subText, icon: Icon, trend, dual }: any) {
     return (
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
-            <div className="flex items-start justify-between mb-4">
-                <div className="p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
-                    <Icon className="w-5 h-5" />
+        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 {trend !== undefined && (
                     <div className={cn(
-                        "text-[11px] font-bold px-2 py-0.5 rounded-full",
+                        "text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 rounded-full",
                         trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
                     )}>
-                        {trend}% {trendLabel}
+                        {trend}%
                     </div>
                 )}
             </div>
             <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{title}</p>
+                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
                 <div className="mt-1 flex items-baseline gap-2">
-                    <span className="text-2xl font-bold text-slate-900">{value}</span>
+                    <span className="text-base md:text-2xl font-bold text-slate-900 tabular-nums">{value}</span>
                 </div>
                 {dual && subValue && (
-                    <div className="mt-0.5 flex items-center gap-2 text-[10px] font-bold">
+                    <div className="mt-0.5 flex flex-col md:flex-row items-start md:items-center gap-0.5 md:gap-2 text-[10px] font-bold">
                         <span className="text-emerald-500">I : {value}</span>
-                        <span className="text-slate-300">|</span>
+                        <span className="hidden md:inline text-slate-300">|</span>
                         <span className="text-amber-500">A : {subValue}</span>
                     </div>
                 )}
-                <p className="text-[11px] text-slate-400 mt-1 font-medium italic">{subText}</p>
+                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );
