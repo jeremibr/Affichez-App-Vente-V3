@@ -569,7 +569,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                     onChange={e => {
                                         const u = zohoUsers.find(z => z.email === e.target.value);
                                         if (u) {
-                                            const matched = repOptions.find(r => r.toLowerCase() === u.name.toLowerCase()) ?? u.name;
+                                            const matched = repOptions.find(r => r.toLowerCase() === u.name.toLowerCase()) ?? '';
                                             setForm(f => ({ ...f, email: u.email, name: u.name, rep_name: matched }));
                                         } else {
                                             setForm(f => ({ ...f, email: '', name: '', rep_name: '' }));

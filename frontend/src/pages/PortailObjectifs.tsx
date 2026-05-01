@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
-import { Target, Loader2, ClipboardList, FileText, User } from 'lucide-react';
+import { Target, Loader2, ClipboardList, FileText, User, BarChart2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { MONTHS } from '../lib/constants';
+import { MONTHS, DEPARTMENTS } from '../lib/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,9 +19,30 @@ interface RepObjective {
     target_amount: number;
 }
 
+interface RepObjectiveDept {
+    module: 'devis' | 'factures';
+    month: number;
+    department: string;
+    target_amount: number;
+}
+
+interface DeptActualRow {
+    month: number;
+    department: string;
+    actual_amount: number;
+}
+
 interface MonthRow {
     month: number;
     label: string;
+    devisTarget: number;
+    devisActual: number;
+    facturesTarget: number;
+    facturesActual: number;
+}
+
+interface DeptRow {
+    department: string;
     devisTarget: number;
     devisActual: number;
     facturesTarget: number;
@@ -37,8 +58,17 @@ const MONTH_LABELS = [
     'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
 
+const DEPT_SHORT: Record<string, string> = {
+    'MULTI-ANNONCEURS':        'Multi-Ann.',
+    'PROMOTIONNEL':            'Promo',
+    'DIST. PUBLICITAIRE SOLO': 'Solo',
+    'NUMERIQUE':               'Numérique',
+    'APPLICATION':             'Application',
+    'SERVICES IA':             'Services IA',
+};
+
 const NOW_MONTH = new Date().getMonth() + 1;
-const NOW_YEAR = new Date().getFullYear();
+const NOW_YEAR  = new Date().getFullYear();
 
 // ─── Progress bar ─────────────────────────────────────────────────────────────
 
@@ -49,7 +79,7 @@ function Progress({ actual, target }: { actual: number; target: number }) {
     const color = pct >= 100 ? 'bg-emerald-400' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400';
     const textColor = pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-600' : 'text-red-500';
     return (
-        <div className="flex items-center gap-2 min-w-[100px]">
+        <div className="flex items-center gap-2 min-w-[90px]">
             <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${clamped}%` }} />
             </div>
@@ -61,20 +91,11 @@ function Progress({ actual, target }: { actual: number; target: number }) {
 // ─── Hero KPI card ─────────────────────────────────────────────────────────────
 
 function HeroKpiCard({
-    icon: Icon,
-    label,
-    actual,
-    target,
-}: {
-    icon: React.ElementType;
-    label: string;
-    actual: number;
-    target: number;
-}) {
+    icon: Icon, label, actual, target,
+}: { icon: React.ElementType; label: string; actual: number; target: number }) {
     const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
     const clamped = Math.min(pct, 100);
     const barColor = pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-500';
-
     return (
         <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex-1 min-w-0">
             <div className="flex items-center gap-1.5 mb-3">
@@ -93,10 +114,7 @@ function HeroKpiCard({
                         <span className="text-xs font-bold text-white">{pct}% atteint</span>
                     </div>
                     <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                        <div
-                            className={cn('h-full rounded-full transition-all duration-700', barColor)}
-                            style={{ width: `${clamped}%` }}
-                        />
+                        <div className={cn('h-full rounded-full transition-all duration-700', barColor)} style={{ width: `${clamped}%` }} />
                     </div>
                 </div>
             )}
@@ -124,8 +142,10 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Tous');
     const selectedMonth: number | 'Tous' = _monthParam === 'Tous' ? 'Tous' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Tous') => _setMonthParam(v === 'Tous' ? 'Tous' : String(v));
-    const [loading, setLoading] = useState(true);
-    const [rows, setRows] = useState<MonthRow[]>([]);
+
+    const [loading, setLoading]     = useState(true);
+    const [rows, setRows]           = useState<MonthRow[]>([]);
+    const [deptRows, setDeptRows]   = useState<DeptRow[]>([]);
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const monthOptions = [
@@ -139,16 +159,23 @@ export default function PortailObjectifs({ propRepName }: Props) {
         if (!repName) { setLoading(false); return; }
         setLoading(true);
 
-        const [objRes, devisRes, factRes] = await Promise.all([
+        const [objRes, deptObjRes, devisRes, factRes, devisDeptRes, factDeptRes] = await Promise.all([
             supabase.from('rep_objectives').select('*').eq('rep_name', repName).eq('year', year),
+            supabase.from('rep_objectives_dept').select('module, month, department, target_amount').eq('rep_name', repName).eq('year', year),
             supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
+            supabase.rpc('get_rep_dept_actuals_devis', { p_rep: repName, p_year: year }),
+            supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: year }),
         ]);
 
-        const objectives  = (objRes.data   ?? []) as RepObjective[];
-        const devisActuals = (devisRes.data ?? []) as { month: number; actual_amount: number }[];
-        const factActuals  = (factRes.data  ?? []) as { month: number; actual_amount: number }[];
+        const objectives      = (objRes.data    ?? []) as RepObjective[];
+        const deptObjectives  = (deptObjRes.data ?? []) as RepObjectiveDept[];
+        const devisActuals    = (devisRes.data   ?? []) as { month: number; actual_amount: number }[];
+        const factActuals     = (factRes.data    ?? []) as { month: number; actual_amount: number }[];
+        const devisDeptActs   = (devisDeptRes.data ?? []) as DeptActualRow[];
+        const factDeptActs    = (factDeptRes.data  ?? []) as DeptActualRow[];
 
+        // ── Monthly rows ──
         const objMap: Record<string, number> = {};
         for (const o of objectives) { objMap[`${o.module}-${o.month}`] = o.target_amount; }
 
@@ -167,8 +194,45 @@ export default function PortailObjectifs({ propRepName }: Props) {
             facturesActual: factMap[i + 1]               ?? 0,
         })));
 
+        // ── Department rows ──
+        // Build lookup: deptObj[module-month-dept] = target
+        const dObjMap: Record<string, number> = {};
+        for (const o of deptObjectives) { dObjMap[`${o.module}-${o.month}-${o.department}`] = o.target_amount; }
+
+        // Actual lookups
+        const devisActMap: Record<string, number> = {};
+        for (const d of devisDeptActs) { devisActMap[`${d.month}-${d.department}`] = d.actual_amount; }
+
+        const factActMap: Record<string, number> = {};
+        for (const f of factDeptActs) { factActMap[`${f.month}-${f.department}`] = f.actual_amount; }
+
+        // Filter by selectedMonth (will be recalculated when month changes so store raw)
+        // Store all data keyed by dept so we can derive the correct totals in render
+        const deptData: DeptRow[] = DEPARTMENTS.map(dept => {
+            let devisTarget = 0, devisActual = 0, facturesTarget = 0, facturesActual = 0;
+            for (let m = 1; m <= 12; m++) {
+                devisTarget    += dObjMap[`devis-${m}-${dept}`]    ?? 0;
+                devisActual    += devisActMap[`${m}-${dept}`]      ?? 0;
+                facturesTarget += dObjMap[`factures-${m}-${dept}`] ?? 0;
+                facturesActual += factActMap[`${m}-${dept}`]       ?? 0;
+            }
+            return { department: dept, devisTarget, devisActual, facturesTarget, facturesActual };
+        });
+
+        // Store raw per-month dept data for month-filtered view
+        // We'll reuse the dObjMap and act maps via closure — store them in a ref-like approach
+        // Simpler: store a pre-built structure for each dept × month
+        setDeptRowsRaw({ dObjMap, devisActMap, factActMap });
+        setDeptRows(deptData);
         setLoading(false);
     }, [repName, year]);
+
+    // Raw dept data for re-slicing by month filter
+    const [deptRowsRaw, setDeptRowsRaw] = useState<{
+        dObjMap: Record<string, number>;
+        devisActMap: Record<string, number>;
+        factActMap: Record<string, number>;
+    } | null>(null);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -201,6 +265,29 @@ export default function PortailObjectifs({ propRepName }: Props) {
         { devisTarget: 0, devisActual: 0, facturesTarget: 0, facturesActual: 0 }
     );
 
+    // Compute filtered dept rows based on selectedMonth
+    const filteredDeptRows: DeptRow[] = (() => {
+        if (!deptRowsRaw) return deptRows;
+        const { dObjMap, devisActMap, factActMap } = deptRowsRaw;
+        const months = selectedMonth === 'Tous'
+            ? Array.from({ length: 12 }, (_, i) => i + 1)
+            : [selectedMonth as number];
+        return DEPARTMENTS.map(dept => {
+            let devisTarget = 0, devisActual = 0, facturesTarget = 0, facturesActual = 0;
+            for (const m of months) {
+                devisTarget    += dObjMap[`devis-${m}-${dept}`]    ?? 0;
+                devisActual    += devisActMap[`${m}-${dept}`]      ?? 0;
+                facturesTarget += dObjMap[`factures-${m}-${dept}`] ?? 0;
+                facturesActual += factActMap[`${m}-${dept}`]       ?? 0;
+            }
+            return { department: dept, devisTarget, devisActual, facturesTarget, facturesActual };
+        });
+    })();
+
+    const hasDeptData = filteredDeptRows.some(
+        r => r.devisTarget > 0 || r.devisActual > 0 || r.facturesTarget > 0 || r.facturesActual > 0
+    );
+
     // ─── Guard ────────────────────────────────────────────────────────────────
 
     if (!repName && !isAdmin) {
@@ -224,12 +311,9 @@ export default function PortailObjectifs({ propRepName }: Props) {
 
             {/* ── Hero banner ── */}
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-main via-brand-main/90 to-amber-500 rounded-2xl p-6 md:p-8 text-white shadow-lg shadow-brand-main/20">
-                {/* Decorative blobs */}
                 <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
                 <div className="absolute -bottom-14 -left-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-
                 <div className="relative flex flex-col gap-6">
-                    {/* Greeting row */}
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
@@ -245,21 +329,9 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             </p>
                         </div>
                     </div>
-
-                    {/* KPI cards */}
                     <div className="flex gap-3 md:gap-4">
-                        <HeroKpiCard
-                            icon={ClipboardList}
-                            label="Devis"
-                            actual={totals.devisActual}
-                            target={totals.devisTarget}
-                        />
-                        <HeroKpiCard
-                            icon={FileText}
-                            label="Factures"
-                            actual={totals.facturesActual}
-                            target={totals.facturesTarget}
-                        />
+                        <HeroKpiCard icon={ClipboardList} label="Devis"    actual={totals.devisActual}    target={totals.devisTarget} />
+                        <HeroKpiCard icon={FileText}      label="Factures" actual={totals.facturesActual} target={totals.facturesTarget} />
                     </div>
                 </div>
             </div>
@@ -267,13 +339,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
             {/* ── Filters ── */}
             <FilterBar>
                 <FilterGroup label="Année">
-                    <Select
-                        value={String(year)}
-                        onChange={v => setYear(Number(v))}
-                        options={yearOptions}
-                        variant="accent"
-                        className="w-28"
-                    />
+                    <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
                 </FilterGroup>
                 <FilterGroup label="Mois">
                     <Select
@@ -285,7 +351,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                 </FilterGroup>
             </FilterBar>
 
-            {/* ── Table ── */}
+            {/* ── Monthly table ── */}
             {!repName ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">
                     <Target className="w-8 h-8 text-slate-200" />
@@ -297,104 +363,186 @@ export default function PortailObjectifs({ propRepName }: Props) {
                     <span className="text-sm text-slate-400">Chargement...</span>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/60">
-                                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Objectif Devis</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Réalisé</th>
-                                    <th className="px-4 py-3 text-[10px] font-bold text-blue-300 uppercase tracking-widest min-w-[120px]">Atteinte</th>
-                                    <th className="w-px bg-slate-100" />
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif Factures</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
-                                    <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[120px]">Atteinte</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {displayedRows.map(row => {
-                                    const isCurrent = row.month === NOW_MONTH && year === NOW_YEAR;
-                                    return (
-                                        <tr
-                                            key={row.month}
-                                            className={cn(
-                                                'hover:bg-slate-50/60 transition-colors',
-                                                isCurrent && 'bg-brand-main/5 hover:bg-brand-main/10'
-                                            )}
-                                        >
-                                            <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
-                                                <div className="flex items-center gap-2">
-                                                    {isCurrent && (
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-main shrink-0" />
-                                                    )}
-                                                    {row.label}
-                                                    {isCurrent && (
-                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-brand-main bg-brand-main/10 px-1.5 py-0.5 rounded-full">
-                                                            En cours
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-
-                                            {/* Devis */}
-                                            <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
-                                                {row.devisTarget > 0 ? formatCurrencyCAD(row.devisTarget) : <span className="text-slate-200">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-semibold text-blue-700 tabular-nums">
-                                                {row.devisActual > 0 ? formatCurrencyCAD(row.devisActual) : <span className="text-slate-200">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Progress actual={row.devisActual} target={row.devisTarget} />
-                                            </td>
-
-                                            <td className="w-px bg-slate-100 p-0" />
-
-                                            {/* Factures */}
-                                            <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
-                                                {row.facturesTarget > 0 ? formatCurrencyCAD(row.facturesTarget) : <span className="text-slate-200">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-semibold text-amber-700 tabular-nums">
-                                                {row.facturesActual > 0 ? formatCurrencyCAD(row.facturesActual) : <span className="text-slate-200">—</span>}
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Progress actual={row.facturesActual} target={row.facturesTarget} />
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                            <tfoot>
-                                <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                    <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                        {selectedMonth === 'Tous'
-                                            ? `Total ${year}`
-                                            : MONTH_LABELS[(selectedMonth as number) - 1]}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                        {displayedTotals.devisTarget > 0 ? formatCurrencyCAD(displayedTotals.devisTarget) : <span className="text-slate-300">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">
-                                        {displayedTotals.devisActual > 0 ? formatCurrencyCAD(displayedTotals.devisActual) : <span className="text-slate-300">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Progress actual={displayedTotals.devisActual} target={displayedTotals.devisTarget} />
-                                    </td>
-                                    <td className="w-px bg-slate-200 p-0" />
-                                    <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                        {displayedTotals.facturesTarget > 0 ? formatCurrencyCAD(displayedTotals.facturesTarget) : <span className="text-slate-300">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
-                                        {displayedTotals.facturesActual > 0 ? formatCurrencyCAD(displayedTotals.facturesActual) : <span className="text-slate-300">—</span>}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <Progress actual={displayedTotals.facturesActual} target={displayedTotals.facturesTarget} />
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                <>
+                    {/* Monthly totals table */}
+                    <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-slate-100 bg-slate-50/60">
+                                        <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Objectif Devis</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Réalisé</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-blue-300 uppercase tracking-widest min-w-[120px]">Atteinte</th>
+                                        <th className="w-px bg-slate-100" />
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif Factures</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[120px]">Atteinte</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {displayedRows.map(row => {
+                                        const isCurrent = row.month === NOW_MONTH && year === NOW_YEAR;
+                                        return (
+                                            <tr key={row.month} className={cn('hover:bg-slate-50/60 transition-colors', isCurrent && 'bg-brand-main/5 hover:bg-brand-main/10')}>
+                                                <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
+                                                    <div className="flex items-center gap-2">
+                                                        {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-brand-main shrink-0" />}
+                                                        {row.label}
+                                                        {isCurrent && (
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-brand-main bg-brand-main/10 px-1.5 py-0.5 rounded-full">En cours</span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
+                                                    {row.devisTarget > 0 ? formatCurrencyCAD(row.devisTarget) : <span className="text-slate-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold text-blue-700 tabular-nums">
+                                                    {row.devisActual > 0 ? formatCurrencyCAD(row.devisActual) : <span className="text-slate-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3"><Progress actual={row.devisActual} target={row.devisTarget} /></td>
+                                                <td className="w-px bg-slate-100 p-0" />
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
+                                                    {row.facturesTarget > 0 ? formatCurrencyCAD(row.facturesTarget) : <span className="text-slate-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-semibold text-amber-700 tabular-nums">
+                                                    {row.facturesActual > 0 ? formatCurrencyCAD(row.facturesActual) : <span className="text-slate-200">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3"><Progress actual={row.facturesActual} target={row.facturesTarget} /></td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t-2 border-slate-200 bg-slate-50/80">
+                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                                            {selectedMonth === 'Tous' ? `Total ${year}` : MONTH_LABELS[(selectedMonth as number) - 1]}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
+                                            {displayedTotals.devisTarget > 0 ? formatCurrencyCAD(displayedTotals.devisTarget) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">
+                                            {displayedTotals.devisActual > 0 ? formatCurrencyCAD(displayedTotals.devisActual) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3"><Progress actual={displayedTotals.devisActual} target={displayedTotals.devisTarget} /></td>
+                                        <td className="w-px bg-slate-200 p-0" />
+                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
+                                            {displayedTotals.facturesTarget > 0 ? formatCurrencyCAD(displayedTotals.facturesTarget) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
+                                            {displayedTotals.facturesActual > 0 ? formatCurrencyCAD(displayedTotals.facturesActual) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3"><Progress actual={displayedTotals.facturesActual} target={displayedTotals.facturesTarget} /></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
                     </div>
-                </div>
+
+                    {/* ── Department breakdown ── */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                                <BarChart2 className="w-3.5 h-3.5 text-slate-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
+                                <p className="text-xs text-slate-400">
+                                    {selectedMonth === 'Tous'
+                                        ? `Objectifs et réalisé cumulés sur ${year}`
+                                        : `Objectifs et réalisé pour ${MONTH_LABELS[(selectedMonth as number) - 1]} ${year}`}
+                                    {' · '}Configurez dans <span className="text-brand-main font-medium">Paramètres</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {!hasDeptData ? (
+                            <div className="bg-white rounded-2xl border border-slate-100 px-6 py-10 flex flex-col items-center gap-2 text-center">
+                                <BarChart2 className="w-8 h-8 text-slate-200" />
+                                <p className="text-sm font-medium text-slate-400">Aucun objectif par département configuré</p>
+                                <p className="text-xs text-slate-300">Rendez-vous dans Paramètres pour définir vos objectifs par département.</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 bg-slate-50/60">
+                                                <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Département</th>
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Obj. Devis</th>
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Réalisé</th>
+                                                <th className="px-4 py-3 text-[10px] font-bold text-blue-300 uppercase tracking-widest min-w-[110px]">Atteinte</th>
+                                                <th className="w-px bg-slate-100" />
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Obj. Factures</th>
+                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
+                                                <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[110px]">Atteinte</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {filteredDeptRows
+                                                .filter(r => r.devisTarget > 0 || r.devisActual > 0 || r.facturesTarget > 0 || r.facturesActual > 0)
+                                                .map(row => (
+                                                    <tr key={row.department} className="hover:bg-slate-50/60 transition-colors">
+                                                        <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
+                                                            {DEPT_SHORT[row.department] ?? row.department}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">
+                                                            {row.devisTarget > 0 ? formatCurrencyCAD(row.devisTarget) : <span className="text-slate-200">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-blue-700 tabular-nums">
+                                                            {row.devisActual > 0 ? formatCurrencyCAD(row.devisActual) : <span className="text-slate-200">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3"><Progress actual={row.devisActual} target={row.devisTarget} /></td>
+                                                        <td className="w-px bg-slate-100 p-0" />
+                                                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">
+                                                            {row.facturesTarget > 0 ? formatCurrencyCAD(row.facturesTarget) : <span className="text-slate-200">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-amber-700 tabular-nums">
+                                                            {row.facturesActual > 0 ? formatCurrencyCAD(row.facturesActual) : <span className="text-slate-200">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3"><Progress actual={row.facturesActual} target={row.facturesTarget} /></td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                        <tfoot>
+                                            {(() => {
+                                                const ft = filteredDeptRows.reduce(
+                                                    (a, r) => ({
+                                                        devisTarget:    a.devisTarget    + r.devisTarget,
+                                                        devisActual:    a.devisActual    + r.devisActual,
+                                                        facturesTarget: a.facturesTarget + r.facturesTarget,
+                                                        facturesActual: a.facturesActual + r.facturesActual,
+                                                    }),
+                                                    { devisTarget: 0, devisActual: 0, facturesTarget: 0, facturesActual: 0 }
+                                                );
+                                                return (
+                                                    <tr className="border-t-2 border-slate-200 bg-slate-50/80">
+                                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Total</td>
+                                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
+                                                            {ft.devisTarget > 0 ? formatCurrencyCAD(ft.devisTarget) : <span className="text-slate-300">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">
+                                                            {ft.devisActual > 0 ? formatCurrencyCAD(ft.devisActual) : <span className="text-slate-300">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3"><Progress actual={ft.devisActual} target={ft.devisTarget} /></td>
+                                                        <td className="w-px bg-slate-200 p-0" />
+                                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
+                                                            {ft.facturesTarget > 0 ? formatCurrencyCAD(ft.facturesTarget) : <span className="text-slate-300">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
+                                                            {ft.facturesActual > 0 ? formatCurrencyCAD(ft.facturesActual) : <span className="text-slate-300">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3"><Progress actual={ft.facturesActual} target={ft.facturesTarget} /></td>
+                                                    </tr>
+                                                );
+                                            })()}
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </>
             )}
         </div>
     );
