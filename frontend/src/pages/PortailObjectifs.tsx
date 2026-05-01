@@ -72,7 +72,7 @@ function HeroKpiCard({
 }) {
     const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
     const clamped = Math.min(pct, 100);
-    const barColor = pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-300';
+    const barColor = pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-500';
 
     return (
         <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex-1 min-w-0">

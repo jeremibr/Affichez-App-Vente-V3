@@ -449,11 +449,28 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
     const [form, setForm] = useState<AllowedUser>({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' });
     const [saving, setSaving] = useState(false);
     const [repOptions, setRepOptions] = useState<string[]>([]);
+    const [zohoUsers, setZohoUsers] = useState<{ name: string; email: string }[]>([]);
+    const [zohoUsersLoading, setZohoUsersLoading] = useState(false);
+    const [zohoUsersError, setZohoUsersError] = useState(false);
 
     useEffect(() => {
         supabase.rpc('get_distinct_rep_names').then(({ data }) => {
             if (data) setRepOptions((data as { rep_name: string }[]).map(r => r.rep_name));
         });
+        setZohoUsersLoading(true);
+        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-zoho-users`, {
+            headers: {
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data.users?.length) setZohoUsers(data.users);
+                else setZohoUsersError(true);
+            })
+            .catch(() => setZohoUsersError(true))
+            .finally(() => setZohoUsersLoading(false));
     }, []);
 
     const fetchUsers = async () => {
@@ -507,20 +524,74 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             </div>
 
             {/* Add/Edit Form */}
-            {showForm && (
+            {showForm && (() => {
+                const isEditing = !!(form.email && users.find(u => u.email === form.email));
+                return (
                 <div className="bg-white border border-brand-main/20 rounded-2xl p-5 shadow-card space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800">{form.email && users.find(u => u.email === form.email) ? 'Modifier' : 'Nouvel'} utilisateur</h3>
+                    <h3 className="text-sm font-bold text-slate-800">
+                        {isEditing ? 'Modifier' : 'Ajouter'} un utilisateur
+                    </h3>
+
+                    {/* User identity row */}
+                    {isEditing ? (
+                        /* Editing: email is locked, show as display */
+                        <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3">
+                            <div className="w-8 h-8 rounded-full bg-brand-main/10 text-brand-main flex items-center justify-center text-sm font-bold shrink-0">
+                                {(form.name || form.email).charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{form.name || '—'}</p>
+                                <p className="text-xs text-slate-400 truncate">{form.email}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Adding: Zoho user picker */
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                                Utilisateur Zoho *
+                            </label>
+                            {zohoUsersError ? (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700 space-y-2">
+                                    <p className="font-semibold">Impossible de charger les utilisateurs Zoho.</p>
+                                    <p>Vérifiez que la fonction <code className="font-mono bg-amber-100 px-1 rounded">get-zoho-users</code> est déployée et que le token Zoho a le scope <code className="font-mono bg-amber-100 px-1 rounded">ZohoBooks.settings.READ</code>.</p>
+                                    <p>En attendant, entrez le courriel manuellement :</p>
+                                    <input
+                                        type="email"
+                                        value={form.email}
+                                        onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                                        className="w-full bg-white rounded-lg px-3 py-2 text-sm border border-amber-200 focus:outline-none focus:ring-2 focus:ring-brand-main/30"
+                                        placeholder="jean@affichez.ca"
+                                    />
+                                </div>
+                            ) : (
+                                <select
+                                    value={form.email}
+                                    onChange={e => {
+                                        const u = zohoUsers.find(z => z.email === e.target.value);
+                                        if (u) setForm(f => ({ ...f, email: u.email, name: u.name }));
+                                        else   setForm(f => ({ ...f, email: '', name: '' }));
+                                    }}
+                                    disabled={zohoUsersLoading}
+                                    className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30 disabled:text-slate-400"
+                                >
+                                    <option value="">
+                                        {zohoUsersLoading ? 'Chargement des utilisateurs Zoho…' : '— Sélectionner un utilisateur Zoho —'}
+                                    </option>
+                                    {zohoUsers.map(u => (
+                                        <option key={u.email} value={u.email}>
+                                            {u.name} — {u.email}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+                            {form.email && !zohoUsersError && (
+                                <p className="text-xs text-slate-400 mt-1 pl-1 truncate">{form.email}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Permissions grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Courriel *</label>
-                            <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="jean@affichez.ca" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Nom</label>
-                            <input type="text" value={form.name ?? ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30" placeholder="Jean Dupont" />
-                        </div>
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 mb-1">Rôle</label>
                             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
@@ -555,7 +626,8 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                         <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all">Annuler</button>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Users Table */}
             <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
@@ -609,7 +681,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                 </table>
             </div>
             <p className="text-xs text-slate-400 px-1">
-                * Le menu déroulant Représentant est alimenté par les noms présents dans Zoho Books (synchronisés). Les membres avec Accès Factures ne voient que leurs propres données.
+                Les utilisateurs pré-configurés ici obtiennent automatiquement leur rôle et accès lors de leur première connexion via Zoho. Les membres avec Accès Factures ne voient que leurs propres données.
             </p>
         </div>
     );
