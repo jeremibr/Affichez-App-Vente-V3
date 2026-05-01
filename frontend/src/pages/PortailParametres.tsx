@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useUrlStateNumber } from '../hooks/useUrlState';
 import { Settings, Loader2, Check, X, Save, User, ClipboardList, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -82,7 +83,7 @@ export default function PortailParametres({ propRepName }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    const [year, setYear] = useState(new Date().getFullYear());
+    const [year, setYear] = useUrlStateNumber('year', new Date().getFullYear());
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [objectives, setObjectives] = useState<Record<string, number>>({});

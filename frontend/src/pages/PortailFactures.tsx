@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, TrendingUp, Target, Briefcase, FileText,
@@ -34,9 +35,11 @@ export default function PortailFactures({ propRepName }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    const [tab, setTab] = useState<'apercu' | 'mensuel'>('apercu');
-    const [year, setYear] = useState(2026);
-    const [selectedMonth, setSelectedMonth] = useState<number | 'Toutes'>('Toutes');
+    const [tab, setTab] = useUrlState('tab', 'apercu') as ['apercu' | 'mensuel', (v: 'apercu' | 'mensuel') => void];
+    const [year, setYear] = useUrlStateNumber('year', 2026);
+    const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
+    const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
+    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     const [commRate, setCommRate] = useState(0.05);
 
     const [loading, setLoading] = useState(true);

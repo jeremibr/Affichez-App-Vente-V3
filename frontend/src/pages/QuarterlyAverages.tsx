@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
@@ -9,9 +10,9 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 
 export default function QuarterlyAverages() {
-    const [year, setYear] = useState<number>(2026);
-    const [selectedRep, setSelectedRep] = useState<string>('Tous');
-    const [selectedOffice, setSelectedOffice] = useState<string>('Toutes');
+    const [year, setYear] = useUrlStateNumber('year', 2026);
+    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { Wallet, Trash2, Loader2, Plus, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -70,8 +71,8 @@ export default function PortailPaye({ propRepName }: Props) {
 
     const canEdit = isAdmin;
 
-    const [year, setYear]               = useState(2026);
-    const [selectedMonth, setSelectedMonth] = useState<string>('Tous');
+    const [year, setYear]               = useUrlStateNumber('year', 2026);
+    const [selectedMonth, setSelectedMonth] = useUrlState('month', 'Tous');
     const [loading, setLoading]         = useState(true);
     const [entries, setEntries]         = useState<PayEntry[]>([]);
     const [meta, setMeta]               = useState<PayMeta>(EMPTY_META);

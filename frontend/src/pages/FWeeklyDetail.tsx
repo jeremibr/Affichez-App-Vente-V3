@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, formatShortDate } from '../lib/utils';
 import { Loader2, Calendar, TrendingUp, Briefcase, Users } from 'lucide-react';
@@ -13,13 +14,13 @@ import { useAuth } from '../contexts/AuthContext';
 export default function FWeeklyDetail() {
     const { isAdmin, repName: authRepName } = useAuth();
 
-    const [year, setYear] = useState<number>(2026);
+    const [year, setYear] = useUrlStateNumber('year', 2026);
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
-    const [selectedWeek, setSelectedWeek] = useState<string>('');
-    const [selectedDept, setSelectedDept] = useState<string>('Toutes');
-    const [selectedRep, setSelectedRep] = useState<string>('Tous');
-    const [selectedOffice, setSelectedOffice] = useState<string>('Toutes');
-    const [selectedStatus, setSelectedStatus] = useState<string>('Toutes');
+    const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
+    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
+    const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);
     const [lineItems, setLineItems] = useState<InvDetailRow[]>([]);

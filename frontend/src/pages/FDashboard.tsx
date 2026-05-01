@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, MinusCircle } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
@@ -27,13 +28,15 @@ interface LeaderboardEntry { rep_name: string; office: string; total_amount: num
 export default function FDashboard() {
     const { isAdmin, repName: authRepName } = useAuth();
 
-    const [year, setYear] = useState<number>(2026);
-    const [selectedOffice, setSelectedOffice] = useState<string>('Toutes');
-    const [selectedStatus, setSelectedStatus] = useState<string>('Toutes');
-    const [selectedDept, setSelectedDept] = useState<string>('Toutes');
-    const [selectedMonth, setSelectedMonth] = useState<number | 'Toutes'>('Toutes');
+    const [year, setYear] = useUrlStateNumber('year', 2026);
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
+    const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
+    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
+    const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
+    const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
+    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     // Admin can switch reps; members are locked to their own rep
-    const [selectedRep, setSelectedRep] = useState<string>(isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);

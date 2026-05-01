@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Target, History, Save, RefreshCcw,
@@ -19,7 +20,7 @@ interface AllowedUser { email: string; name: string | null; role: string; can_ac
 
 export default function Settings() {
     const { isAdmin } = useAuth();
-    const [activeTab, setActiveTab] = useState<Tab>('objectives');
+    const [activeTab, setActiveTab] = useUrlState('tab', 'objectives') as [Tab, (v: Tab) => void];
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const tabItems: { id: Tab; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
@@ -73,8 +74,8 @@ export default function Settings() {
 
 // ─── Objectives Manager (Devis + Factures) ────────────────────────────────────
 function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' | 'error', text: string }) => void }) {
-    const [module, setModule] = useState<'devis' | 'factures'>('devis');
-    const [year, setYear] = useState(new Date().getFullYear());
+    const [module, setModule] = useUrlState('obj_module', 'devis') as ['devis' | 'factures', (v: 'devis' | 'factures') => void];
+    const [year, setYear] = useUrlStateNumber('obj_year', new Date().getFullYear());
     const [objectives, setObjectives] = useState<Objective[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -461,7 +462,6 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
         fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-zoho-users`, {
             headers: {
                 Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-                apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
             },
         })
             .then(r => r.json())
@@ -568,8 +568,12 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                     value={form.email}
                                     onChange={e => {
                                         const u = zohoUsers.find(z => z.email === e.target.value);
-                                        if (u) setForm(f => ({ ...f, email: u.email, name: u.name }));
-                                        else   setForm(f => ({ ...f, email: '', name: '' }));
+                                        if (u) {
+                                            const matched = repOptions.find(r => r.toLowerCase() === u.name.toLowerCase()) ?? u.name;
+                                            setForm(f => ({ ...f, email: u.email, name: u.name, rep_name: matched }));
+                                        } else {
+                                            setForm(f => ({ ...f, email: '', name: '', rep_name: '' }));
+                                        }
                                     }}
                                     disabled={zohoUsersLoading}
                                     className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30 disabled:text-slate-400"
@@ -585,7 +589,14 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                 </select>
                             )}
                             {form.email && !zohoUsersError && (
-                                <p className="text-xs text-slate-400 mt-1 pl-1 truncate">{form.email}</p>
+                                <div className="flex items-center gap-2 mt-2 pl-1">
+                                    <span className="text-xs text-slate-400 truncate">{form.email}</span>
+                                    {form.rep_name && (
+                                        <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                                            <CheckCircle2 className="w-3 h-3" /> Associé : {form.rep_name}
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
@@ -600,17 +611,20 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Représentant Zoho</label>
-                            <select
-                                value={form.rep_name ?? ''}
-                                onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
-                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30"
-                            >
-                                <option value="">— Aucun —</option>
-                                {repOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                            </select>
-                        </div>
+                        {/* Rep name: auto-matched on add, manually editable on edit */}
+                        {isEditing && (
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Représentant Zoho</label>
+                                <select
+                                    value={form.rep_name ?? ''}
+                                    onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
+                                    className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30"
+                                >
+                                    <option value="">— Aucun —</option>
+                                    {repOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                                </select>
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <input type="checkbox" id="factures-access" checked={form.can_access_factures}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, formatShortDate } from '../lib/utils';
 import { Loader2, Calendar, TrendingUp, Briefcase, Users, FileDown } from 'lucide-react';
@@ -12,14 +13,14 @@ import { Select } from '../components/Select';
 import { generateWeeklyPdf } from '../utils/weeklyPdfExport';
 
 export default function WeeklyDetail() {
-    const [year, setYear] = useState<number>(2026);
+    const [year, setYear] = useUrlStateNumber('year', 2026);
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
-    const [selectedWeek, setSelectedWeek] = useState<string>('');
+    const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
 
-    const [selectedDept, setSelectedDept] = useState<string>('Toutes');
-    const [selectedRep, setSelectedRep] = useState<string>('Tous');
-    const [selectedOffice, setSelectedOffice] = useState<string>('Toutes');
-    const [selectedStatus, setSelectedStatus] = useState<string>('Toutes');
+    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
+    const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
 
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow } from '../types/database';
@@ -11,9 +12,9 @@ import { useAuth } from '../contexts/AuthContext';
 export default function FQuarterlyAverages() {
     const { isAdmin, repName: authRepName } = useAuth();
 
-    const [year, setYear] = useState<number>(2026);
-    const [selectedOffice, setSelectedOffice] = useState<string>('Toutes');
-    const [selectedRep, setSelectedRep] = useState<string>(isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
+    const [year, setYear] = useUrlStateNumber('year', 2026);
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
 

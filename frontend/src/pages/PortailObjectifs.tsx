@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { Target, Loader2, ClipboardList, FileText, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -119,8 +120,10 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    const [year, setYear] = useState(NOW_YEAR);
-    const [selectedMonth, setSelectedMonth] = useState<number | 'Tous'>('Tous');
+    const [year, setYear] = useUrlStateNumber('year', NOW_YEAR);
+    const [_monthParam, _setMonthParam] = useUrlState('month', 'Tous');
+    const selectedMonth: number | 'Tous' = _monthParam === 'Tous' ? 'Tous' : Number(_monthParam);
+    const setSelectedMonth = (v: number | 'Tous') => _setMonthParam(v === 'Tous' ? 'Tous' : String(v));
     const [loading, setLoading] = useState(true);
     const [rows, setRows] = useState<MonthRow[]>([]);
 

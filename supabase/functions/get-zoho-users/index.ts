@@ -9,7 +9,7 @@ const ORGS = [
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
 };
 
 async function getAccessToken(): Promise<string> {
