@@ -676,7 +676,15 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                         ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
                                         : <span className="text-slate-300 text-xs">—</span>}
                                 </td>
-                                <td className="px-5 py-3 text-slate-400 text-xs font-mono">{user.rep_name || '—'}</td>
+                                <td className="px-5 py-3">
+                                    {user.rep_name
+                                        ? repOptions.some(r => r.toLowerCase() === user.rep_name!.toLowerCase())
+                                            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{user.rep_name}
+                                              </span>
+                                            : <span className="text-xs text-amber-600 font-medium">{user.rep_name}</span>
+                                        : <span className="text-slate-300 text-xs">—</span>}
+                                </td>
                                 <td className="px-5 py-3 text-center">
                                     <div className="flex items-center justify-center gap-1">
                                         <button onClick={() => handleEdit(user)}
