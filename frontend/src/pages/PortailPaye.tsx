@@ -85,7 +85,7 @@ export default function PortailPaye({ propRepName }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    const canEdit = isAdmin;
+    const canEdit = isAdmin && !viewAsRep;
 
     const [year, setYear]               = useUrlStateNumber('year', 2026);
     const [selectedMonth, setSelectedMonth] = useUrlState('month', 'Tous');

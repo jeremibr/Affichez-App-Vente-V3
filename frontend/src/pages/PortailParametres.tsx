@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
+import { useRepList } from '../hooks/useRepList';
 import { Select } from '../components/Select';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 
@@ -105,7 +106,30 @@ function TargetCell({
 export default function PortailParametres({ propRepName }: Props) {
     const { repName: authRepName, isAdmin } = useAuth();
     const { viewAsRep } = useAdminView();
-    const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
+    const repList = useRepList();
+    const [adminPickedRep, setAdminPickedRep] = useState('');
+
+    // Admin accessing directly (no propRepName, not in view-as-rep): use their own picker
+    // Admin in view-as-rep mode or with propRepName: use that rep
+    // Member: not allowed
+    const repName = propRepName
+        ?? viewAsRep
+        ?? (isAdmin ? adminPickedRep : authRepName)
+        ?? '';
+
+    if (!isAdmin) {
+        return (
+            <div className="p-4 md:p-8 max-w-screen-xl mx-auto flex items-center justify-center min-h-[60vh]">
+                <div className="text-center space-y-3">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
+                        <Settings className="w-7 h-7 text-slate-300" />
+                    </div>
+                    <h2 className="text-base font-semibold text-slate-700">Accès réservé aux administrateurs</h2>
+                    <p className="text-sm text-slate-400 max-w-xs">Cette section est gérée par l'administrateur.</p>
+                </div>
+            </div>
+        );
+    }
 
     const [year, setYear]           = useUrlStateNumber('year', new Date().getFullYear());
     const [deptModule, setDeptModule] = useUrlState('dept_module', 'devis');
@@ -269,36 +293,38 @@ export default function PortailParametres({ propRepName }: Props) {
         return Math.round(v / 12 * 100) / 100;
     })();
 
-    // ── Guard ─────────────────────────────────────────────────────────────────
-
-    if (!repName && !isAdmin) {
-        return (
-            <div className="p-4 md:p-8 max-w-screen-xl mx-auto flex items-center justify-center min-h-[60vh]">
-                <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-                        <User className="w-7 h-7 text-slate-300" />
-                    </div>
-                    <h2 className="text-base font-semibold text-slate-700">Portail non configuré</h2>
-                    <p className="text-sm text-slate-400 max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
-                </div>
-            </div>
-        );
-    }
-
     // ── Render ────────────────────────────────────────────────────────────────
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
+
+            {/* Rep picker — shown when admin has no rep context from prop or view-as-rep */}
+            {isAdmin && !propRepName && !viewAsRep && (
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="text-sm font-semibold text-slate-600 shrink-0">Représentant :</span>
+                    <Select
+                        value={adminPickedRep}
+                        onChange={setAdminPickedRep}
+                        options={[
+                            { value: '', label: 'Sélectionner un rep...' },
+                            ...repList.map(r => ({ value: r, label: r })),
+                        ]}
+                        variant={adminPickedRep ? 'accent' : 'default'}
+                        className="w-56"
+                    />
+                </div>
+            )}
 
             {/* Page header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                         <Settings className="w-5 h-5 text-slate-400" />
-                        Paramètres
+                        Objectifs Reps
                     </h2>
                     <p className="text-sm text-slate-400 mt-0.5">
-                        Configurez vos objectifs · {repName || 'Représentant'}
+                        {repName ? `Objectifs de ${repName}` : 'Sélectionnez un représentant'}
                     </p>
                 </div>
                 <Select

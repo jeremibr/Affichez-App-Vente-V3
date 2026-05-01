@@ -46,9 +46,10 @@ interface MonthRow {
     label: string;
     target: number;
     actual: number;
+    prevActual: number;
 }
 
-type DeptMonthData = Record<string, Record<number, { target: number; actual: number }>>;
+type DeptMonthData = Record<string, Record<number, { target: number; actual: number; prevActual: number }>>;
 
 interface Props { propRepName?: string; }
 
@@ -90,6 +91,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const [deptData, setDeptData] = useState<DeptMonthData>({});
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
+    const prevYear = year - 1;
 
     // ─── Fetch ───────────────────────────────────────────────────────────────
 
@@ -97,13 +99,16 @@ export default function PortailObjectifs({ propRepName }: Props) {
         if (!repName) { setLoading(false); return; }
         setLoading(true);
 
-        const [objRes, deptObjRes, factRes, factDeptRes] = await Promise.all([
+        const [objRes, deptObjRes, factRes, factDeptRes, prevFactRes, prevDeptRes] = await Promise.all([
             supabase.from('rep_objectives').select('month, target_amount')
                 .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
             supabase.from('rep_objectives_dept').select('month, department, target_amount')
                 .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
             supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: year }),
+            // Previous year actuals
+            supabase.rpc('get_inv_sommaire_grand_total', { p_year: prevYear, p_office: null, p_status: null, p_rep: repName }),
+            supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: prevYear }),
         ]);
 
         const objMap: Record<number, number> = {};
@@ -118,12 +123,18 @@ export default function PortailObjectifs({ propRepName }: Props) {
         const factActMap: Record<string, number> = {};
         for (const f of (factDeptRes.data ?? [])) factActMap[`${f.month}-${f.department}`] = Number(f.actual_amount);
 
-        // Monthly rows — effective target = dept sum when set, otherwise manual monthly total
+        const prevFactMap: Record<number, number> = {};
+        for (const f of (prevFactRes.data ?? [])) prevFactMap[f.month] = Number(f.actual_amount);
+
+        const prevDeptActMap: Record<string, number> = {};
+        for (const f of (prevDeptRes.data ?? [])) prevDeptActMap[`${f.month}-${f.department}`] = Number(f.actual_amount);
+
+        // Monthly rows
         setRows(MONTH_LABELS.map((label, i) => {
             const m = i + 1;
             const deptSum = DEPARTMENTS.reduce((s, d) => s + (dObjMap[`${m}-${d}`] ?? 0), 0);
             const target  = deptSum > 0 ? deptSum : (objMap[m] ?? 0);
-            return { month: m, label, target, actual: factMap[m] ?? 0 };
+            return { month: m, label, target, actual: factMap[m] ?? 0, prevActual: prevFactMap[m] ?? 0 };
         }));
 
         // Dept × month matrix
@@ -132,39 +143,41 @@ export default function PortailObjectifs({ propRepName }: Props) {
             dd[dept] = {};
             for (let m = 1; m <= 12; m++) {
                 dd[dept][m] = {
-                    target: dObjMap[`${m}-${dept}`] ?? 0,
-                    actual: factActMap[`${m}-${dept}`] ?? 0,
+                    target:     dObjMap[`${m}-${dept}`] ?? 0,
+                    actual:     factActMap[`${m}-${dept}`] ?? 0,
+                    prevActual: prevDeptActMap[`${m}-${dept}`] ?? 0,
                 };
             }
         }
         setDeptData(dd);
         setLoading(false);
-    }, [repName, year]);
+    }, [repName, year, prevYear]);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
     // ─── Derived ──────────────────────────────────────────────────────────────
 
     const totals = rows.reduce(
-        (acc, r) => ({ target: acc.target + r.target, actual: acc.actual + r.actual }),
-        { target: 0, actual: 0 }
+        (acc, r) => ({ target: acc.target + r.target, actual: acc.actual + r.actual, prevActual: acc.prevActual + r.prevActual }),
+        { target: 0, actual: 0, prevActual: 0 }
     );
     const pct = totals.target > 0 ? Math.round((totals.actual / totals.target) * 100) : 0;
     const { text: motivText, emoji: motivEmoji } = getMotivation(pct);
 
     const hasDeptData = DEPARTMENTS.some(dept =>
-        Object.values(deptData[dept] ?? {}).some(({ target, actual }) => target > 0 || actual > 0)
+        Object.values(deptData[dept] ?? {}).some(({ target, actual, prevActual }) => target > 0 || actual > 0 || prevActual > 0)
     );
 
     // Per-month column totals for dept matrix footer
-    const colTotals: Record<number, { target: number; actual: number }> = {};
+    const colTotals: Record<number, { target: number; actual: number; prevActual: number }> = {};
     for (let m = 1; m <= 12; m++) {
         colTotals[m] = DEPARTMENTS.reduce(
             (acc, dept) => ({
-                target: acc.target + (deptData[dept]?.[m]?.target ?? 0),
-                actual: acc.actual + (deptData[dept]?.[m]?.actual ?? 0),
+                target:     acc.target     + (deptData[dept]?.[m]?.target ?? 0),
+                actual:     acc.actual     + (deptData[dept]?.[m]?.actual ?? 0),
+                prevActual: acc.prevActual + (deptData[dept]?.[m]?.prevActual ?? 0),
             }),
-            { target: 0, actual: 0 }
+            { target: 0, actual: 0, prevActual: 0 }
         );
     }
 
@@ -209,7 +222,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             </p>
                         </div>
                     </div>
-                    {/* Single factures KPI */}
+                    {/* KPI */}
                     <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex items-center justify-between gap-6 flex-wrap">
                         <div className="flex items-center gap-3">
                             <FileText className="w-5 h-5 text-white/70 shrink-0" />
@@ -222,6 +235,9 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                     {totals.target > 0
                                         ? `sur ${formatCurrencyCAD(totals.target)} objectif`
                                         : 'Objectif non fixé — configurez dans Paramètres'}
+                                    {totals.prevActual > 0 && (
+                                        <span className="ml-2 opacity-70">· {formatCurrencyCAD(totals.prevActual)} en {prevYear}</span>
+                                    )}
                                 </p>
                             </div>
                         </div>
@@ -244,7 +260,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                 </div>
             </div>
 
-            {/* ── Filters (year only) ── */}
+            {/* ── Filters ── */}
             <FilterBar>
                 <FilterGroup label="Année">
                     <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
@@ -271,7 +287,8 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                     <tr className="border-b border-slate-100 bg-slate-50/60">
                                         <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
                                         <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé {year}</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest border-l border-slate-100">{prevYear}</th>
                                         <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[130px]">Atteinte</th>
                                     </tr>
                                 </thead>
@@ -298,6 +315,13 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
                                                     {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-slate-200">—</span>}
                                                 </td>
+                                                <td className="px-4 py-3 text-right tabular-nums text-slate-400 border-l border-slate-100">
+                                                    {row.prevActual > 0 ? (
+                                                        <span className="text-xs font-medium">{formatCurrencyCAD(row.prevActual)}</span>
+                                                    ) : (
+                                                        <span className="text-slate-200">—</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <Progress actual={row.actual} target={row.target} />
                                                 </td>
@@ -313,6 +337,13 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
                                             {totals.actual > 0 ? formatCurrencyCAD(totals.actual) : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-right tabular-nums border-l border-slate-100">
+                                            {totals.prevActual > 0 ? (
+                                                <span className="text-sm font-semibold text-slate-500 tabular-nums">{formatCurrencyCAD(totals.prevActual)}</span>
+                                            ) : (
+                                                <span className="text-slate-300">—</span>
+                                            )}
                                         </td>
                                         <td className="px-4 py-3"><Progress actual={totals.actual} target={totals.target} /></td>
                                     </tr>
@@ -330,8 +361,8 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
                                 <p className="text-xs text-slate-400">
-                                    Objectif par mois · Chiffre en orange = réalisé
-                                    {' · '}Configurez dans <span className="text-brand-main font-medium">Paramètres</span>
+                                    Objectif · <span className="text-amber-500 font-medium">Réalisé {year}</span>
+                                    {' · '}<span className="text-slate-400 font-medium">{prevYear}</span>
                                 </p>
                             </div>
                         </div>
@@ -353,7 +384,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                 </th>
                                                 {MONTH_SHORT.map((m, i) => (
                                                     <th key={i} className={cn(
-                                                        'px-2 py-3 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-100 min-w-[58px]',
+                                                        'px-2 py-3 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-100 min-w-[60px]',
                                                         (i + 1) === NOW_MONTH && year === NOW_YEAR
                                                             ? 'text-brand-main bg-brand-main/5'
                                                             : 'text-slate-400'
@@ -361,7 +392,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                         {m}
                                                     </th>
                                                 ))}
-                                                <th className="px-3 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-slate-200 min-w-[90px]">
+                                                <th className="px-3 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-slate-200 min-w-[100px]">
                                                     Total
                                                 </th>
                                             </tr>
@@ -369,12 +400,12 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                         <tbody>
                                             {DEPARTMENTS.map(dept => {
                                                 const monthCells = deptData[dept] ?? {};
-                                                const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0);
+                                                const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0 || c.prevActual > 0);
                                                 if (!hasRow) return null;
 
                                                 const rowTotal = Object.values(monthCells).reduce(
-                                                    (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual }),
-                                                    { target: 0, actual: 0 }
+                                                    (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual, prevActual: acc.prevActual + c.prevActual }),
+                                                    { target: 0, actual: 0, prevActual: 0 }
                                                 );
 
                                                 return (
@@ -383,31 +414,35 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                             {DEPT_SHORT[dept] ?? dept}
                                                         </td>
                                                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                                            const cell = monthCells[m] ?? { target: 0, actual: 0 };
+                                                            const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
                                                             const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
+                                                            const hasAny = cell.target > 0 || cell.actual > 0 || cell.prevActual > 0;
                                                             return (
                                                                 <td key={m} className={cn(
                                                                     'px-2 py-2.5 text-center border-r border-slate-100',
                                                                     isCurrent && 'bg-brand-main/5'
                                                                 )}>
-                                                                    {cell.target > 0 ? (
-                                                                        <div className="leading-tight">
-                                                                            <div className="font-semibold text-slate-700 tabular-nums">{fmtK(cell.target)}</div>
+                                                                    {hasAny ? (
+                                                                        <div className="leading-tight space-y-px">
+                                                                            {cell.target > 0 && (
+                                                                                <div className="font-semibold text-slate-600 tabular-nums">{fmtK(cell.target)}</div>
+                                                                            )}
                                                                             {cell.actual > 0 && (
                                                                                 <div className={cn(
-                                                                                    'font-bold tabular-nums mt-0.5',
-                                                                                    cell.actual >= cell.target
-                                                                                        ? 'text-emerald-500'
-                                                                                        : cell.actual >= cell.target * 0.7
-                                                                                            ? 'text-amber-500'
-                                                                                            : 'text-brand-main'
+                                                                                    'font-bold tabular-nums',
+                                                                                    cell.target > 0
+                                                                                        ? (cell.actual >= cell.target ? 'text-emerald-500' : cell.actual >= cell.target * 0.7 ? 'text-amber-500' : 'text-brand-main')
+                                                                                        : 'text-amber-600'
                                                                                 )}>
                                                                                     {fmtK(cell.actual)}
                                                                                 </div>
                                                                             )}
+                                                                            {cell.prevActual > 0 && (
+                                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums">
+                                                                                    {fmtK(cell.prevActual)}
+                                                                                </div>
+                                                                            )}
                                                                         </div>
-                                                                    ) : cell.actual > 0 ? (
-                                                                        <div className="font-bold text-brand-main tabular-nums">{fmtK(cell.actual)}</div>
                                                                     ) : (
                                                                         <span className="text-slate-100">·</span>
                                                                     )}
@@ -416,15 +451,24 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                         })}
                                                         {/* Row total */}
                                                         <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
-                                                            <div className="font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                                                                {rowTotal.target > 0 ? formatCurrencyCAD(rowTotal.target) : <span className="text-slate-200">—</span>}
-                                                            </div>
+                                                            {rowTotal.target > 0 && (
+                                                                <div className="font-semibold text-slate-700 tabular-nums whitespace-nowrap">
+                                                                    {formatCurrencyCAD(rowTotal.target)}
+                                                                </div>
+                                                            )}
                                                             {rowTotal.actual > 0 && (
                                                                 <div className={cn(
-                                                                    'font-bold tabular-nums text-[11px] mt-0.5 whitespace-nowrap',
-                                                                    rowTotal.actual >= rowTotal.target ? 'text-emerald-500' : 'text-brand-main'
+                                                                    'font-bold tabular-nums text-[11px] whitespace-nowrap',
+                                                                    rowTotal.target > 0
+                                                                        ? (rowTotal.actual >= rowTotal.target ? 'text-emerald-500' : 'text-brand-main')
+                                                                        : 'text-amber-600'
                                                                 )}>
                                                                     {formatCurrencyCAD(rowTotal.actual)}
+                                                                </div>
+                                                            )}
+                                                            {rowTotal.prevActual > 0 && (
+                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums whitespace-nowrap mt-0.5">
+                                                                    {formatCurrencyCAD(rowTotal.prevActual)}
                                                                 </div>
                                                             )}
                                                         </td>
@@ -438,48 +482,62 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                     Total
                                                 </td>
                                                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                                    const col = colTotals[m] ?? { target: 0, actual: 0 };
+                                                    const col = colTotals[m] ?? { target: 0, actual: 0, prevActual: 0 };
                                                     const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
                                                     return (
                                                         <td key={m} className={cn(
                                                             'px-2 py-2.5 text-center border-r border-slate-100',
                                                             isCurrent && 'bg-brand-main/5'
                                                         )}>
-                                                            {col.target > 0 ? (
-                                                                <div className="leading-tight">
-                                                                    <div className="font-bold text-slate-800 tabular-nums">{fmtK(col.target)}</div>
-                                                                    {col.actual > 0 && (
-                                                                        <div className={cn(
-                                                                            'font-bold tabular-nums mt-0.5',
-                                                                            col.actual >= col.target ? 'text-emerald-500' : 'text-amber-500'
-                                                                        )}>
-                                                                            {fmtK(col.actual)}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-slate-200">—</span>
-                                                            )}
+                                                            <div className="leading-tight space-y-px">
+                                                                {col.target > 0 && (
+                                                                    <div className="font-bold text-slate-700 tabular-nums">{fmtK(col.target)}</div>
+                                                                )}
+                                                                {col.actual > 0 && (
+                                                                    <div className={cn(
+                                                                        'font-bold tabular-nums',
+                                                                        col.target > 0
+                                                                            ? (col.actual >= col.target ? 'text-emerald-500' : 'text-amber-500')
+                                                                            : 'text-amber-600'
+                                                                    )}>
+                                                                        {fmtK(col.actual)}
+                                                                    </div>
+                                                                )}
+                                                                {col.prevActual > 0 && (
+                                                                    <div className="text-[10px] font-medium text-slate-400 tabular-nums">
+                                                                        {fmtK(col.prevActual)}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     );
                                                 })}
                                                 {/* Grand total */}
                                                 {(() => {
                                                     const gt = Object.values(colTotals).reduce(
-                                                        (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual }),
-                                                        { target: 0, actual: 0 }
+                                                        (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual, prevActual: acc.prevActual + c.prevActual }),
+                                                        { target: 0, actual: 0, prevActual: 0 }
                                                     );
                                                     return (
                                                         <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
-                                                            <div className="font-bold text-slate-900 tabular-nums whitespace-nowrap text-xs">
-                                                                {gt.target > 0 ? formatCurrencyCAD(gt.target) : <span className="text-slate-300">—</span>}
-                                                            </div>
+                                                            {gt.target > 0 && (
+                                                                <div className="font-bold text-slate-900 tabular-nums whitespace-nowrap text-xs">
+                                                                    {formatCurrencyCAD(gt.target)}
+                                                                </div>
+                                                            )}
                                                             {gt.actual > 0 && (
                                                                 <div className={cn(
-                                                                    'font-bold tabular-nums text-[11px] mt-0.5 whitespace-nowrap',
-                                                                    gt.actual >= gt.target ? 'text-emerald-500' : 'text-brand-main'
+                                                                    'font-bold tabular-nums text-[11px] whitespace-nowrap',
+                                                                    gt.target > 0
+                                                                        ? (gt.actual >= gt.target ? 'text-emerald-500' : 'text-brand-main')
+                                                                        : 'text-amber-600'
                                                                 )}>
                                                                     {formatCurrencyCAD(gt.actual)}
+                                                                </div>
+                                                            )}
+                                                            {gt.prevActual > 0 && (
+                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums whitespace-nowrap mt-0.5">
+                                                                    {formatCurrencyCAD(gt.prevActual)}
                                                                 </div>
                                                             )}
                                                         </td>

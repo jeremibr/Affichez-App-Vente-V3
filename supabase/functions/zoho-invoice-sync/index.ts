@@ -22,9 +22,11 @@ const DEPT_MAP: Record<string, string> = {
   'SERVICES IA': 'SERVICES IA',
 };
 
-const REVENUE_STATUS_MAP: Record<string, string> = {
+const STATUS_MAP: Record<string, string> = {
   paid:          'paid',
   partiallypaid: 'partial',
+  sent:          'sent',
+  overdue:       'overdue',
 };
 
 // Full sync window: 2025-01-01 — covers all app data, keeps the request well within 150s
@@ -143,13 +145,17 @@ async function syncInvoices(
   org: { id: string; office: string },
   accessToken: string,
   lastModified: Date | null,
+  statusOverride: string | null = null,
 ): Promise<{ upserted: number; errors: string[] }> {
   let upserted = 0;
   const errors: string[] = [];
 
-  // Full sync: filter by status (Paid, PartiallyPaid) + date.start to avoid fetching thousands of old records.
-  // Incremental: no status filter — last_modified_time is narrow enough; REVENUE_STATUS_MAP guards upsert.
-  const statusFilters = lastModified === null ? ['Paid', 'PartiallyPaid'] : [null];
+  // Full sync: one Zoho request per status + date.start to stay within 150s limit.
+  //   statusOverride → only that one status (use for targeted back-fills without re-fetching paid).
+  // Incremental: no status filter — last_modified_time window is narrow; STATUS_MAP guards upsert.
+  const statusFilters = lastModified === null
+    ? (statusOverride ? [statusOverride] : ['Paid', 'PartiallyPaid', 'Sent', 'OverDue'])
+    : [null];
 
   for (const statusFilter of statusFilters) {
     let page = 1;
@@ -178,7 +184,7 @@ async function syncInvoices(
       const toUpsert: object[] = [];
       for (const inv of invoices) {
         const rawStatus = ((inv.status as string) ?? '').toLowerCase().replace(/_/g, '');
-        const mappedStatus = REVENUE_STATUS_MAP[rawStatus];
+        const mappedStatus = STATUS_MAP[rawStatus];
         if (!mappedStatus) continue;
         const dept = extractDept(inv);
         if (!dept) continue;
@@ -289,17 +295,18 @@ async function syncCreditNotes(
 Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-sync-source, x-full-sync, x-org, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-sync-source, x-full-sync, x-org, x-status, content-type',
   };
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';
   const isFullSync = req.headers.get('x-full-sync') === 'true';
-  // x-org: optional header to restrict full sync to a single office (QC or MTL).
-  // The full dataset (both orgs, 2025-2026) exceeds 150s so we process one org at a time
-  // when doing a manual full sync. The incremental cron runs both orgs (small window = fast).
+  // x-org: optional — restrict to a single office (QC or MTL).
   const orgFilter = req.headers.get('x-org')?.toUpperCase() ?? null;
+  // x-status: optional — restrict full sync to a single Zoho status (e.g. "Sent", "Overdue").
+  // Use this to back-fill a single status without re-fetching all paid/partial records.
+  const statusOverride = req.headers.get('x-status') ?? null;
   const action = isManual
     ? (isFullSync ? 'sync_invoices_manual_full' : 'sync_invoices_manual')
     : 'sync_invoices_auto';
@@ -321,7 +328,7 @@ Deno.serve(async (req: Request) => {
     const lastModified = isFullSync ? null : await readSyncState('invoices');
 
     for (const org of orgsToProcess) {
-      const invResult = await syncInvoices(org, accessToken, lastModified);
+      const invResult = await syncInvoices(org, accessToken, lastModified, statusOverride);
       totalUpserted += invResult.upserted;
       allErrors.push(...invResult.errors);
 

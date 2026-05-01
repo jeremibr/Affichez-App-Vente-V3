@@ -4,7 +4,7 @@ import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
     DollarSign, ChevronDown, UserCircle,
-    Target, Eye, Building2, SlidersHorizontal,
+    Target, Eye, Building2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -95,14 +95,14 @@ export default function Layout() {
                 { name: 'Mes Devis',       href: '/portail/devis',       icon: ClipboardList },
                 { name: 'Mes Factures',    href: '/portail/factures',    icon: FileText },
                 { name: 'Ma Paye',         href: '/portail/paye',        icon: Wallet },
-                { name: 'Paramètres',      href: '/portail/parametres',  icon: SlidersHorizontal },
             ],
         },
     ];
 
     const adminItems: NavItem[] = [
-        { name: 'Commissions',   href: '/paye',     icon: DollarSign },
-        { name: 'Paramètres',    href: '/settings', icon: Settings },
+        { name: 'Commissions',     href: '/paye',               icon: DollarSign },
+        { name: 'Objectifs Reps',  href: '/portail/parametres', icon: Target },
+        { name: 'Paramètres',      href: '/settings',           icon: Settings },
     ];
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ export default function Layout() {
 
             {/* Main nav */}
             <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
-                {sections.map(s => (
+                {(viewAsRep ? sections.filter(s => s.key === 'portail') : sections).map(s => (
                     <SectionHeader
                         key={s.key}
                         sectionKey={s.key}
@@ -222,8 +222,8 @@ export default function Layout() {
             {/* Bottom: Admin + rep switcher + user */}
             <div className="shrink-0 border-t border-slate-100 px-3 py-3 space-y-0.5">
 
-                {/* Admin section */}
-                {isAdmin && (
+                {/* Admin section — hidden when viewing as rep */}
+                {isAdmin && !viewAsRep && (
                     <div>
                         <button
                             onClick={() => toggle('admin')}

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, DollarSign, CheckCircle2, Clock,
-    TrendingUp, Users, Wallet, AlertCircle, Pencil, Check, X,
+    TrendingUp, Users, Wallet, AlertCircle, Pencil, Check, X, User,
 } from 'lucide-react';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
@@ -10,6 +10,8 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { MONTHS, OFFICES } from '../lib/constants';
 import { fetchAllCommRates, saveCommRate } from '../utils/commRates';
+import { useRepList } from '../hooks/useRepList';
+import PortailPaye from './PortailPaye';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,6 +168,8 @@ const MONTH_LABEL: Record<number, string> = {
 
 export default function Paye() {
     const { isAdmin } = useAuth();
+    const repList = useRepList();
+    const [selectedPayeRep, setSelectedPayeRep] = useState('');
 
     const [year, setYear] = useState(2026);
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -487,6 +491,27 @@ export default function Paye() {
                             </tfoot>
                         </table>
                     </div>
+                )}
+            </div>
+
+            {/* ─── Per-rep pay detail ─── */}
+            <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <User className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="text-sm font-semibold text-slate-600 shrink-0">Paye détaillée :</span>
+                    <Select
+                        value={selectedPayeRep}
+                        onChange={setSelectedPayeRep}
+                        options={[
+                            { value: '', label: 'Sélectionner un représentant...' },
+                            ...repList.map(r => ({ value: r, label: r })),
+                        ]}
+                        variant={selectedPayeRep ? 'accent' : 'default'}
+                        className="w-64"
+                    />
+                </div>
+                {selectedPayeRep && (
+                    <PortailPaye propRepName={selectedPayeRep} />
                 )}
             </div>
 

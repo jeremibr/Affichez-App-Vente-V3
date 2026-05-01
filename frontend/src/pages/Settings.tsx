@@ -1,17 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
-    Zap, Loader2, Users, Trash2, Plus, FileText
+    Zap, Loader2, Users, Trash2, Plus, FileText,
+    Ban, Search, X
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
 
-type Tab = 'objectives' | 'quarters' | 'sync' | 'logs' | 'users';
+type Tab = 'objectives' | 'quarters' | 'sync' | 'logs' | 'users' | 'excluded';
 
 interface Objective { id: string; year: number; month: number; department: string; target_amount: number; }
 interface Quarter { id: string; year: number; quarter: number; start_date: string; end_date: string; num_weeks: number; }
@@ -24,11 +25,12 @@ export default function Settings() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const tabItems: { id: Tab; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
-        { id: 'objectives', label: 'Objectifs', icon: Target },
+        { id: 'objectives', label: 'Objectifs Équipe', icon: Target },
         { id: 'quarters', label: 'Trimestres', icon: Calendar },
         { id: 'sync', label: 'Synchronisation', icon: Zap },
         { id: 'logs', label: 'Historique', icon: History },
         { id: 'users', label: 'Utilisateurs', icon: Users, adminOnly: true },
+        { id: 'excluded', label: 'Clients Exclus', icon: Ban, adminOnly: true },
     ];
 
     useEffect(() => {
@@ -68,6 +70,7 @@ export default function Settings() {
             {activeTab === 'sync' && <SyncManager />}
             {activeTab === 'logs' && <WebhookLogs />}
             {activeTab === 'users' && isAdmin && <UsersManager setMessage={setMessage} />}
+            {activeTab === 'excluded' && isAdmin && <ExcludedClientsManager setMessage={setMessage} />}
         </div>
     );
 }
@@ -704,6 +707,152 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             </div>
             <p className="text-xs text-slate-400 px-1">
                 Les utilisateurs pré-configurés ici obtiennent automatiquement leur rôle et accès lors de leur première connexion via Zoho. Les membres avec Accès Factures ne voient que leurs propres données.
+            </p>
+        </div>
+    );
+}
+
+// ─── Excluded Clients Manager (admin only) ────────────────────────────────────
+interface ExcludedClient { id: number; client_name: string; created_at: string; }
+
+function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'success' | 'error', text: string }) => void }) {
+    const [excluded, setExcluded] = useState<ExcludedClient[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<string[]>([]);
+    const [searching, setSearching] = useState(false);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const fetchExcluded = async () => {
+        setLoading(true);
+        const { data, error } = await supabase.from('excluded_clients').select('*').order('client_name');
+        if (error) console.error(error); else setExcluded(data || []);
+        setLoading(false);
+    };
+
+    useEffect(() => { fetchExcluded(); }, []);
+    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (!value.trim() || value.trim().length < 2) { setSearchResults([]); setShowDropdown(false); return; }
+        const timer = setTimeout(async () => {
+            setSearching(true);
+            const { data } = await supabase.rpc('search_clients', { p_query: value.trim(), p_limit: 20 });
+            setSearchResults((data || []).map((r: { client_name: string }) => r.client_name));
+            setShowDropdown(true);
+            setSearching(false);
+        }, 300);
+        debounceRef.current = timer;
+    };
+
+    const handleAdd = async (clientName: string) => {
+        const { error } = await supabase.from('excluded_clients').insert({ client_name: clientName });
+        if (error) setMessage({ type: 'error', text: 'Erreur: ' + error.message });
+        else {
+            setMessage({ type: 'success', text: `"${clientName}" exclu.` });
+            setSearchQuery('');
+            setSearchResults([]);
+            setShowDropdown(false);
+            fetchExcluded();
+        }
+    };
+
+    const handleRemove = async (id: number, clientName: string) => {
+        const { error } = await supabase.from('excluded_clients').delete().eq('id', id);
+        if (error) setMessage({ type: 'error', text: 'Erreur: ' + error.message });
+        else { setMessage({ type: 'success', text: `"${clientName}" réintégré.` }); fetchExcluded(); }
+    };
+
+    return (
+        <div className="space-y-6 max-w-2xl">
+            <div>
+                <h2 className="text-base font-semibold text-slate-800">Clients exclus</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                    Les clients exclus n'apparaissent dans aucun tableau de bord, ni dans les KPIs des modules Devis et Factures.
+                </p>
+            </div>
+
+            {/* Search & Add */}
+            <div className="relative">
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-brand-main/30 focus-within:border-brand-main/40 transition-all">
+                    {searching
+                        ? <Loader2 className="w-4 h-4 text-slate-400 shrink-0 animate-spin" />
+                        : <Search className="w-4 h-4 text-slate-400 shrink-0" />}
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={e => handleSearchChange(e.target.value)}
+                        onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
+                        placeholder="Rechercher un client à exclure…"
+                        className="flex-1 text-sm bg-transparent outline-none placeholder:text-slate-400"
+                    />
+                    {searchQuery && (
+                        <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowDropdown(false); }}
+                            className="p-0.5 text-slate-300 hover:text-slate-500 transition-colors">
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                </div>
+
+                {showDropdown && searchResults.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-64 overflow-y-auto">
+                        {searchResults.map(name => (
+                            <button
+                                key={name}
+                                onClick={() => handleAdd(name)}
+                                className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-slate-50 transition-colors first:rounded-t-xl last:rounded-b-xl group"
+                            >
+                                <span className="text-slate-700 truncate">{name}</span>
+                                <span className="text-xs font-semibold text-brand-main opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                    + Exclure
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {showDropdown && !searching && searchResults.length === 0 && searchQuery.trim().length >= 2 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 px-4 py-3 text-sm text-slate-400 italic">
+                        Aucun client trouvé pour « {searchQuery} »
+                    </div>
+                )}
+            </div>
+
+            {/* Excluded list */}
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
+                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+                        {loading ? '…' : excluded.length} client{excluded.length !== 1 ? 's' : ''} exclu{excluded.length !== 1 ? 's' : ''}
+                    </span>
+                </div>
+                {loading ? (
+                    <div className="py-10 text-center text-slate-400 italic text-sm">Chargement…</div>
+                ) : excluded.length === 0 ? (
+                    <div className="py-10 text-center text-slate-400 italic text-sm">Aucun client exclu pour l'instant.</div>
+                ) : (
+                    <ul className="divide-y divide-slate-50">
+                        {excluded.map(ec => (
+                            <li key={ec.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50/60 transition-colors group">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <Ban className="w-3.5 h-3.5 text-red-300 shrink-0" />
+                                    <span className="text-sm font-medium text-slate-700 truncate">{ec.client_name}</span>
+                                </div>
+                                <button
+                                    onClick={() => handleRemove(ec.id, ec.client_name)}
+                                    title="Réintégrer ce client"
+                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+            <p className="text-xs text-slate-400 px-1">
+                Les modifications sont immédiates — les filtres SQL excluent ces clients de tous les calculs en temps réel.
             </p>
         </div>
     );
