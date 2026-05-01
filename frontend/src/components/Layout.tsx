@@ -4,7 +4,7 @@ import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
     DollarSign, ChevronDown, UserCircle,
-    Target, Eye, Building2,
+    Target, Eye, Building2, SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -91,10 +91,11 @@ export default function Layout() {
             icon: UserCircle,
             activeColor: 'text-brand-main',
             items: [
-                { name: 'Mes Devis',       href: '/portail',          icon: ClipboardList, end: true },
-                { name: 'Mes Factures',    href: '/portail/factures', icon: FileText },
-                { name: 'Mes Objectifs',   href: '/portail/objectifs', icon: Target },
-                { name: 'Ma Paye',         href: '/portail/paye',      icon: Wallet },
+                { name: 'Mes Objectifs',   href: '/portail',             icon: Target,             end: true },
+                { name: 'Mes Devis',       href: '/portail/devis',       icon: ClipboardList },
+                { name: 'Mes Factures',    href: '/portail/factures',    icon: FileText },
+                { name: 'Ma Paye',         href: '/portail/paye',        icon: Wallet },
+                { name: 'Paramètres',      href: '/portail/parametres',  icon: SlidersHorizontal },
             ],
         },
     ];

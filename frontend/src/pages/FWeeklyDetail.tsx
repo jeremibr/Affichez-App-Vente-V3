@@ -142,9 +142,9 @@ export default function FWeeklyDetail() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                        Factures — Détail Hebdomadaire
-                        {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                        Factures — Détail Hebdo
+                        {!isAdmin && authRepName && <span className="ml-2 text-sm font-normal text-slate-400">({authRepName})</span>}
                     </h1>
                     <p className="text-sm text-slate-400 mt-0.5">
                         {selectedWeek ? <>Semaine du <span className="text-brand-main font-bold">{formatShortDate(selectedWeek)}</span></> : 'Sélectionnez une période'}
@@ -190,27 +190,27 @@ export default function FWeeklyDetail() {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-3 gap-3 md:gap-6">
-                        <div className="bg-brand-main rounded-2xl p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
-                            <div>
-                                <p className="text-white/60 text-[10px] font-black uppercase tracking-widest">Total Hebdomadaire</p>
-                                <p className="text-3xl font-black mt-1">{formatCurrencyCAD(filteredGrandTotal)}</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-6">
+                        <div className="bg-brand-main rounded-2xl p-3 md:p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
+                            <div className="min-w-0">
+                                <p className="text-white/60 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Total Hebdo</p>
+                                <p className="text-base md:text-3xl font-black mt-1 tabular-nums truncate">{formatCurrencyCAD(filteredGrandTotal)}</p>
                             </div>
-                            <div className="p-3 bg-white/10 rounded-xl"><TrendingUp className="w-6 h-6" /></div>
+                            <div className="p-2 md:p-3 bg-white/10 rounded-xl shrink-0 ml-2"><TrendingUp className="w-4 h-4 md:w-6 md:h-6" /></div>
                         </div>
-                        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
-                            <div>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Montant Moyen</p>
-                                <p className="text-2xl font-black text-slate-800 mt-1">{formatCurrencyCAD(avgTicket)}</p>
+                        <div className="hidden sm:flex bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card items-center justify-between group hover:border-brand-main/20 transition-all">
+                            <div className="min-w-0">
+                                <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Moy./facture</p>
+                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1 tabular-nums truncate">{formatCurrencyCAD(avgTicket)}</p>
                             </div>
-                            <div className="p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors"><Briefcase className="w-6 h-6" /></div>
+                            <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2"><Briefcase className="w-4 h-4 md:w-6 md:h-6" /></div>
                         </div>
-                        <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
-                            <div>
-                                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Volume</p>
-                                <p className="text-2xl font-black text-slate-800 mt-1">{filteredLineItems.length} Factures</p>
+                        <div className="bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
+                            <div className="min-w-0">
+                                <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Volume</p>
+                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{filteredLineItems.length} <span className="text-xs md:text-base">Factures</span></p>
                             </div>
-                            <div className="p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors"><Users className="w-6 h-6" /></div>
+                            <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2 hidden sm:flex"><Users className="w-4 h-4 md:w-6 md:h-6" /></div>
                         </div>
                     </div>
 

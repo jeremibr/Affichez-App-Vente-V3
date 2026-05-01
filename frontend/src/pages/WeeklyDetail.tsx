@@ -220,7 +220,7 @@ export default function WeeklyDetail() {
             ) : (
                 <div className="space-y-4 md:space-y-6">
                     {/* KPI Cards for the week */}
-                    <div className="grid grid-cols-3 gap-3 md:gap-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-6">
                         <div className="bg-brand-main rounded-2xl p-3 md:p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
                             <div className="min-w-0">
                                 <p className="text-white/60 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Total Hebdo</p>
@@ -230,7 +230,7 @@ export default function WeeklyDetail() {
                                 <TrendingUp className="w-4 h-4 md:w-6 md:h-6" />
                             </div>
                         </div>
-                        <div className="bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
+                        <div className="hidden sm:flex bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card items-center justify-between group hover:border-brand-main/20 transition-all">
                             <div className="min-w-0">
                                 <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Moy./vente</p>
                                 <p className="text-base md:text-2xl font-black text-slate-800 mt-1 tabular-nums truncate">{formatCurrencyCAD(avgTicket)}</p>

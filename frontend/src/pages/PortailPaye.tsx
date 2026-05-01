@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Wallet, Trash2, Loader2, Percent, Plus, User } from 'lucide-react';
+import { Wallet, Trash2, Loader2, Plus, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { fetchCommRate } from '../utils/commRates';
+import { MONTHS } from '../lib/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,15 @@ function fmt(v: number | null): string {
     return String(v);
 }
 
+function formatPayDate(d: string): string {
+    if (!d) return '—';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+        const [y, m, day] = d.split('-').map(Number);
+        return new Date(y, m - 1, day).toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    return d;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props { propRepName?: string; }
@@ -58,16 +68,20 @@ export default function PortailPaye({ propRepName }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    // Admins can always edit; reps see read-only view
     const canEdit = isAdmin;
 
-    const [year, setYear]       = useState(2026);
-    const [loading, setLoading] = useState(true);
-    const [entries, setEntries] = useState<PayEntry[]>([]);
-    const [meta, setMeta]       = useState<PayMeta>(EMPTY_META);
-    const [commRate, setCommRate] = useState(0.05);
+    const [year, setYear]               = useState(2026);
+    const [selectedMonth, setSelectedMonth] = useState<string>('Tous');
+    const [loading, setLoading]         = useState(true);
+    const [entries, setEntries]         = useState<PayEntry[]>([]);
+    const [meta, setMeta]               = useState<PayMeta>(EMPTY_META);
+    const [commRate, setCommRate]       = useState(0.05);
 
-    const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
+    const yearOptions  = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
+    const monthOptions = [
+        { value: 'Tous', label: 'Tous les mois' },
+        ...MONTHS.map(m => ({ value: String(m.value), label: m.label })),
+    ];
 
     // ─── Fetch ───────────────────────────────────────────────────────────────
 
@@ -96,6 +110,16 @@ export default function PortailPaye({ propRepName }: Props) {
     }, [repName, year]);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
+
+    // ─── Month filter (client-side) ───────────────────────────────────────────
+
+    const filteredEntries = selectedMonth === 'Tous'
+        ? entries
+        : entries.filter(e => {
+            if (!e.pay_date) return false;
+            const m = String(selectedMonth).padStart(2, '0');
+            return e.pay_date.startsWith(`${year}-${m}`);
+        });
 
     // ─── Entry mutations (admin only) ────────────────────────────────────────
 
@@ -156,9 +180,9 @@ export default function PortailPaye({ propRepName }: Props) {
         }, 600);
     };
 
-    // ─── Totals ───────────────────────────────────────────────────────────────
+    // ─── Totals (based on filtered entries for display, all entries for net) ──
 
-    const totals = entries.reduce(
+    const totals = filteredEntries.reduce(
         (acc, e) => ({
             base_salary: acc.base_salary + n(e.base_salary),
             commission:  acc.commission  + n(e.commission),
@@ -169,11 +193,24 @@ export default function PortailPaye({ propRepName }: Props) {
         { base_salary: 0, commission: 0, expenses: 0, holidays: 0, vacation: 0 }
     );
     const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
-    const netTotal   = grandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
+
+    // Net total always uses all entries (ignoring month filter)
+    const allTotals = entries.reduce(
+        (acc, e) => ({
+            base_salary: acc.base_salary + n(e.base_salary),
+            commission:  acc.commission  + n(e.commission),
+            expenses:    acc.expenses    + n(e.expenses),
+            holidays:    acc.holidays    + n(e.holidays),
+            vacation:    acc.vacation    + n(e.vacation),
+        }),
+        { base_salary: 0, commission: 0, expenses: 0, holidays: 0, vacation: 0 }
+    );
+    const allGrandTotal = Object.values(allTotals).reduce((s, v) => s + v, 0);
+    const netTotal = allGrandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
 
     const commRateLabel = `${Math.round(commRate * 100)}%`;
 
-    // ─── Render ───────────────────────────────────────────────────────────────
+    // ─── Guard ────────────────────────────────────────────────────────────────
 
     if (!repName && !isAdmin) {
         return (
@@ -188,6 +225,8 @@ export default function PortailPaye({ propRepName }: Props) {
             </div>
         );
     }
+
+    // ─── Render ───────────────────────────────────────────────────────────────
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-5 md:space-y-6">
@@ -204,19 +243,15 @@ export default function PortailPaye({ propRepName }: Props) {
                         {!canEdit && <span className="ml-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Lecture seule</span>}
                     </p>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 bg-brand-main/5 border border-brand-main/20 rounded-xl">
-                    <Percent className="w-3.5 h-3.5 text-brand-main shrink-0" />
-                    <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Commission</p>
-                        <p className="text-base font-bold text-brand-main leading-tight">{commRateLabel}</p>
-                    </div>
-                </div>
             </div>
 
             {/* Filters */}
             <FilterBar>
                 <FilterGroup label="Année">
                     <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
+                </FilterGroup>
+                <FilterGroup label="Mois">
+                    <Select value={selectedMonth} onChange={setSelectedMonth} options={monthOptions} className="w-44" />
                 </FilterGroup>
             </FilterBar>
 
@@ -229,12 +264,13 @@ export default function PortailPaye({ propRepName }: Props) {
             </div>
 
             {/* ─── Payroll table ───────────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
                     <div>
                         <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
                         <p className="text-xs text-slate-400 mt-0.5">
                             Taux commission : <span className="font-bold text-brand-main">{commRateLabel}</span>
+                            {selectedMonth !== 'Tous' && <span className="ml-2 text-brand-main font-semibold">· {MONTHS.find(m => String(m.value) === selectedMonth)?.label}</span>}
                         </p>
                     </div>
                 </div>
@@ -250,46 +286,50 @@ export default function PortailPaye({ propRepName }: Props) {
                     </div>
                 ) : (
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm border-collapse">
                         <thead>
-                            <tr className="border-b border-slate-100 bg-slate-50/40">
-                                <Th align="left"  color="" className="min-w-[160px]">Date</Th>
-                                <Th align="right" color="text-blue-400">Salaire de base</Th>
+                            <tr className="bg-slate-100 border-b-2 border-slate-300">
+                                <Th align="left"  color="text-slate-600" className="min-w-[160px]">Date</Th>
+                                <Th align="right" color="text-blue-600">Salaire de base</Th>
                                 <Th align="right" color="text-brand-main">Commission</Th>
-                                <Th align="right" color="text-emerald-500">Remb. Dépenses</Th>
-                                <Th align="right" color="text-purple-400">Fériés</Th>
-                                <Th align="right" color="text-teal-500">Vacances</Th>
-                                <Th align="right" color="text-slate-400">Total</Th>
-                                <Th align="left"  color="text-slate-300" className="min-w-[130px]">Note</Th>
-                                {canEdit && <th className="w-8" />}
+                                <Th align="right" color="text-emerald-600">Remb. Dépenses</Th>
+                                <Th align="right" color="text-purple-600">Fériés</Th>
+                                <Th align="right" color="text-teal-600">Vacances</Th>
+                                <Th align="right" color="text-slate-700">Total</Th>
+                                <Th align="left"  color="text-slate-500" className="min-w-[130px]">Note</Th>
+                                {canEdit && <th className="w-8 border-l border-slate-200" />}
                             </tr>
                         </thead>
 
-                        <tbody className="divide-y divide-slate-50">
-                            {entries.length === 0 && (
+                        <tbody>
+                            {filteredEntries.length === 0 && (
                                 <tr>
                                     <td colSpan={canEdit ? 9 : 8} className="px-5 py-12 text-center text-sm text-slate-300 italic">
-                                        Aucune paie enregistrée pour {year}
+                                        {selectedMonth !== 'Tous'
+                                            ? `Aucune paie pour ce mois`
+                                            : `Aucune paie enregistrée pour ${year}`}
                                     </td>
                                 </tr>
                             )}
-                            {entries.map((entry, idx) => {
+                            {filteredEntries.map((entry) => {
                                 const rowTotal = n(entry.base_salary) + n(entry.commission) + n(entry.expenses) + n(entry.holidays) + n(entry.vacation);
+                                const dateVal = /^\d{4}-\d{2}-\d{2}$/.test(entry.pay_date) ? entry.pay_date : '';
                                 return (
-                                    <tr key={entry.id} className={cn("group transition-colors hover:bg-brand-main/[0.02]", idx % 2 === 1 && "bg-slate-50/30")}>
-                                        <td className="px-4 py-2.5">
+                                    <tr key={entry.id} className="border-b border-slate-200 hover:bg-amber-50/30 transition-colors group">
+                                        {/* Date */}
+                                        <td className="px-3 py-2 border-r border-slate-200">
                                             {canEdit ? (
                                                 <input
-                                                    type="text"
-                                                    value={entry.pay_date}
+                                                    type="date"
+                                                    value={dateVal}
                                                     onChange={e => updateField(entry.id, 'pay_date', e.target.value)}
-                                                    placeholder="ex: 8 janvier 2026"
-                                                    className="w-full bg-transparent text-slate-700 font-medium placeholder:text-slate-200 focus:outline-none text-sm"
+                                                    className="w-full bg-transparent text-slate-700 font-medium focus:outline-none text-sm cursor-pointer"
                                                 />
                                             ) : (
-                                                <span className="text-slate-700 font-medium text-sm">{entry.pay_date || '—'}</span>
+                                                <span className="text-slate-700 font-medium text-sm">{formatPayDate(entry.pay_date) || '—'}</span>
                                             )}
                                         </td>
+
                                         {canEdit ? (
                                             <>
                                                 <NumInput value={fmt(entry.base_salary)} onChange={v => updateField(entry.id, 'base_salary', v)} color="text-blue-700" />
@@ -307,10 +347,14 @@ export default function PortailPaye({ propRepName }: Props) {
                                                 <NumDisplay value={entry.vacation}    color="text-teal-600" />
                                             </>
                                         )}
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-800 tabular-nums">
+
+                                        {/* Row total */}
+                                        <td className="px-3 py-2 text-right font-bold text-slate-800 tabular-nums border-r border-slate-200">
                                             {rowTotal > 0 ? formatCurrencyCAD(rowTotal) : <span className="text-slate-200">—</span>}
                                         </td>
-                                        <td className="px-4 py-2.5">
+
+                                        {/* Note */}
+                                        <td className="px-3 py-2 border-r border-slate-200">
                                             {canEdit ? (
                                                 <input
                                                     type="text"
@@ -323,8 +367,9 @@ export default function PortailPaye({ propRepName }: Props) {
                                                 <span className="text-xs text-slate-400 italic">{entry.note || ''}</span>
                                             )}
                                         </td>
+
                                         {canEdit && (
-                                            <td className="px-2 py-2.5">
+                                            <td className="px-2 py-2">
                                                 <button
                                                     onClick={() => deleteEntry(entry.id)}
                                                     className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all"
@@ -341,7 +386,7 @@ export default function PortailPaye({ propRepName }: Props) {
                         <tfoot>
                             {/* Add row — admin only */}
                             {canEdit && (
-                                <tr className="border-t border-slate-100">
+                                <tr className="border-t border-slate-200 bg-white">
                                     <td colSpan={9} className="px-4 py-2">
                                         <button
                                             onClick={addEntry}
@@ -354,14 +399,16 @@ export default function PortailPaye({ propRepName }: Props) {
                                 </tr>
                             )}
                             {/* Totals */}
-                            <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">SOMME</td>
+                            <tr className="border-t-2 border-slate-300 bg-slate-100">
+                                <td className="px-3 py-3 text-xs font-bold text-slate-600 uppercase tracking-widest border-r border-slate-200">
+                                    {selectedMonth !== 'Tous' ? MONTHS.find(m => String(m.value) === selectedMonth)?.label : `Total ${year}`}
+                                </td>
                                 <TotalCell value={totals.base_salary} color="text-blue-700" />
                                 <TotalCell value={totals.commission}  color="text-brand-main" />
                                 <TotalCell value={totals.expenses}    color="text-emerald-600" />
                                 <TotalCell value={totals.holidays}    color="text-purple-600" />
                                 <TotalCell value={totals.vacation}    color="text-teal-600" />
-                                <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums text-base">
+                                <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums text-base border-r border-slate-200">
                                     {formatCurrencyCAD(grandTotal)}
                                 </td>
                                 <td colSpan={canEdit ? 2 : 1} />
@@ -383,7 +430,7 @@ export default function PortailPaye({ propRepName }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-right">
                     <p className="text-xs text-slate-400">Total des paies</p>
-                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(grandTotal)}</p>
+                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(allGrandTotal)}</p>
                     {n(meta.previous_year_balance) !== 0 && (<>
                         <p className="text-xs text-slate-400">Solde {year - 1}</p>
                         <p className="text-sm font-bold text-blue-600 tabular-nums">{formatCurrencyCAD(n(meta.previous_year_balance))}</p>
@@ -405,7 +452,7 @@ function Th({ children, align, color, className }: {
 }) {
     return (
         <th className={cn(
-            "px-4 py-3 text-[10px] font-bold uppercase tracking-widest",
+            "px-3 py-3 text-[10px] font-bold uppercase tracking-widest border-r border-slate-200 last:border-r-0",
             align === 'right' ? 'text-right' : 'text-left',
             color, className
         )}>
@@ -416,7 +463,7 @@ function Th({ children, align, color, className }: {
 
 function NumInput({ value, onChange, color }: { value: string; onChange: (v: string) => void; color: string }) {
     return (
-        <td className="px-4 py-2.5">
+        <td className="px-3 py-2 border-r border-slate-200">
             <input
                 type="text"
                 value={value}
@@ -433,7 +480,7 @@ function NumInput({ value, onChange, color }: { value: string; onChange: (v: str
 
 function NumDisplay({ value, color }: { value: number | null; color: string }) {
     return (
-        <td className={cn("px-4 py-2.5 text-right font-semibold tabular-nums text-sm", color)}>
+        <td className={cn("px-3 py-2 text-right font-semibold tabular-nums text-sm border-r border-slate-200", color)}>
             {value ? formatCurrencyCAD(value) : <span className="text-slate-200">—</span>}
         </td>
     );
@@ -441,7 +488,7 @@ function NumDisplay({ value, color }: { value: number | null; color: string }) {
 
 function TotalCell({ value, color }: { value: number; color: string }) {
     return (
-        <td className={cn("px-4 py-3 text-right font-bold tabular-nums", color)}>
+        <td className={cn("px-3 py-3 text-right font-bold tabular-nums border-r border-slate-200", color)}>
             {value > 0 ? formatCurrencyCAD(value) : <span className="text-slate-300">—</span>}
         </td>
     );

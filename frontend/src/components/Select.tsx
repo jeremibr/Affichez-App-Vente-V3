@@ -60,7 +60,7 @@ export function Select({
     const isAccent = variant === 'accent';
 
     return (
-        <div ref={containerRef} className={cn("relative", className)}>
+        <div ref={containerRef} className={cn("relative max-w-full", className)}>
             {/* Trigger */}
             <button
                 type="button"

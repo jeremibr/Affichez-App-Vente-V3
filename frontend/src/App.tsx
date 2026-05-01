@@ -17,6 +17,7 @@ import PortailDevis from './pages/PortailDevis';
 import PortailFactures from './pages/PortailFactures';
 import PortailPaye from './pages/PortailPaye';
 import PortailObjectifs from './pages/PortailObjectifs';
+import PortailParametres from './pages/PortailParametres';
 
 function AppRoutes() {
     const { user, loading, canAccessFactures, isAdmin } = useAuth();
@@ -52,10 +53,11 @@ function AppRoutes() {
                 )}
 
                 {/* ─── Mon Portail — personal view for every rep ─── */}
-                <Route path="portail" element={<PortailDevis />} />
+                <Route path="portail" element={<PortailObjectifs />} />
+                <Route path="portail/devis" element={<PortailDevis />} />
                 <Route path="portail/factures" element={<PortailFactures />} />
                 <Route path="portail/paye" element={<PortailPaye />} />
-                <Route path="portail/objectifs" element={<PortailObjectifs />} />
+                <Route path="portail/parametres" element={<PortailParametres />} />
 
                 {/* ─── Admin-only ─── */}
                 {isAdmin && (

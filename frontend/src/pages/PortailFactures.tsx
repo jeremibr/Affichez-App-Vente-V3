@@ -176,7 +176,7 @@ export default function PortailFactures({ propRepName }: Props) {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <KPICard
                             title="Facturé YTD"
-                            value={formatCurrencyCAD(kpis?.ytd_total ?? 0)}
+                            value={new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(kpis?.ytd_total ?? 0).replace(/\s*CA$/, '').trim()}
                             sub="Revenus facturés cumulés"
                             icon={TrendingUp}
                             trend={kpis?.pct_of_target}
@@ -307,25 +307,25 @@ function KPICard({ title, value, sub, icon: Icon, trend, accent = false }: {
 }) {
     return (
         <div className={cn(
-            "p-5 rounded-2xl border flex flex-col justify-between hover:shadow-card-hover transition-all group",
+            "p-3 md:p-5 rounded-2xl border flex flex-col justify-between hover:shadow-card-hover transition-all group",
             accent ? "bg-brand-main/5 border-brand-main/20" : "bg-white border-slate-100 shadow-card"
         )}>
-            <div className="flex items-start justify-between mb-4">
-                <div className={cn("p-2.5 rounded-xl transition-colors",
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+                <div className={cn("p-2 md:p-2.5 rounded-xl transition-colors",
                     accent ? "bg-brand-main/10 text-brand-main" : "bg-slate-50 text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50")}>
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 {trend !== undefined && (
-                    <span className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full",
+                    <span className={cn("text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 rounded-full",
                         trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
                         {trend}% obj.
                     </span>
                 )}
             </div>
             <div>
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">{title}</p>
-                <p className={cn("text-2xl font-bold mt-1", accent ? "text-brand-main" : "text-slate-900")}>{value}</p>
-                <p className="text-[11px] text-slate-400 mt-1 italic">{sub}</p>
+                <p className="text-[9px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest">{title}</p>
+                <p className={cn("text-lg md:text-2xl font-bold mt-1 tabular-nums", accent ? "text-brand-main" : "text-slate-900")}>{value}</p>
+                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 italic">{sub}</p>
             </div>
         </div>
     );
