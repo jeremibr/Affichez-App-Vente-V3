@@ -1,62 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
-import { Target, Loader2, ClipboardList, FileText, User, BarChart2 } from 'lucide-react';
+import { useUrlStateNumber } from '../hooks/useUrlState';
+import { Target, Loader2, FileText, User, BarChart2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { MONTHS, DEPARTMENTS } from '../lib/constants';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface RepObjective {
-    rep_name: string;
-    module: 'devis' | 'factures';
-    year: number;
-    month: number;
-    target_amount: number;
-}
-
-interface RepObjectiveDept {
-    module: 'devis' | 'factures';
-    month: number;
-    department: string;
-    target_amount: number;
-}
-
-interface DeptActualRow {
-    month: number;
-    department: string;
-    actual_amount: number;
-}
-
-interface MonthRow {
-    month: number;
-    label: string;
-    devisTarget: number;
-    devisActual: number;
-    facturesTarget: number;
-    facturesActual: number;
-}
-
-interface DeptRow {
-    department: string;
-    devisTarget: number;
-    devisActual: number;
-    facturesTarget: number;
-    facturesActual: number;
-}
-
-interface Props { propRepName?: string; }
+import { DEPARTMENTS } from '../lib/constants';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTH_LABELS = [
-    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+    'Janvier','Février','Mars','Avril','Mai','Juin',
+    'Juillet','Août','Septembre','Octobre','Novembre','Décembre',
 ];
+const MONTH_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 
 const DEPT_SHORT: Record<string, string> = {
     'MULTI-ANNONCEURS':        'Multi-Ann.',
@@ -70,7 +29,30 @@ const DEPT_SHORT: Record<string, string> = {
 const NOW_MONTH = new Date().getMonth() + 1;
 const NOW_YEAR  = new Date().getFullYear();
 
-// ─── Progress bar ─────────────────────────────────────────────────────────────
+// compact number: 125000 → "125k", 1600 → "1,6k"
+function fmtK(v: number): string {
+    if (v <= 0) return '';
+    if (v >= 1000) {
+        const k = v / 1000;
+        return `${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+    }
+    return String(Math.round(v));
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MonthRow {
+    month: number;
+    label: string;
+    target: number;
+    actual: number;
+}
+
+type DeptMonthData = Record<string, Record<number, { target: number; actual: number }>>;
+
+interface Props { propRepName?: string; }
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Progress({ actual, target }: { actual: number; target: number }) {
     if (target <= 0) return <span className="text-slate-300 text-xs">—</span>;
@@ -88,42 +70,6 @@ function Progress({ actual, target }: { actual: number; target: number }) {
     );
 }
 
-// ─── Hero KPI card ─────────────────────────────────────────────────────────────
-
-function HeroKpiCard({
-    icon: Icon, label, actual, target,
-}: { icon: React.ElementType; label: string; actual: number; target: number }) {
-    const pct = target > 0 ? Math.round((actual / target) * 100) : 0;
-    const clamped = Math.min(pct, 100);
-    const barColor = pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-500';
-    return (
-        <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex-1 min-w-0">
-            <div className="flex items-center gap-1.5 mb-3">
-                <Icon className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white/70">{label}</span>
-            </div>
-            <p className="text-xl md:text-2xl font-bold tabular-nums leading-none truncate">
-                {formatCurrencyCAD(actual)}
-            </p>
-            <p className="text-[11px] text-white/60 mt-1">
-                {target > 0 ? `sur ${formatCurrencyCAD(target)}` : 'Objectif non fixé — configurez dans Paramètres'}
-            </p>
-            {target > 0 && (
-                <div className="mt-3">
-                    <div className="flex justify-between items-center mb-1.5">
-                        <span className="text-xs font-bold text-white">{pct}% atteint</span>
-                    </div>
-                    <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-                        <div className={cn('h-full rounded-full transition-all duration-700', barColor)} style={{ width: `${clamped}%` }} />
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ─── Motivational text ────────────────────────────────────────────────────────
-
 function getMotivation(pct: number): { text: string; emoji: string } {
     if (pct >= 100) return { text: 'Objectif atteint! Tu es une légende!', emoji: '🏆' };
     if (pct >= 75)  return { text: 'Presque là, donne tout!',              emoji: '🚀' };
@@ -139,19 +85,11 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
     const [year, setYear] = useUrlStateNumber('year', NOW_YEAR);
-    const [_monthParam, _setMonthParam] = useUrlState('month', 'Tous');
-    const selectedMonth: number | 'Tous' = _monthParam === 'Tous' ? 'Tous' : Number(_monthParam);
-    const setSelectedMonth = (v: number | 'Tous') => _setMonthParam(v === 'Tous' ? 'Tous' : String(v));
-
-    const [loading, setLoading]     = useState(true);
-    const [rows, setRows]           = useState<MonthRow[]>([]);
-    const [deptRows, setDeptRows]   = useState<DeptRow[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [rows, setRows]       = useState<MonthRow[]>([]);
+    const [deptData, setDeptData] = useState<DeptMonthData>({});
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = [
-        { value: 'Tous', label: 'Tous les mois' },
-        ...MONTHS.map(m => ({ value: String(m.value), label: m.label })),
-    ];
 
     // ─── Fetch ───────────────────────────────────────────────────────────────
 
@@ -159,140 +97,76 @@ export default function PortailObjectifs({ propRepName }: Props) {
         if (!repName) { setLoading(false); return; }
         setLoading(true);
 
-        const [objRes, deptObjRes, devisRes, factRes, devisDeptRes, factDeptRes] = await Promise.all([
-            supabase.from('rep_objectives').select('*').eq('rep_name', repName).eq('year', year),
-            supabase.from('rep_objectives_dept').select('module, month, department, target_amount').eq('rep_name', repName).eq('year', year),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
+        const [objRes, deptObjRes, factRes, factDeptRes] = await Promise.all([
+            supabase.from('rep_objectives').select('month, target_amount')
+                .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
+            supabase.from('rep_objectives_dept').select('month, department, target_amount')
+                .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
-            supabase.rpc('get_rep_dept_actuals_devis', { p_rep: repName, p_year: year }),
             supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: year }),
         ]);
 
-        const objectives      = (objRes.data    ?? []) as RepObjective[];
-        const deptObjectives  = (deptObjRes.data ?? []) as RepObjectiveDept[];
-        const devisActuals    = (devisRes.data   ?? []) as { month: number; actual_amount: number }[];
-        const factActuals     = (factRes.data    ?? []) as { month: number; actual_amount: number }[];
-        const devisDeptActs   = (devisDeptRes.data ?? []) as DeptActualRow[];
-        const factDeptActs    = (factDeptRes.data  ?? []) as DeptActualRow[];
+        const objMap: Record<number, number> = {};
+        for (const o of (objRes.data ?? [])) objMap[o.month] = Number(o.target_amount);
 
-        // ── Build monthly objective map (manual totals)
-        const objMap: Record<string, number> = {};
-        for (const o of objectives) { objMap[`${o.module}-${o.month}`] = o.target_amount; }
-
-        // ── Build dept objective map
         const dObjMap: Record<string, number> = {};
-        for (const o of deptObjectives) { dObjMap[`${o.module}-${o.month}-${o.department}`] = o.target_amount; }
-
-        // Effective target: dept sum if any dept is set, otherwise manual monthly total
-        const effectiveTarget = (mod: 'devis' | 'factures', month: number) => {
-            const deptSum = DEPARTMENTS.reduce((s, d) => s + (dObjMap[`${mod}-${month}-${d}`] ?? 0), 0);
-            return deptSum > 0 ? deptSum : (objMap[`${mod}-${month}`] ?? 0);
-        };
-
-        const devisMap: Record<number, number> = {};
-        for (const d of devisActuals) { devisMap[d.month] = d.actual_amount; }
+        for (const o of (deptObjRes.data ?? [])) dObjMap[`${o.month}-${o.department}`] = Number(o.target_amount);
 
         const factMap: Record<number, number> = {};
-        for (const f of factActuals) { factMap[f.month] = f.actual_amount; }
-
-        setRows(MONTH_LABELS.map((label, i) => ({
-            month: i + 1,
-            label,
-            devisTarget:    effectiveTarget('devis',    i + 1),
-            devisActual:    devisMap[i + 1]              ?? 0,
-            facturesTarget: effectiveTarget('factures',  i + 1),
-            facturesActual: factMap[i + 1]               ?? 0,
-        })));
-
-        // ── Department rows ──
-        // Actual lookups
-        const devisActMap: Record<string, number> = {};
-        for (const d of devisDeptActs) { devisActMap[`${d.month}-${d.department}`] = d.actual_amount; }
+        for (const f of (factRes.data ?? [])) factMap[f.month] = Number(f.actual_amount);
 
         const factActMap: Record<string, number> = {};
-        for (const f of factDeptActs) { factActMap[`${f.month}-${f.department}`] = f.actual_amount; }
+        for (const f of (factDeptRes.data ?? [])) factActMap[`${f.month}-${f.department}`] = Number(f.actual_amount);
 
-        // Filter by selectedMonth (will be recalculated when month changes so store raw)
-        // Store all data keyed by dept so we can derive the correct totals in render
-        const deptData: DeptRow[] = DEPARTMENTS.map(dept => {
-            let devisTarget = 0, devisActual = 0, facturesTarget = 0, facturesActual = 0;
+        // Monthly rows — effective target = dept sum when set, otherwise manual monthly total
+        setRows(MONTH_LABELS.map((label, i) => {
+            const m = i + 1;
+            const deptSum = DEPARTMENTS.reduce((s, d) => s + (dObjMap[`${m}-${d}`] ?? 0), 0);
+            const target  = deptSum > 0 ? deptSum : (objMap[m] ?? 0);
+            return { month: m, label, target, actual: factMap[m] ?? 0 };
+        }));
+
+        // Dept × month matrix
+        const dd: DeptMonthData = {};
+        for (const dept of DEPARTMENTS) {
+            dd[dept] = {};
             for (let m = 1; m <= 12; m++) {
-                devisTarget    += dObjMap[`devis-${m}-${dept}`]    ?? 0;
-                devisActual    += devisActMap[`${m}-${dept}`]      ?? 0;
-                facturesTarget += dObjMap[`factures-${m}-${dept}`] ?? 0;
-                facturesActual += factActMap[`${m}-${dept}`]       ?? 0;
+                dd[dept][m] = {
+                    target: dObjMap[`${m}-${dept}`] ?? 0,
+                    actual: factActMap[`${m}-${dept}`] ?? 0,
+                };
             }
-            return { department: dept, devisTarget, devisActual, facturesTarget, facturesActual };
-        });
-
-        // Store raw per-month dept data for month-filtered view
-        // We'll reuse the dObjMap and act maps via closure — store them in a ref-like approach
-        // Simpler: store a pre-built structure for each dept × month
-        setDeptRowsRaw({ dObjMap, devisActMap, factActMap });
-        setDeptRows(deptData);
+        }
+        setDeptData(dd);
         setLoading(false);
     }, [repName, year]);
-
-    // Raw dept data for re-slicing by month filter
-    const [deptRowsRaw, setDeptRowsRaw] = useState<{
-        dObjMap: Record<string, number>;
-        devisActMap: Record<string, number>;
-        factActMap: Record<string, number>;
-    } | null>(null);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
     // ─── Derived ──────────────────────────────────────────────────────────────
 
     const totals = rows.reduce(
-        (acc, r) => ({
-            devisTarget:    acc.devisTarget    + r.devisTarget,
-            devisActual:    acc.devisActual    + r.devisActual,
-            facturesTarget: acc.facturesTarget + r.facturesTarget,
-            facturesActual: acc.facturesActual + r.facturesActual,
-        }),
-        { devisTarget: 0, devisActual: 0, facturesTarget: 0, facturesActual: 0 }
+        (acc, r) => ({ target: acc.target + r.target, actual: acc.actual + r.actual }),
+        { target: 0, actual: 0 }
+    );
+    const pct = totals.target > 0 ? Math.round((totals.actual / totals.target) * 100) : 0;
+    const { text: motivText, emoji: motivEmoji } = getMotivation(pct);
+
+    const hasDeptData = DEPARTMENTS.some(dept =>
+        Object.values(deptData[dept] ?? {}).some(({ target, actual }) => target > 0 || actual > 0)
     );
 
-    const devisPct = totals.devisTarget > 0 ? Math.round((totals.devisActual / totals.devisTarget) * 100) : 0;
-    const { text: motivText, emoji: motivEmoji } = getMotivation(devisPct);
-
-    const displayedRows = selectedMonth === 'Tous'
-        ? rows
-        : rows.filter(r => r.month === selectedMonth);
-
-    const displayedTotals = displayedRows.reduce(
-        (acc, r) => ({
-            devisTarget:    acc.devisTarget    + r.devisTarget,
-            devisActual:    acc.devisActual    + r.devisActual,
-            facturesTarget: acc.facturesTarget + r.facturesTarget,
-            facturesActual: acc.facturesActual + r.facturesActual,
-        }),
-        { devisTarget: 0, devisActual: 0, facturesTarget: 0, facturesActual: 0 }
-    );
-
-    // Compute filtered dept rows based on selectedMonth
-    const filteredDeptRows: DeptRow[] = (() => {
-        if (!deptRowsRaw) return deptRows;
-        const { dObjMap, devisActMap, factActMap } = deptRowsRaw;
-        const months = selectedMonth === 'Tous'
-            ? Array.from({ length: 12 }, (_, i) => i + 1)
-            : [selectedMonth as number];
-        return DEPARTMENTS.map(dept => {
-            let devisTarget = 0, devisActual = 0, facturesTarget = 0, facturesActual = 0;
-            for (const m of months) {
-                devisTarget    += dObjMap[`devis-${m}-${dept}`]    ?? 0;
-                devisActual    += devisActMap[`${m}-${dept}`]      ?? 0;
-                facturesTarget += dObjMap[`factures-${m}-${dept}`] ?? 0;
-                facturesActual += factActMap[`${m}-${dept}`]       ?? 0;
-            }
-            return { department: dept, devisTarget, devisActual, facturesTarget, facturesActual };
-        });
-    })();
-
-    const hasDeptData = filteredDeptRows.some(
-        r => r.devisTarget > 0 || r.devisActual > 0 || r.facturesTarget > 0 || r.facturesActual > 0
-    );
+    // Per-month column totals for dept matrix footer
+    const colTotals: Record<number, { target: number; actual: number }> = {};
+    for (let m = 1; m <= 12; m++) {
+        colTotals[m] = DEPARTMENTS.reduce(
+            (acc, dept) => ({
+                target: acc.target + (deptData[dept]?.[m]?.target ?? 0),
+                actual: acc.actual + (deptData[dept]?.[m]?.actual ?? 0),
+            }),
+            { target: 0, actual: 0 }
+        );
+    }
 
     // ─── Guard ────────────────────────────────────────────────────────────────
 
@@ -319,13 +193,13 @@ export default function PortailObjectifs({ propRepName }: Props) {
             <div className="relative overflow-hidden bg-gradient-to-br from-brand-main via-brand-main/90 to-amber-500 rounded-2xl p-6 md:p-8 text-white shadow-lg shadow-brand-main/20">
                 <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
                 <div className="absolute -bottom-14 -left-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-                <div className="relative flex flex-col gap-6">
+                <div className="relative flex flex-col gap-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
                                 <Target className="w-4 h-4 text-white/70" />
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                                    Mes Objectifs {year}
+                                    Mes Objectifs Factures {year}
                                 </span>
                             </div>
                             <h1 className="text-2xl md:text-3xl font-bold leading-tight">{repName || 'Représentant'}</h1>
@@ -335,29 +209,48 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             </p>
                         </div>
                     </div>
-                    <div className="flex gap-3 md:gap-4">
-                        <HeroKpiCard icon={ClipboardList} label="Devis"    actual={totals.devisActual}    target={totals.devisTarget} />
-                        <HeroKpiCard icon={FileText}      label="Factures" actual={totals.facturesActual} target={totals.facturesTarget} />
+                    {/* Single factures KPI */}
+                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex items-center justify-between gap-6 flex-wrap">
+                        <div className="flex items-center gap-3">
+                            <FileText className="w-5 h-5 text-white/70 shrink-0" />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Total Facturé {year}</p>
+                                <p className="text-2xl md:text-3xl font-bold tabular-nums leading-none mt-0.5">
+                                    {formatCurrencyCAD(totals.actual)}
+                                </p>
+                                <p className="text-[11px] text-white/60 mt-1">
+                                    {totals.target > 0
+                                        ? `sur ${formatCurrencyCAD(totals.target)} objectif`
+                                        : 'Objectif non fixé — configurez dans Paramètres'}
+                                </p>
+                            </div>
+                        </div>
+                        {totals.target > 0 && (
+                            <div className="flex-1 min-w-[160px] max-w-xs">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-sm font-bold text-white">{pct}% atteint</span>
+                                </div>
+                                <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
+                                    <div
+                                        className={cn('h-full rounded-full transition-all duration-700',
+                                            pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-400'
+                                        )}
+                                        style={{ width: `${Math.min(pct, 100)}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
-            {/* ── Filters ── */}
+            {/* ── Filters (year only) ── */}
             <FilterBar>
                 <FilterGroup label="Année">
                     <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
                 </FilterGroup>
-                <FilterGroup label="Mois">
-                    <Select
-                        value={selectedMonth === 'Tous' ? 'Tous' : String(selectedMonth)}
-                        onChange={v => setSelectedMonth(v === 'Tous' ? 'Tous' : Number(v))}
-                        options={monthOptions}
-                        className="w-40"
-                    />
-                </FilterGroup>
             </FilterBar>
 
-            {/* ── Monthly table ── */}
             {!repName ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">
                     <Target className="w-8 h-8 text-slate-200" />
@@ -370,27 +263,26 @@ export default function PortailObjectifs({ propRepName }: Props) {
                 </div>
             ) : (
                 <>
-                    {/* Monthly totals table */}
+                    {/* ── Monthly totals table ── */}
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-slate-100 bg-slate-50/60">
                                         <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Objectif Devis</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Réalisé</th>
-                                        <th className="px-4 py-3 text-[10px] font-bold text-blue-300 uppercase tracking-widest min-w-[120px]">Atteinte</th>
-                                        <th className="w-px bg-slate-100" />
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif Factures</th>
+                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Objectif</th>
                                         <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
-                                        <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[120px]">Atteinte</th>
+                                        <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[130px]">Atteinte</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {displayedRows.map(row => {
+                                    {rows.map(row => {
                                         const isCurrent = row.month === NOW_MONTH && year === NOW_YEAR;
                                         return (
-                                            <tr key={row.month} className={cn('hover:bg-slate-50/60 transition-colors', isCurrent && 'bg-brand-main/5 hover:bg-brand-main/10')}>
+                                            <tr key={row.month} className={cn(
+                                                'hover:bg-slate-50/60 transition-colors',
+                                                isCurrent && 'bg-brand-main/5 hover:bg-brand-main/10'
+                                            )}>
                                                 <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
                                                     <div className="flex items-center gap-2">
                                                         {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-brand-main shrink-0" />}
@@ -401,51 +293,35 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
-                                                    {row.devisTarget > 0 ? formatCurrencyCAD(row.devisTarget) : <span className="text-slate-200">—</span>}
+                                                    {row.target > 0 ? formatCurrencyCAD(row.target) : <span className="text-slate-200">—</span>}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-semibold text-blue-700 tabular-nums">
-                                                    {row.devisActual > 0 ? formatCurrencyCAD(row.devisActual) : <span className="text-slate-200">—</span>}
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
+                                                    {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-slate-200">—</span>}
                                                 </td>
-                                                <td className="px-4 py-3"><Progress actual={row.devisActual} target={row.devisTarget} /></td>
-                                                <td className="w-px bg-slate-100 p-0" />
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700">
-                                                    {row.facturesTarget > 0 ? formatCurrencyCAD(row.facturesTarget) : <span className="text-slate-200">—</span>}
+                                                <td className="px-4 py-3">
+                                                    <Progress actual={row.actual} target={row.target} />
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-semibold text-amber-700 tabular-nums">
-                                                    {row.facturesActual > 0 ? formatCurrencyCAD(row.facturesActual) : <span className="text-slate-200">—</span>}
-                                                </td>
-                                                <td className="px-4 py-3"><Progress actual={row.facturesActual} target={row.facturesTarget} /></td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                                 <tfoot>
                                     <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">
-                                            {selectedMonth === 'Tous' ? `Total ${year}` : MONTH_LABELS[(selectedMonth as number) - 1]}
-                                        </td>
+                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Total {year}</td>
                                         <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                            {displayedTotals.devisTarget > 0 ? formatCurrencyCAD(displayedTotals.devisTarget) : <span className="text-slate-300">—</span>}
-                                        </td>
-                                        <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">
-                                            {displayedTotals.devisActual > 0 ? formatCurrencyCAD(displayedTotals.devisActual) : <span className="text-slate-300">—</span>}
-                                        </td>
-                                        <td className="px-4 py-3"><Progress actual={displayedTotals.devisActual} target={displayedTotals.devisTarget} /></td>
-                                        <td className="w-px bg-slate-200 p-0" />
-                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                            {displayedTotals.facturesTarget > 0 ? formatCurrencyCAD(displayedTotals.facturesTarget) : <span className="text-slate-300">—</span>}
+                                            {totals.target > 0 ? formatCurrencyCAD(totals.target) : <span className="text-slate-300">—</span>}
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
-                                            {displayedTotals.facturesActual > 0 ? formatCurrencyCAD(displayedTotals.facturesActual) : <span className="text-slate-300">—</span>}
+                                            {totals.actual > 0 ? formatCurrencyCAD(totals.actual) : <span className="text-slate-300">—</span>}
                                         </td>
-                                        <td className="px-4 py-3"><Progress actual={displayedTotals.facturesActual} target={displayedTotals.facturesTarget} /></td>
+                                        <td className="px-4 py-3"><Progress actual={totals.actual} target={totals.target} /></td>
                                     </tr>
                                 </tfoot>
                             </table>
                         </div>
                     </div>
 
-                    {/* ── Department breakdown ── */}
+                    {/* ── Department × Month matrix ── */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
                             <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
@@ -454,9 +330,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
                                 <p className="text-xs text-slate-400">
-                                    {selectedMonth === 'Tous'
-                                        ? `Objectifs et réalisé cumulés sur ${year}`
-                                        : `Objectifs et réalisé pour ${MONTH_LABELS[(selectedMonth as number) - 1]} ${year}`}
+                                    Objectif par mois · Chiffre en orange = réalisé
                                     {' · '}Configurez dans <span className="text-brand-main font-medium">Paramètres</span>
                                 </p>
                             </div>
@@ -471,77 +345,147 @@ export default function PortailObjectifs({ propRepName }: Props) {
                         ) : (
                             <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-xs border-collapse">
                                         <thead>
-                                            <tr className="border-b border-slate-100 bg-slate-50/60">
-                                                <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Département</th>
-                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Obj. Devis</th>
-                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-blue-400 uppercase tracking-widest">Réalisé</th>
-                                                <th className="px-4 py-3 text-[10px] font-bold text-blue-300 uppercase tracking-widest min-w-[110px]">Atteinte</th>
-                                                <th className="w-px bg-slate-100" />
-                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Obj. Factures</th>
-                                                <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">Réalisé</th>
-                                                <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[110px]">Atteinte</th>
+                                            <tr className="bg-slate-50 border-b-2 border-slate-200">
+                                                <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-200 min-w-[110px]">
+                                                    Département
+                                                </th>
+                                                {MONTH_SHORT.map((m, i) => (
+                                                    <th key={i} className={cn(
+                                                        'px-2 py-3 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-100 min-w-[58px]',
+                                                        (i + 1) === NOW_MONTH && year === NOW_YEAR
+                                                            ? 'text-brand-main bg-brand-main/5'
+                                                            : 'text-slate-400'
+                                                    )}>
+                                                        {m}
+                                                    </th>
+                                                ))}
+                                                <th className="px-3 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-slate-200 min-w-[90px]">
+                                                    Total
+                                                </th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {filteredDeptRows
-                                                .filter(r => r.devisTarget > 0 || r.devisActual > 0 || r.facturesTarget > 0 || r.facturesActual > 0)
-                                                .map(row => (
-                                                    <tr key={row.department} className="hover:bg-slate-50/60 transition-colors">
-                                                        <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
-                                                            {DEPT_SHORT[row.department] ?? row.department}
+                                        <tbody>
+                                            {DEPARTMENTS.map(dept => {
+                                                const monthCells = deptData[dept] ?? {};
+                                                const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0);
+                                                if (!hasRow) return null;
+
+                                                const rowTotal = Object.values(monthCells).reduce(
+                                                    (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual }),
+                                                    { target: 0, actual: 0 }
+                                                );
+
+                                                return (
+                                                    <tr key={dept} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors group">
+                                                        <td className="px-4 py-2.5 font-semibold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50/60 border-r border-slate-200 text-xs whitespace-nowrap z-10">
+                                                            {DEPT_SHORT[dept] ?? dept}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">
-                                                            {row.devisTarget > 0 ? formatCurrencyCAD(row.devisTarget) : <span className="text-slate-200">—</span>}
+                                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                                            const cell = monthCells[m] ?? { target: 0, actual: 0 };
+                                                            const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
+                                                            return (
+                                                                <td key={m} className={cn(
+                                                                    'px-2 py-2.5 text-center border-r border-slate-100',
+                                                                    isCurrent && 'bg-brand-main/5'
+                                                                )}>
+                                                                    {cell.target > 0 ? (
+                                                                        <div className="leading-tight">
+                                                                            <div className="font-semibold text-slate-700 tabular-nums">{fmtK(cell.target)}</div>
+                                                                            {cell.actual > 0 && (
+                                                                                <div className={cn(
+                                                                                    'font-bold tabular-nums mt-0.5',
+                                                                                    cell.actual >= cell.target
+                                                                                        ? 'text-emerald-500'
+                                                                                        : cell.actual >= cell.target * 0.7
+                                                                                            ? 'text-amber-500'
+                                                                                            : 'text-brand-main'
+                                                                                )}>
+                                                                                    {fmtK(cell.actual)}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : cell.actual > 0 ? (
+                                                                        <div className="font-bold text-brand-main tabular-nums">{fmtK(cell.actual)}</div>
+                                                                    ) : (
+                                                                        <span className="text-slate-100">·</span>
+                                                                    )}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                        {/* Row total */}
+                                                        <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
+                                                            <div className="font-semibold text-slate-700 tabular-nums whitespace-nowrap">
+                                                                {rowTotal.target > 0 ? formatCurrencyCAD(rowTotal.target) : <span className="text-slate-200">—</span>}
+                                                            </div>
+                                                            {rowTotal.actual > 0 && (
+                                                                <div className={cn(
+                                                                    'font-bold tabular-nums text-[11px] mt-0.5 whitespace-nowrap',
+                                                                    rowTotal.actual >= rowTotal.target ? 'text-emerald-500' : 'text-brand-main'
+                                                                )}>
+                                                                    {formatCurrencyCAD(rowTotal.actual)}
+                                                                </div>
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-semibold text-blue-700 tabular-nums">
-                                                            {row.devisActual > 0 ? formatCurrencyCAD(row.devisActual) : <span className="text-slate-200">—</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3"><Progress actual={row.devisActual} target={row.devisTarget} /></td>
-                                                        <td className="w-px bg-slate-100 p-0" />
-                                                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">
-                                                            {row.facturesTarget > 0 ? formatCurrencyCAD(row.facturesTarget) : <span className="text-slate-200">—</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-semibold text-amber-700 tabular-nums">
-                                                            {row.facturesActual > 0 ? formatCurrencyCAD(row.facturesActual) : <span className="text-slate-200">—</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3"><Progress actual={row.facturesActual} target={row.facturesTarget} /></td>
                                                     </tr>
-                                                ))}
+                                                );
+                                            })}
                                         </tbody>
                                         <tfoot>
-                                            {(() => {
-                                                const ft = filteredDeptRows.reduce(
-                                                    (a, r) => ({
-                                                        devisTarget:    a.devisTarget    + r.devisTarget,
-                                                        devisActual:    a.devisActual    + r.devisActual,
-                                                        facturesTarget: a.facturesTarget + r.facturesTarget,
-                                                        facturesActual: a.facturesActual + r.facturesActual,
-                                                    }),
-                                                    { devisTarget: 0, devisActual: 0, facturesTarget: 0, facturesActual: 0 }
-                                                );
-                                                return (
-                                                    <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Total</td>
-                                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                                            {ft.devisTarget > 0 ? formatCurrencyCAD(ft.devisTarget) : <span className="text-slate-300">—</span>}
+                                            <tr className="border-t-2 border-slate-200 bg-slate-50/80">
+                                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50 border-r border-slate-200 z-10">
+                                                    Total
+                                                </td>
+                                                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                                    const col = colTotals[m] ?? { target: 0, actual: 0 };
+                                                    const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
+                                                    return (
+                                                        <td key={m} className={cn(
+                                                            'px-2 py-2.5 text-center border-r border-slate-100',
+                                                            isCurrent && 'bg-brand-main/5'
+                                                        )}>
+                                                            {col.target > 0 ? (
+                                                                <div className="leading-tight">
+                                                                    <div className="font-bold text-slate-800 tabular-nums">{fmtK(col.target)}</div>
+                                                                    {col.actual > 0 && (
+                                                                        <div className={cn(
+                                                                            'font-bold tabular-nums mt-0.5',
+                                                                            col.actual >= col.target ? 'text-emerald-500' : 'text-amber-500'
+                                                                        )}>
+                                                                            {fmtK(col.actual)}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-slate-200">—</span>
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-blue-700 tabular-nums">
-                                                            {ft.devisActual > 0 ? formatCurrencyCAD(ft.devisActual) : <span className="text-slate-300">—</span>}
+                                                    );
+                                                })}
+                                                {/* Grand total */}
+                                                {(() => {
+                                                    const gt = Object.values(colTotals).reduce(
+                                                        (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual }),
+                                                        { target: 0, actual: 0 }
+                                                    );
+                                                    return (
+                                                        <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
+                                                            <div className="font-bold text-slate-900 tabular-nums whitespace-nowrap text-xs">
+                                                                {gt.target > 0 ? formatCurrencyCAD(gt.target) : <span className="text-slate-300">—</span>}
+                                                            </div>
+                                                            {gt.actual > 0 && (
+                                                                <div className={cn(
+                                                                    'font-bold tabular-nums text-[11px] mt-0.5 whitespace-nowrap',
+                                                                    gt.actual >= gt.target ? 'text-emerald-500' : 'text-brand-main'
+                                                                )}>
+                                                                    {formatCurrencyCAD(gt.actual)}
+                                                                </div>
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3"><Progress actual={ft.devisActual} target={ft.devisTarget} /></td>
-                                                        <td className="w-px bg-slate-200 p-0" />
-                                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums">
-                                                            {ft.facturesTarget > 0 ? formatCurrencyCAD(ft.facturesTarget) : <span className="text-slate-300">—</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
-                                                            {ft.facturesActual > 0 ? formatCurrencyCAD(ft.facturesActual) : <span className="text-slate-300">—</span>}
-                                                        </td>
-                                                        <td className="px-4 py-3"><Progress actual={ft.facturesActual} target={ft.facturesTarget} /></td>
-                                                    </tr>
-                                                );
-                                            })()}
+                                                    );
+                                                })()}
+                                            </tr>
                                         </tfoot>
                                     </table>
                                 </div>

@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-/** Returns a deduplicated sorted list of rep names from the sales table. */
+/** Returns rep names from allowed_users where rep_name is set (active team members only). */
 export function useRepList(): string[] {
     const [repList, setRepList] = useState<string[]>([]);
     useEffect(() => {
         supabase
-            .from('sales')
+            .from('allowed_users')
             .select('rep_name')
             .not('rep_name', 'is', null)
-            .limit(1000)
             .then(({ data }) => {
                 const unique = [
                     ...new Set(
