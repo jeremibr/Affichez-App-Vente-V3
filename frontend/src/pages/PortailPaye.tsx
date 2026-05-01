@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
-import { Wallet, Trash2, Loader2, Plus, User } from 'lucide-react';
+import { Wallet, Trash2, Loader2, Plus, User, CalendarClock, ChevronDown, Check, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -58,6 +58,22 @@ function formatPayDate(d: string): string {
     return d;
 }
 
+// ─── Schedule generator ───────────────────────────────────────────────────────
+
+function generateBiweeklyDates(startDate: string, year: number): string[] {
+    if (!startDate) return [];
+    const dates: string[] = [];
+    const d = new Date(startDate + 'T12:00:00');
+    if (isNaN(d.getTime())) return [];
+    while (d.getFullYear() <= year) {
+        if (d.getFullYear() === year) {
+            dates.push(d.toISOString().slice(0, 10));
+        }
+        d.setDate(d.getDate() + 14);
+    }
+    return dates;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props { propRepName?: string; }
@@ -77,6 +93,11 @@ export default function PortailPaye({ propRepName }: Props) {
     const [entries, setEntries]         = useState<PayEntry[]>([]);
     const [meta, setMeta]               = useState<PayMeta>(EMPTY_META);
     const [commRate, setCommRate]       = useState(0.05);
+
+    // Schedule generator
+    const [showGenerator, setShowGenerator] = useState(false);
+    const [genStartDate, setGenStartDate]   = useState('');
+    const [generating, setGenerating]       = useState(false);
 
     const yearOptions  = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const monthOptions = [
@@ -123,6 +144,32 @@ export default function PortailPaye({ propRepName }: Props) {
         });
 
     // ─── Entry mutations (admin only) ────────────────────────────────────────
+
+    const generateSchedule = async () => {
+        if (!repName || !canEdit || !genStartDate) return;
+        setGenerating(true);
+        const allDates = generateBiweeklyDates(genStartDate, year);
+        const existingDates = new Set(entries.map(e => e.pay_date));
+        const newDates = allDates.filter(d => !existingDates.has(d));
+        if (newDates.length > 0) {
+            const rows = newDates.map((pay_date, i) => ({
+                rep_name: repName,
+                year,
+                pay_date,
+                sort_order: entries.length + i,
+            }));
+            const { data } = await supabase.from('paye_entries').insert(rows).select();
+            if (data) {
+                setEntries(prev => [
+                    ...prev,
+                    ...(data as PayEntry[]),
+                ].sort((a, b) => a.pay_date < b.pay_date ? -1 : 1));
+            }
+        }
+        setShowGenerator(false);
+        setGenStartDate('');
+        setGenerating(false);
+    };
 
     const addEntry = async () => {
         if (!repName || !canEdit) return;
@@ -266,14 +313,104 @@ export default function PortailPaye({ propRepName }: Props) {
 
             {/* ─── Payroll table ───────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                            Taux commission : <span className="font-bold text-brand-main">{commRateLabel}</span>
-                            {selectedMonth !== 'Tous' && <span className="ml-2 text-brand-main font-semibold">· {MONTHS.find(m => String(m.value) === selectedMonth)?.label}</span>}
-                        </p>
+                <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                Taux commission : <span className="font-bold text-brand-main">{commRateLabel}</span>
+                                {selectedMonth !== 'Tous' && <span className="ml-2 text-brand-main font-semibold">· {MONTHS.find(m => String(m.value) === selectedMonth)?.label}</span>}
+                            </p>
+                        </div>
+                        {canEdit && (
+                            <button
+                                onClick={() => setShowGenerator(v => !v)}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border',
+                                    showGenerator
+                                        ? 'bg-brand-main text-white border-brand-main'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:border-brand-main hover:text-brand-main'
+                                )}
+                            >
+                                <CalendarClock className="w-3.5 h-3.5" />
+                                Générer le calendrier
+                                <ChevronDown className={cn('w-3 h-3 transition-transform', showGenerator && 'rotate-180')} />
+                            </button>
+                        )}
                     </div>
+
+                    {/* ── Inline generator panel ── */}
+                    {showGenerator && canEdit && (() => {
+                        const previewDates = generateBiweeklyDates(genStartDate, year);
+                        const existingDates = new Set(entries.map(e => e.pay_date));
+                        const newDates = previewDates.filter(d => !existingDates.has(d));
+                        return (
+                            <div className="mt-4 p-4 bg-white rounded-xl border border-slate-200 space-y-4">
+                                <div className="flex items-start gap-4 flex-wrap">
+                                    <div className="flex-1 min-w-[200px]">
+                                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                                            Première date de paie {year}
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={genStartDate}
+                                            onChange={e => setGenStartDate(e.target.value)}
+                                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-brand-main font-medium text-slate-700"
+                                        />
+                                        <p className="text-[10px] text-slate-300 mt-1">Fréquence : aux 2 semaines</p>
+                                    </div>
+
+                                    {previewDates.length > 0 && (
+                                        <div className="flex-1 min-w-[200px]">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                                                Aperçu — {previewDates.length} dates · {newDates.length} nouvelles
+                                            </p>
+                                            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                                                {previewDates.map(d => (
+                                                    <span
+                                                        key={d}
+                                                        className={cn(
+                                                            'px-2 py-0.5 rounded-full text-[10px] font-semibold',
+                                                            existingDates.has(d)
+                                                                ? 'bg-slate-100 text-slate-300 line-through'
+                                                                : 'bg-brand-main/10 text-brand-main'
+                                                        )}
+                                                    >
+                                                        {formatPayDate(d)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={generateSchedule}
+                                        disabled={generating || newDates.length === 0}
+                                        className="flex items-center gap-1.5 px-4 py-2 bg-brand-main text-white text-xs font-bold rounded-xl hover:bg-brand-main/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {generating
+                                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            : <Check className="w-3.5 h-3.5" />}
+                                        {generating ? 'Génération…' : `Créer ${newDates.length} ligne${newDates.length > 1 ? 's' : ''}`}
+                                    </button>
+                                    <button
+                                        onClick={() => { setShowGenerator(false); setGenStartDate(''); }}
+                                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                        Annuler
+                                    </button>
+                                    {previewDates.length > 0 && newDates.length === 0 && (
+                                        <span className="text-xs text-emerald-600 font-semibold">
+                                            ✓ Toutes ces dates existent déjà
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {!repName ? (

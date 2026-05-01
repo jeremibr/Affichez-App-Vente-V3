@@ -175,9 +175,19 @@ export default function PortailObjectifs({ propRepName }: Props) {
         const devisDeptActs   = (devisDeptRes.data ?? []) as DeptActualRow[];
         const factDeptActs    = (factDeptRes.data  ?? []) as DeptActualRow[];
 
-        // ── Monthly rows ──
+        // ── Build monthly objective map (manual totals)
         const objMap: Record<string, number> = {};
         for (const o of objectives) { objMap[`${o.module}-${o.month}`] = o.target_amount; }
+
+        // ── Build dept objective map
+        const dObjMap: Record<string, number> = {};
+        for (const o of deptObjectives) { dObjMap[`${o.module}-${o.month}-${o.department}`] = o.target_amount; }
+
+        // Effective target: dept sum if any dept is set, otherwise manual monthly total
+        const effectiveTarget = (mod: 'devis' | 'factures', month: number) => {
+            const deptSum = DEPARTMENTS.reduce((s, d) => s + (dObjMap[`${mod}-${month}-${d}`] ?? 0), 0);
+            return deptSum > 0 ? deptSum : (objMap[`${mod}-${month}`] ?? 0);
+        };
 
         const devisMap: Record<number, number> = {};
         for (const d of devisActuals) { devisMap[d.month] = d.actual_amount; }
@@ -188,17 +198,13 @@ export default function PortailObjectifs({ propRepName }: Props) {
         setRows(MONTH_LABELS.map((label, i) => ({
             month: i + 1,
             label,
-            devisTarget:    objMap[`devis-${i + 1}`]    ?? 0,
+            devisTarget:    effectiveTarget('devis',    i + 1),
             devisActual:    devisMap[i + 1]              ?? 0,
-            facturesTarget: objMap[`factures-${i + 1}`] ?? 0,
+            facturesTarget: effectiveTarget('factures',  i + 1),
             facturesActual: factMap[i + 1]               ?? 0,
         })));
 
         // ── Department rows ──
-        // Build lookup: deptObj[module-month-dept] = target
-        const dObjMap: Record<string, number> = {};
-        for (const o of deptObjectives) { dObjMap[`${o.module}-${o.month}-${o.department}`] = o.target_amount; }
-
         // Actual lookups
         const devisActMap: Record<string, number> = {};
         for (const d of devisDeptActs) { devisActMap[`${d.month}-${d.department}`] = d.actual_amount; }
