@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
-import { Wallet, Trash2, Loader2, Plus, User, CalendarClock, ChevronDown, Check, X } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useUrlStateNumber } from '../hooks/useUrlState';
+import { Wallet, Trash2, Loader2, Plus, User, Pencil, Check, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,7 +8,6 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { fetchCommRate } from '../utils/commRates';
-import { MONTHS } from '../lib/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,34 +75,30 @@ function generateBiweeklyDates(startDate: string, year: number): string[] {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
-interface Props { propRepName?: string; }
+interface Props { propRepName?: string; embedded?: boolean; }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function PortailPaye({ propRepName }: Props) {
+export default function PortailPaye({ propRepName, embedded }: Props) {
     const { repName: authRepName, isAdmin } = useAuth();
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
     const canEdit = isAdmin && !viewAsRep;
+    const isAdminView = !!propRepName;
 
-    const [year, setYear]               = useUrlStateNumber('year', 2026);
-    const [selectedMonth, setSelectedMonth] = useUrlState('month', 'Tous');
-    const [loading, setLoading]         = useState(true);
-    const [entries, setEntries]         = useState<PayEntry[]>([]);
-    const [meta, setMeta]               = useState<PayMeta>(EMPTY_META);
-    const [commRate, setCommRate]       = useState(0.05);
+    const [year, setYear]         = useUrlStateNumber('year', 2026);
+    const [loading, setLoading]   = useState(true);
+    const [entries, setEntries]   = useState<PayEntry[]>([]);
+    const [meta, setMeta]         = useState<PayMeta>(EMPTY_META);
+    const [commRate, setCommRate] = useState(0.05);
+    const [generating, setGenerating] = useState(false);
 
-    // Schedule generator
-    const [showManualPicker, setShowManualPicker] = useState(false);
-    const [genStartDate, setGenStartDate]          = useState('');
-    const [generating, setGenerating]              = useState(false);
+    // Inline commission rate editing
+    const [editingRate, setEditingRate] = useState(false);
+    const [rateDraft, setRateDraft]     = useState('');
 
-    const yearOptions  = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = [
-        { value: 'Tous', label: 'Tous les mois' },
-        ...MONTHS.map(m => ({ value: String(m.value), label: m.label })),
-    ];
+    const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     // ─── Fetch ───────────────────────────────────────────────────────────────
 
@@ -133,56 +128,27 @@ export default function PortailPaye({ propRepName }: Props) {
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
-    // ─── Month filter (client-side) ───────────────────────────────────────────
+    // ─── Auto-generate bi-weekly dates for admin view when year is empty ──────
 
-    const filteredEntries = selectedMonth === 'Tous'
-        ? entries
-        : entries.filter(e => {
-            if (!e.pay_date) return false;
-            const m = String(selectedMonth).padStart(2, '0');
-            return e.pay_date.startsWith(`${year}-${m}`);
+    useEffect(() => {
+        if (!isAdminView || !canEdit || loading || entries.length > 0 || !repName || generating) return;
+        const defaultStart = `${year}-01-09`;
+        const dates = generateBiweeklyDates(defaultStart, year);
+        if (dates.length === 0) return;
+        setGenerating(true);
+        const rows = dates.map((pay_date, i) => ({ rep_name: repName, year, pay_date, sort_order: i }));
+        supabase.from('paye_entries').insert(rows).select().then(({ data }) => {
+            if (data) setEntries((data as PayEntry[]).sort((a, b) => a.pay_date < b.pay_date ? -1 : 1));
+            setGenerating(false);
         });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, entries.length, isAdminView, canEdit, repName, year]);
+
+    // In admin view, always show full year (no month filter)
+    const filteredEntries = entries;
 
     // ─── Entry mutations (admin only) ────────────────────────────────────────
 
-    // Auto-detect: last valid pay date in entries → next biweekly date from there
-    const lastValidDate = useMemo(() => {
-        const valid = entries.map(e => e.pay_date).filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
-        return valid.at(-1) ?? null;
-    }, [entries]);
-
-    const autoNextStart = useMemo(() => {
-        if (!lastValidDate) return '';
-        const d = new Date(lastValidDate + 'T12:00:00');
-        d.setDate(d.getDate() + 14);
-        return d.toISOString().slice(0, 10);
-    }, [lastValidDate]);
-
-    const autoPendingDates = useMemo(() => {
-        const start = autoNextStart || genStartDate;
-        if (!start) return [];
-        const all = generateBiweeklyDates(start, year);
-        const existing = new Set(entries.map(e => e.pay_date));
-        return all.filter(d => !existing.has(d));
-    }, [autoNextStart, genStartDate, year, entries]);
-
-    const generateSchedule = async () => {
-        if (!repName || !canEdit || autoPendingDates.length === 0) return;
-        setGenerating(true);
-        const rows = autoPendingDates.map((pay_date, i) => ({
-            rep_name: repName,
-            year,
-            pay_date,
-            sort_order: entries.length + i,
-        }));
-        const { data } = await supabase.from('paye_entries').insert(rows).select();
-        if (data) {
-            setEntries(prev => [...prev, ...(data as PayEntry[])].sort((a, b) => a.pay_date < b.pay_date ? -1 : 1));
-        }
-        setShowManualPicker(false);
-        setGenStartDate('');
-        setGenerating(false);
-    };
 
     const addEntry = async () => {
         if (!repName || !canEdit) return;
@@ -255,21 +221,7 @@ export default function PortailPaye({ propRepName }: Props) {
     );
     const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
 
-    // Net total always uses all entries (ignoring month filter)
-    const allTotals = entries.reduce(
-        (acc, e) => ({
-            base_salary: acc.base_salary + n(e.base_salary),
-            commission:  acc.commission  + n(e.commission),
-            expenses:    acc.expenses    + n(e.expenses),
-            holidays:    acc.holidays    + n(e.holidays),
-            vacation:    acc.vacation    + n(e.vacation),
-        }),
-        { base_salary: 0, commission: 0, expenses: 0, holidays: 0, vacation: 0 }
-    );
-    const allGrandTotal = Object.values(allTotals).reduce((s, v) => s + v, 0);
-    const netTotal = allGrandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
-
-    const commRateLabel = `${Math.round(commRate * 100)}%`;
+    const netTotal = grandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
 
     // ─── Guard ────────────────────────────────────────────────────────────────
 
@@ -290,29 +242,31 @@ export default function PortailPaye({ propRepName }: Props) {
     // ─── Render ───────────────────────────────────────────────────────────────
 
     return (
-        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-5 md:space-y-6">
+        <div className={cn(
+            "space-y-5 md:space-y-6",
+            !embedded && "p-4 md:p-8 max-w-screen-2xl mx-auto"
+        )}>
 
             {/* Header */}
             <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                     <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
                         <Wallet className="w-5 h-5 text-emerald-500" />
-                        Ma Paye
+                        {isAdminView ? `Paye de ${repName}` : 'Ma Paye'}
                     </h2>
-                    <p className="text-sm text-slate-400 mt-0.5">
-                        {repName || 'Représentant'}
-                        {!canEdit && <span className="ml-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Lecture seule</span>}
-                    </p>
+                    {!isAdminView && (
+                        <p className="text-sm text-slate-400 mt-0.5">
+                            {repName || 'Représentant'}
+                            {!canEdit && <span className="ml-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Lecture seule</span>}
+                        </p>
+                    )}
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* Filters — year only */}
             <FilterBar>
                 <FilterGroup label="Année">
                     <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
-                </FilterGroup>
-                <FilterGroup label="Mois">
-                    <Select value={selectedMonth} onChange={setSelectedMonth} options={monthOptions} className="w-44" />
                 </FilterGroup>
             </FilterBar>
 
@@ -326,93 +280,65 @@ export default function PortailPaye({ propRepName }: Props) {
 
             {/* ─── Payroll table ───────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200 bg-slate-50">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                        <div>
-                            <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">
-                                Taux commission : <span className="font-bold text-brand-main">{commRateLabel}</span>
-                                {selectedMonth !== 'Tous' && <span className="ml-2 text-brand-main font-semibold">· {MONTHS.find(m => String(m.value) === selectedMonth)?.label}</span>}
-                            </p>
-                        </div>
-                        {/* ── Generator control ── */}
-                        {canEdit && (
-                            <div className="flex items-center gap-2">
-                                {lastValidDate ? (
-                                    autoPendingDates.length > 0 ? (
-                                        <button
-                                            onClick={generateSchedule}
-                                            disabled={generating}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border bg-white text-slate-600 border-slate-200 hover:border-brand-main hover:text-brand-main disabled:opacity-40"
-                                        >
-                                            {generating
-                                                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                : <CalendarClock className="w-3.5 h-3.5" />}
-                                            {generating ? 'Génération…' : `Compléter l'année (${autoPendingDates.length} dates)`}
-                                        </button>
-                                    ) : (
-                                        <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-                                            <Check className="w-3.5 h-3.5" />
-                                            Calendrier complet
-                                        </span>
-                                    )
-                                ) : (
-                                    <button
-                                        onClick={() => setShowManualPicker(v => !v)}
-                                        className={cn(
-                                            'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border',
-                                            showManualPicker
-                                                ? 'bg-brand-main text-white border-brand-main'
-                                                : 'bg-white text-slate-600 border-slate-200 hover:border-brand-main hover:text-brand-main'
-                                        )}
-                                    >
-                                        <CalendarClock className="w-3.5 h-3.5" />
-                                        Créer le calendrier
-                                        <ChevronDown className={cn('w-3 h-3 transition-transform', showManualPicker && 'rotate-180')} />
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── Manual date picker (only when no entries exist) ── */}
-                    {showManualPicker && canEdit && !lastValidDate && (
-                        <div className="mt-3 p-4 bg-white rounded-xl border border-slate-200 space-y-3">
-                            <div className="flex items-end gap-3 flex-wrap">
-                                <div>
-                                    <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                                        Première date de paie {year}
-                                    </label>
+                <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-slate-400">Taux commission :</span>
+                            {canEdit && editingRate ? (
+                                <div className="flex items-center gap-1.5">
                                     <input
-                                        type="date"
-                                        value={genStartDate}
-                                        onChange={e => setGenStartDate(e.target.value)}
-                                        className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-brand-main font-medium text-slate-700"
+                                        autoFocus
+                                        type="number"
+                                        min={0} max={100}
+                                        value={rateDraft}
+                                        onChange={e => setRateDraft(e.target.value)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter') {
+                                                const n = parseFloat(rateDraft);
+                                                if (!isNaN(n)) {
+                                                    const r = n / 100;
+                                                    import('../utils/commRates').then(m => m.saveCommRate(repName, r));
+                                                    setCommRate(r);
+                                                }
+                                                setEditingRate(false);
+                                            }
+                                            if (e.key === 'Escape') setEditingRate(false);
+                                        }}
+                                        className="w-14 px-1.5 py-0.5 text-xs border border-brand-main rounded-md focus:outline-none text-center font-bold text-brand-main"
                                     />
+                                    <span className="text-xs text-slate-400">%</span>
+                                    <button
+                                        onClick={() => {
+                                            const n = parseFloat(rateDraft);
+                                            if (!isNaN(n)) {
+                                                const r = n / 100;
+                                                import('../utils/commRates').then(m => m.saveCommRate(repName, r));
+                                                setCommRate(r);
+                                            }
+                                            setEditingRate(false);
+                                        }}
+                                        className="p-0.5 text-emerald-500 hover:text-emerald-600"
+                                    ><Check className="w-3 h-3" /></button>
+                                    <button onClick={() => setEditingRate(false)} className="p-0.5 text-slate-300 hover:text-slate-500">
+                                        <X className="w-3 h-3" />
+                                    </button>
                                 </div>
-                                {autoPendingDates.length > 0 && (
-                                    <p className="text-xs text-slate-500 pb-2">
-                                        <span className="font-bold text-brand-main">{autoPendingDates.length} dates</span> · aux 2 semaines jusqu'au 31 déc.
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-2">
+                            ) : (
                                 <button
-                                    onClick={generateSchedule}
-                                    disabled={generating || autoPendingDates.length === 0}
-                                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-main text-white text-xs font-bold rounded-xl hover:bg-brand-main/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    onClick={() => { setRateDraft(String(Math.round(commRate * 100))); setEditingRate(true); }}
+                                    className="flex items-center gap-1 group"
                                 >
-                                    {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                                    {generating ? 'Génération…' : `Créer ${autoPendingDates.length} lignes`}
+                                    <span className="text-xs font-bold text-brand-main tabular-nums">{Math.round(commRate * 100)}%</span>
+                                    {canEdit && <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-brand-main transition-colors" />}
                                 </button>
-                                <button
-                                    onClick={() => { setShowManualPicker(false); setGenStartDate(''); }}
-                                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
-                                >
-                                    <X className="w-3.5 h-3.5" />
-                                    Annuler
-                                </button>
-                            </div>
+                            )}
+                        </div>
+                    </div>
+                    {generating && (
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Génération du calendrier...
                         </div>
                     )}
                 </div>
@@ -447,7 +373,7 @@ export default function PortailPaye({ propRepName }: Props) {
                             {filteredEntries.length === 0 && (
                                 <tr>
                                     <td colSpan={canEdit ? 9 : 8} className="px-5 py-12 text-center text-sm text-slate-300 italic">
-                                        {selectedMonth !== 'Tous'
+                                        {false
                                             ? `Aucune paie pour ce mois`
                                             : `Aucune paie enregistrée pour ${year}`}
                                     </td>
@@ -543,7 +469,7 @@ export default function PortailPaye({ propRepName }: Props) {
                             {/* Totals */}
                             <tr className="border-t-2 border-slate-300 bg-slate-100">
                                 <td className="px-3 py-3 text-xs font-bold text-slate-600 uppercase tracking-widest border-r border-slate-200">
-                                    {selectedMonth !== 'Tous' ? MONTHS.find(m => String(m.value) === selectedMonth)?.label : `Total ${year}`}
+                                    {`Total ${year}`}
                                 </td>
                                 <TotalCell value={totals.base_salary} color="text-blue-700" />
                                 <TotalCell value={totals.commission}  color="text-brand-main" />
@@ -572,7 +498,7 @@ export default function PortailPaye({ propRepName }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-right">
                     <p className="text-xs text-slate-400">Total des paies</p>
-                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(allGrandTotal)}</p>
+                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(grandTotal)}</p>
                     {n(meta.previous_year_balance) !== 0 && (<>
                         <p className="text-xs text-slate-400">Solde {year - 1}</p>
                         <p className="text-sm font-bold text-blue-600 tabular-nums">{formatCurrencyCAD(n(meta.previous_year_balance))}</p>

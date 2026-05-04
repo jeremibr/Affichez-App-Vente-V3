@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import {
-    Settings, Loader2, Check, X, Save, User, ClipboardList, FileText,
+    Settings, Loader2, Check, X, Save, Users, ClipboardList, FileText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -226,32 +226,14 @@ export default function PortailParametres({ propRepName }: Props) {
 
     // ── Render ────────────────────────────────────────────────────────────────
 
-    return (
-        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
+    // ─── Shared content (objectives grid) ───────────────────────────────────────
 
-            {/* Rep picker — shown when admin has no rep context from prop or view-as-rep */}
-            {isAdmin && !propRepName && !viewAsRep && (
-                <div className="flex items-center gap-3 p-4 bg-brand-main/8 rounded-2xl border border-brand-main/15">
-                    <User className="w-4 h-4 text-brand-main shrink-0" />
-                    <span className="text-sm font-semibold text-brand-main shrink-0">Représentant :</span>
-                    <Select
-                        value={adminPickedRep}
-                        onChange={setAdminPickedRep}
-                        options={[
-                            { value: '', label: 'Sélectionner un rep...' },
-                            ...repList.map(r => ({ value: r, label: r })),
-                        ]}
-                        variant="accent"
-                        className="w-56"
-                    />
-                </div>
-            )}
-
-            {/* Page header */}
+    const objectivesContent = (
+        <div className="space-y-5">
+            {/* Header row */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-slate-400" />
+                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
                         Objectifs Reps
                     </h2>
                     <p className="text-sm text-slate-400 mt-0.5">
@@ -267,7 +249,7 @@ export default function PortailParametres({ propRepName }: Props) {
                 />
             </div>
 
-            {/* ── Module tabs ── */}
+            {/* Module tabs */}
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
                 {(['devis', 'factures'] as const).map(m => (
                     <button
@@ -288,134 +270,179 @@ export default function PortailParametres({ propRepName }: Props) {
                 ))}
             </div>
 
-            {/* ── Objectives grid ── */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-brand-main/10 flex items-center justify-center shrink-0">
-                        <span className="text-brand-main font-bold text-sm">01</span>
-                    </div>
-                    <div>
-                        <h3 className="text-sm font-bold text-slate-800">Objectifs par département</h3>
-                        <p className="text-xs text-slate-400">
-                            Le total du mois se calcule automatiquement depuis les départements, ou peut être saisi directement si aucun département n'est défini.
-                        </p>
-                    </div>
+            {/* Objectives table */}
+            {!repName ? (
+                <div className="flex items-center justify-center py-16 bg-white rounded-2xl border border-slate-100">
+                    <p className="text-sm text-slate-400">Représentant non sélectionné</p>
                 </div>
-
-                {!repName ? (
-                    <div className="flex items-center justify-center py-16 bg-white rounded-2xl border border-slate-100">
-                        <p className="text-sm text-slate-400">Représentant non sélectionné</p>
-                    </div>
-                ) : loading ? (
-                    <div className="flex items-center justify-center py-12 gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
-                        <span className="text-sm text-slate-400">Chargement...</span>
-                    </div>
-                ) : (
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/60">
-                                        <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/60 whitespace-nowrap">
-                                            Mois
+            ) : loading ? (
+                <div className="flex items-center justify-center py-12 gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
+                    <span className="text-sm text-slate-400">Chargement...</span>
+                </div>
+            ) : (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/60">
+                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/60 whitespace-nowrap">
+                                        Mois
+                                    </th>
+                                    {DEPARTMENTS.map(d => (
+                                        <th key={d} className="px-2 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap min-w-[110px]">
+                                            <span title={d}>{DEPT_SHORT[d] ?? d}</span>
                                         </th>
-                                        {DEPARTMENTS.map(d => (
-                                            <th key={d} className="px-2 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap min-w-[110px]">
-                                                <span title={d}>{DEPT_SHORT[d] ?? d}</span>
-                                            </th>
-                                        ))}
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap min-w-[130px] border-l border-slate-100">
-                                            Total mois
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {MONTH_LABELS.map((label, i) => {
-                                        const month = i + 1;
-                                        const deptSum = deptSumForMonth(month);
-                                        const manualTotal = monthTargets[`${module}-${month}`] ?? 0;
-                                        const hasDeptsSet = deptSum > 0;
+                                    ))}
+                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap min-w-[130px] border-l border-slate-100">
+                                        Total mois
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {MONTH_LABELS.map((label, i) => {
+                                    const month = i + 1;
+                                    const deptSum = deptSumForMonth(month);
+                                    const manualTotal = monthTargets[`${module}-${month}`] ?? 0;
+                                    const hasDeptsSet = deptSum > 0;
+                                    return (
+                                        <tr key={month} className="hover:bg-slate-50/40 transition-colors">
+                                            <td className="px-4 py-2 font-semibold text-slate-700 sticky left-0 bg-white whitespace-nowrap text-sm">
+                                                {label}
+                                                {saving?.startsWith(`${month}-`) || saving === `${module}-${month}` ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin text-slate-300 inline ml-2" />
+                                                ) : null}
+                                            </td>
+                                            {DEPARTMENTS.map(dept => {
+                                                const key = deptKey(month, dept);
+                                                return (
+                                                    <td key={dept} className="px-2 py-1.5">
+                                                        {saving === key ? (
+                                                            <div className="flex items-center justify-center h-8">
+                                                                <Loader2 className="w-3 h-3 animate-spin text-slate-300" />
+                                                            </div>
+                                                        ) : (
+                                                            <TargetCell
+                                                                value={objectives[key] ?? 0}
+                                                                onSave={v => saveDept(month, dept, v)}
+                                                                compact
+                                                            />
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                            <td className="px-3 py-1.5 border-l border-slate-100">
+                                                {hasDeptsSet ? (
+                                                    <div className="flex items-center justify-end gap-1.5 px-2.5 py-2">
+                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">auto</span>
+                                                        <span className="text-sm font-bold tabular-nums text-slate-800">
+                                                            {formatCurrencyCAD(deptSum)}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <TargetCell
+                                                        value={manualTotal}
+                                                        onSave={v => saveMonthTotal(month, v)}
+                                                        placeholder="Fixer objectif"
+                                                    />
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 border-slate-100 bg-slate-50/60">
+                                    <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50/60">
+                                        Total {year}
+                                    </td>
+                                    {DEPARTMENTS.map(dept => {
+                                        const t = deptAnnualTotal(dept);
                                         return (
-                                            <tr key={month} className="hover:bg-slate-50/40 transition-colors">
-                                                <td className="px-4 py-2 font-semibold text-slate-700 sticky left-0 bg-white whitespace-nowrap text-sm">
-                                                    {label}
-                                                    {saving?.startsWith(`${month}-`) || saving === `${module}-${month}` ? (
-                                                        <Loader2 className="w-3 h-3 animate-spin text-slate-300 inline ml-2" />
-                                                    ) : null}
-                                                </td>
-                                                {DEPARTMENTS.map(dept => {
-                                                    const key = deptKey(month, dept);
-                                                    return (
-                                                        <td key={dept} className="px-2 py-1.5">
-                                                            {saving === key ? (
-                                                                <div className="flex items-center justify-center h-8">
-                                                                    <Loader2 className="w-3 h-3 animate-spin text-slate-300" />
-                                                                </div>
-                                                            ) : (
-                                                                <TargetCell
-                                                                    value={objectives[key] ?? 0}
-                                                                    onSave={v => saveDept(month, dept, v)}
-                                                                    compact
-                                                                />
-                                                            )}
-                                                        </td>
-                                                    );
-                                                })}
-                                                {/* Total mois: auto if depts set, editable if not */}
-                                                <td className="px-3 py-1.5 border-l border-slate-100">
-                                                    {hasDeptsSet ? (
-                                                        <div className="flex items-center justify-end gap-1.5 px-2.5 py-2">
-                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">auto</span>
-                                                            <span className="text-sm font-bold tabular-nums text-slate-800">
-                                                                {formatCurrencyCAD(deptSum)}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <TargetCell
-                                                            value={manualTotal}
-                                                            onSave={v => saveMonthTotal(month, v)}
-                                                            placeholder="Fixer objectif"
-                                                        />
-                                                    )}
-                                                </td>
-                                            </tr>
+                                            <td key={dept} className="px-2 py-3 text-center">
+                                                <span className="text-xs font-bold text-slate-700 tabular-nums">
+                                                    {t > 0 ? formatCurrencyCAD(t) : <span className="text-slate-200">—</span>}
+                                                </span>
+                                            </td>
                                         );
                                     })}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t-2 border-slate-100 bg-slate-50/60">
-                                        <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50/60">
-                                            Total {year}
-                                        </td>
-                                        {DEPARTMENTS.map(dept => {
-                                            const t = deptAnnualTotal(dept);
-                                            return (
-                                                <td key={dept} className="px-2 py-3 text-center">
-                                                    <span className="text-xs font-bold text-slate-700 tabular-nums">
-                                                        {t > 0 ? formatCurrencyCAD(t) : <span className="text-slate-200">—</span>}
-                                                    </span>
-                                                </td>
-                                            );
-                                        })}
-                                        <td className="px-4 py-3 text-right border-l border-slate-100">
-                                            <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                                {grandTotal > 0 ? formatCurrencyCAD(grandTotal) : <span className="text-slate-200">—</span>}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                                    <td className="px-4 py-3 text-right border-l border-slate-100">
+                                        <span className="text-sm font-bold text-slate-800 tabular-nums">
+                                            {grandTotal > 0 ? formatCurrencyCAD(grandTotal) : <span className="text-slate-200">—</span>}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto">
+
+            {isAdmin && !propRepName && !viewAsRep ? (
+                /* ─── Admin view: bordered container with hero + content ─── */
+                <div className="rounded-2xl border border-brand-main/20 shadow-card overflow-visible">
+                    {/* Hero — orange gradient */}
+                    <div className="bg-gradient-to-br from-brand-main to-amber-600 rounded-t-2xl px-6 py-6 md:py-7">
+                        <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-5">
+                            Objectifs du représentant
+                        </p>
+                        <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                <div className={cn(
+                                    "w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 transition-all",
+                                    adminPickedRep
+                                        ? "bg-white text-brand-main shadow-lg shadow-black/10"
+                                        : "bg-white/20 text-white/40"
+                                )}>
+                                    {adminPickedRep
+                                        ? adminPickedRep.charAt(0).toUpperCase()
+                                        : <Users className="w-6 h-6" />}
+                                </div>
+                                <div className="min-w-0">
+                                    {adminPickedRep ? (
+                                        <h2 className="text-xl md:text-2xl font-black text-white tracking-tight truncate">
+                                            {adminPickedRep}
+                                        </h2>
+                                    ) : (
+                                        <h2 className="text-lg md:text-xl font-bold text-white/50">
+                                            Sélectionner un représentant
+                                        </h2>
+                                    )}
+                                    <p className="text-xs text-white/60 mt-0.5">
+                                        {adminPickedRep
+                                            ? 'Tous les objectifs ci-dessous correspondent à ce représentant'
+                                            : 'Choisissez un représentant pour modifier ses objectifs'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="w-full md:w-64 shrink-0">
+                                <Select
+                                    value={adminPickedRep}
+                                    onChange={setAdminPickedRep}
+                                    options={[
+                                        { value: '', label: adminPickedRep ? 'Changer de représentant...' : 'Choisir un représentant...' },
+                                        ...repList.map(r => ({ value: r, label: r })),
+                                    ]}
+                                    variant={adminPickedRep ? 'accent' : 'default'}
+                                    className="w-full"
+                                />
+                            </div>
                         </div>
                     </div>
-                )}
-            </div>
-
-            {/* Coming soon */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-400">
-                <Settings className="w-4 h-4 shrink-0" />
-                D'autres paramètres seront disponibles prochainement.
-            </div>
+                    {/* Content inside the border box */}
+                    <div className="px-4 md:px-6 py-5 bg-white rounded-b-2xl">
+                        {objectivesContent}
+                    </div>
+                </div>
+            ) : (
+                /* ─── Embedded / rep view: plain content ─── */
+                objectivesContent
+            )}
         </div>
     );
 }

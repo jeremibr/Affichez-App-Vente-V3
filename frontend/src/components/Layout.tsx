@@ -4,7 +4,7 @@ import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
     DollarSign, ChevronDown, UserCircle,
-    Target, Eye, Building2,
+    Target, Eye, Building2, BarChart2, Users,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -87,8 +87,7 @@ function SubItems({ items, open }: { items: NavItem[]; open: boolean }) {
     );
 }
 
-function SectionHeader({ sectionKey, label, icon: Icon, activeColor, items, open, active, onToggle }: {
-    sectionKey: string;
+function SectionHeader({ label, icon: Icon, activeColor, items, open, active, onToggle }: {
     label: string;
     icon: React.ElementType;
     activeColor: string;
@@ -179,8 +178,13 @@ export default function Layout() {
     ];
 
     const adminItems: NavItem[] = [
-        { name: 'Commissions',     href: '/paye',               icon: DollarSign },
-        { name: 'Objectifs Reps',  href: '/portail/parametres', icon: Target },
+        { name: 'Commissions',     href: '',                    icon: DollarSign,   isLabel: true },
+        { name: 'Vue ensemble',    href: '/paye',               icon: BarChart2,  end: true },
+        { name: 'Paramètres reps', href: '/paye/settings',      icon: Users },
+        { name: 'Objectifs',        href: '',                     icon: Target,       isLabel: true },
+        { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Target,       end: true },
+        { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
+        { name: 'Système',         href: '',                    icon: Settings,     isLabel: true },
         { name: 'Paramètres',      href: '/settings',           icon: Settings },
     ];
 
@@ -215,7 +219,6 @@ export default function Layout() {
                 {sections.map(s => (
                     <SectionHeader
                         key={s.key}
-                        sectionKey={s.key}
                         label={s.label}
                         icon={s.icon}
                         activeColor={s.activeColor}
@@ -233,7 +236,6 @@ export default function Layout() {
                 {/* Admin section — hidden when viewing as rep */}
                 {isAdmin && !viewAsRep && (
                     <SectionHeader
-                        sectionKey="admin"
                         label="Administration"
                         icon={Settings}
                         activeColor="text-slate-500"

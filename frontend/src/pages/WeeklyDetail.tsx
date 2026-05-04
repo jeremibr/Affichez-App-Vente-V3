@@ -1,26 +1,29 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { formatCurrencyCAD, formatShortDate } from '../lib/utils';
-import { Loader2, Calendar, TrendingUp, Briefcase, Users } from 'lucide-react';
+import { formatCurrencyCAD } from '../lib/utils';
+import { Loader2, Calendar, TrendingUp, Briefcase, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SyncButton } from '../components/SyncButton';
 import type { AvailableWeek, ZoneA_SummaryRow, ZoneA_DeptTotal, ZoneB_DetailRow } from '../types/database';
 import { ZoneAPivotTable } from '../components/weekly/ZoneAPivotTable';
 import { ZoneBTable } from '../components/weekly/ZoneBTable';
-import { DEPARTMENTS, OFFICES, SALE_STATUSES } from '../lib/constants';
-import { FilterBar, FilterGroup } from '../components/FilterBar';
-import { Select } from '../components/Select';
+import { cn } from '../lib/utils';
+
+// ─── Week label helpers ───────────────────────────────────────────────────────
+
+function fmtShort(dateStr: string): string {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
+}
+
+function fmtWeekRange(start: string, end: string): string {
+    return `${fmtShort(start)} — ${fmtShort(end)}`;
+}
 
 export default function WeeklyDetail() {
-    const [year, setYear] = useUrlStateNumber('year', 2026);
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
     const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
-
-    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
-    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
-    const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
-
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);
     const [lineItems, setLineItems] = useState<ZoneB_DetailRow[]>([]);
@@ -29,11 +32,7 @@ export default function WeeklyDetail() {
 
     const fetchAvailableWeeks = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
-        const { data } = await supabase.rpc('get_available_weeks', {
-            p_year: year,
-            p_office: selectedOffice === 'Toutes' ? null : selectedOffice,
-            p_status: selectedStatus === 'Toutes' ? null : selectedStatus
-        });
+        const { data } = await supabase.rpc('get_available_weeks', { p_year: new Date().getFullYear(), p_office: null, p_status: null });
         const weeks = data || [];
         setAvailableWeeks(weeks);
         if (weeks.length > 0) {
@@ -42,26 +41,18 @@ export default function WeeklyDetail() {
             }
         } else { setSelectedWeek(''); clearData(); }
         if (showLoader) setLoading(false);
-    }, [year, selectedOffice, selectedStatus, selectedWeek]);
+    }, [selectedWeek]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchWeekData = useCallback(async (weekStart: string, showLoader = true) => {
         if (showLoader) setLoading(true);
-        let summaryQuery = supabase.from('v_weekly_summary').select('*').eq('week_start', weekStart);
-        if (selectedOffice !== 'Toutes') summaryQuery = summaryQuery.eq('office', selectedOffice);
-        if (selectedStatus !== 'Toutes') summaryQuery = summaryQuery.eq('status', selectedStatus);
-
         const [{ data: sData }, { data: lData }] = await Promise.all([
-            summaryQuery,
-            supabase.rpc('get_weekly_detail', {
-                p_week_start: weekStart,
-                p_office: selectedOffice === 'Toutes' ? null : selectedOffice,
-                p_status: selectedStatus === 'Toutes' ? null : selectedStatus
-            })
+            supabase.from('v_weekly_summary').select('*').eq('week_start', weekStart),
+            supabase.rpc('get_weekly_detail', { p_week_start: weekStart, p_office: null, p_status: null })
         ]);
         setSummaryData(sData || []);
         setLineItems(lData || []);
         if (showLoader) setLoading(false);
-    }, [selectedOffice, selectedStatus]);
+    }, []);
 
     useEffect(() => { fetchAvailableWeeks(); }, [fetchAvailableWeeks]);
     useEffect(() => { if (selectedWeek) fetchWeekData(selectedWeek); }, [selectedWeek, fetchWeekData]);
@@ -74,46 +65,32 @@ export default function WeeklyDetail() {
         return () => { supabase.removeChannel(channel); };
     }, [selectedWeek, fetchAvailableWeeks, fetchWeekData]);
 
-    const uniqueReps = useMemo(() => {
-        const reps = new Set<string>();
-        summaryData.forEach(row => reps.add(row.rep_name));
-        return Array.from(reps).sort((a, b) => a.localeCompare(b));
-    }, [summaryData]);
+    // Week navigation (availableWeeks is newest-first)
+    const currentIdx = availableWeeks.findIndex(w => w.week_start === selectedWeek);
+    const currentWeekObj = availableWeeks[currentIdx] ?? null;
+    const prevWeekObj = currentIdx < availableWeeks.length - 1 ? availableWeeks[currentIdx + 1] : null;
+    const nextWeekObj = currentIdx > 0 ? availableWeeks[currentIdx - 1] : null;
 
-    const filteredSummaryData = useMemo(() => summaryData.filter(row => {
-        const matchDept = selectedDept === 'Toutes' || row.department === selectedDept;
-        const matchRep = selectedRep === 'Tous' || row.rep_name === selectedRep;
-        return matchDept && matchRep;
-    }), [summaryData, selectedDept, selectedRep]);
-
-    const filteredLineItems = useMemo(() => lineItems.filter(row => {
-        const matchDept = selectedDept === 'Toutes' || row.department === selectedDept;
-        const matchRep = selectedRep === 'Tous' || row.rep_name === selectedRep;
-        return matchDept && matchRep;
-    }), [lineItems, selectedDept, selectedRep]);
-
-    const filteredGrandTotal = useMemo(() =>
-        filteredSummaryData.reduce((sum, row) => sum + Number(row.total_amount), 0),
-        [filteredSummaryData]);
+    const grandTotal = useMemo(() =>
+        summaryData.reduce((sum, row) => sum + Number(row.total_amount), 0), [summaryData]);
 
     const avgTicket = useMemo(() =>
-        filteredLineItems.length > 0 ? filteredGrandTotal / filteredLineItems.length : 0
-        , [filteredGrandTotal, filteredLineItems]);
+        lineItems.length > 0 ? grandTotal / lineItems.length : 0, [grandTotal, lineItems]);
 
-    const filteredDeptTotals = useMemo(() => {
+    const deptTotals = useMemo(() => {
         const map = new Map<string, ZoneA_DeptTotal>();
-        filteredSummaryData.forEach(row => {
+        summaryData.forEach(row => {
             if (!map.has(row.department)) map.set(row.department, { department: row.department, total_amount: 0, num_sales: 0 });
             const dt = map.get(row.department)!;
             dt.total_amount += Number(row.total_amount);
             dt.num_sales += Number(row.num_sales);
         });
         return Array.from(map.values());
-    }, [filteredSummaryData]);
+    }, [summaryData]);
 
     const repPivotRows = useMemo(() => {
         const repsMap = new Map<string, Record<string, number>>();
-        filteredSummaryData.forEach(row => {
+        summaryData.forEach(row => {
             if (!repsMap.has(row.rep_name)) repsMap.set(row.rep_name, { "Total": 0 });
             const r = repsMap.get(row.rep_name)!;
             r[row.department] = (r[row.department] || 0) + Number(row.total_amount);
@@ -121,20 +98,7 @@ export default function WeeklyDetail() {
         });
         return Array.from(repsMap.entries()).map(([repName, depts]) => ({ repName, ...depts }))
             .sort((a, b) => a.repName.localeCompare(b.repName));
-    }, [filteredSummaryData]);
-
-    // Options for Selects
-    const weekOptions = useMemo(() => availableWeeks.map(w => ({
-        value: w.week_start,
-        label: `${formatShortDate(w.week_start)} — ${formatShortDate(w.week_end)}`
-    })), [availableWeeks]);
-
-    const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
-    const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Tous les reps' }, ...uniqueReps.map(r => ({ value: r, label: r }))], [uniqueReps]);
-    const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
-
+    }, [summaryData]);
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
@@ -142,36 +106,46 @@ export default function WeeklyDetail() {
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Détail Hebdomadaire</h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">
-                        {selectedWeek ? <>Semaine du <span className="text-brand-main font-bold">{formatShortDate(selectedWeek)}</span></> : 'Sélectionnez une période'}
-                    </p>
+                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Devis — Vue équipe complète</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <SyncButton onSyncComplete={() => { fetchAvailableWeeks(false); if (selectedWeek) fetchWeekData(selectedWeek, false); }} />
-                </div>
+                <SyncButton onSyncComplete={() => { fetchAvailableWeeks(false); if (selectedWeek) fetchWeekData(selectedWeek, false); }} />
             </div>
 
-            {/* Combined Filters */}
-            <FilterBar>
-                <FilterGroup label="Semaine">
-                    <Select value={selectedWeek} onChange={setSelectedWeek} options={weekOptions} variant="accent" className="w-64" disabled={availableWeeks.length === 0} />
-                </FilterGroup>
-                <FilterGroup label="Année">
-                    <Select value={String(year)} onChange={(v) => setYear(Number(v))} options={yearOptions} className="w-24" />
-                </FilterGroup>
-                <FilterGroup label="Siège">
-                    <Select value={selectedOffice} onChange={setSelectedOffice} options={officeOptions} className="w-40" />
-                </FilterGroup>
-                <FilterGroup label="Statut">
-                    <Select value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} className="w-36" />
-                </FilterGroup>
-                <FilterGroup label="Département">
-                    <Select value={selectedDept} onChange={setSelectedDept} options={deptOptions} className="w-44" />
-                </FilterGroup>
-                <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-40" />
-                </FilterGroup>
-            </FilterBar>
+            {/* Week switcher */}
+            <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-3">
+                <button
+                    onClick={() => prevWeekObj && setSelectedWeek(prevWeekObj.week_start)}
+                    disabled={!prevWeekObj}
+                    className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                        !prevWeekObj ? "text-slate-200 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                >
+                    <ChevronLeft className="w-4 h-4" />
+                    {prevWeekObj ? fmtShort(prevWeekObj.week_start) : '—'}
+                </button>
+
+                <div className="text-center">
+                    <h3 className="text-base font-bold text-slate-900">
+                        {currentWeekObj ? fmtWeekRange(currentWeekObj.week_start, currentWeekObj.week_end) : '—'}
+                    </h3>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                        Détail des devis
+                    </p>
+                </div>
+
+                <button
+                    onClick={() => nextWeekObj && setSelectedWeek(nextWeekObj.week_start)}
+                    disabled={!nextWeekObj}
+                    className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                        !nextWeekObj ? "text-slate-200 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                    )}
+                >
+                    {nextWeekObj ? fmtShort(nextWeekObj.week_start) : '—'}
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            </div>
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -184,16 +158,15 @@ export default function WeeklyDetail() {
                         <Calendar className="w-8 h-8 text-slate-200" />
                     </div>
                     <h3 className="text-base font-bold text-slate-700">Aucune vente enregistrée</h3>
-                    <p className="text-sm text-slate-400 mt-1">Essayez de modifier l'année ou les filtres de siège.</p>
+                    <p className="text-sm text-slate-400 mt-1">Essayez de modifier l'année.</p>
                 </div>
             ) : (
                 <div className="space-y-4 md:space-y-6">
-                    {/* KPI Cards for the week */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-6">
                         <div className="bg-brand-main rounded-2xl p-3 md:p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
                             <div className="min-w-0">
                                 <p className="text-white/60 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Total Hebdo</p>
-                                <p className="text-base md:text-3xl font-black mt-1 tabular-nums truncate">{formatCurrencyCAD(filteredGrandTotal)}</p>
+                                <p className="text-base md:text-3xl font-black mt-1 tabular-nums truncate">{formatCurrencyCAD(grandTotal)}</p>
                             </div>
                             <div className="p-2 md:p-3 bg-white/10 rounded-xl shrink-0 ml-2">
                                 <TrendingUp className="w-4 h-4 md:w-6 md:h-6" />
@@ -211,7 +184,7 @@ export default function WeeklyDetail() {
                         <div className="bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
                             <div className="min-w-0">
                                 <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Volume</p>
-                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{filteredLineItems.length} <span className="text-xs md:text-base">Devis</span></p>
+                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{lineItems.length} <span className="text-xs md:text-base">Devis</span></p>
                             </div>
                             <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2 hidden sm:flex">
                                 <Users className="w-4 h-4 md:w-6 md:h-6" />
@@ -219,8 +192,8 @@ export default function WeeklyDetail() {
                         </div>
                     </div>
 
-                    <ZoneAPivotTable repPivotRows={repPivotRows} grandTotal={filteredGrandTotal} deptTotals={filteredDeptTotals} />
-                    <ZoneBTable lineItems={filteredLineItems} />
+                    <ZoneAPivotTable repPivotRows={repPivotRows} grandTotal={grandTotal} deptTotals={deptTotals} />
+                    <ZoneBTable lineItems={lineItems} />
                 </div>
             )}
         </div>

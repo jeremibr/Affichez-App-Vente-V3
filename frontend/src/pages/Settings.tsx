@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import {
     Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
-    Zap, Loader2, Users, Trash2, Plus, FileText,
+    Zap, Loader2, Users, Trash2, Plus,
     Ban, Search, X
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
@@ -75,20 +75,18 @@ export default function Settings() {
     );
 }
 
-// ─── Objectives Manager (Devis + Factures) ────────────────────────────────────
+// ─── Objectives Manager (Factures only) ──────────────────────────────────────
 function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' | 'error', text: string }) => void }) {
-    const [module, setModule] = useUrlState('obj_module', 'devis') as ['devis' | 'factures', (v: 'devis' | 'factures') => void];
     const [year, setYear] = useUrlStateNumber('obj_year', new Date().getFullYear());
     const [objectives, setObjectives] = useState<Objective[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const table = module === 'devis' ? 'objectives' : 'objectives_factures';
 
-    useEffect(() => { fetchObjectives(); }, [year, module]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { fetchObjectives(); }, [year]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const fetchObjectives = async () => {
         setLoading(true);
-        const { data, error } = await supabase.from(table).select('*').eq('year', year);
+        const { data, error } = await supabase.from('objectives_factures').select('*').eq('year', year);
         if (error) console.error(error);
         else setObjectives(data || []);
         setLoading(false);
@@ -107,9 +105,9 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
     const saveAll = async () => {
         setSaving(true);
         const toSave = objectives.map(o => ({ year, month: o.month, department: o.department, target_amount: o.target_amount }));
-        const { error: delError } = await supabase.from(table).delete().eq('year', year);
+        const { error: delError } = await supabase.from('objectives_factures').delete().eq('year', year);
         if (delError) { setMessage({ type: 'error', text: 'Erreur lors du nettoyage.' }); setSaving(false); return; }
-        const { error: insError } = await supabase.from(table).insert(toSave);
+        const { error: insError } = await supabase.from('objectives_factures').insert(toSave);
         if (insError) setMessage({ type: 'error', text: 'Erreur lors de la sauvegarde.' });
         else { setMessage({ type: 'success', text: 'Objectifs sauvegardés.' }); fetchObjectives(); }
         setSaving(false);
@@ -121,20 +119,7 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-base font-semibold text-slate-800">Objectifs par département</h2>
-                    {/* Module toggle */}
-                    <div className="flex gap-1 bg-slate-100 p-0.5 rounded-lg">
-                        <button onClick={() => setModule('devis')}
-                            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
-                                module === 'devis' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700")}>
-                            Devis
-                        </button>
-                        <button onClick={() => setModule('factures')}
-                            className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all",
-                                module === 'factures' ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700")}>
-                            <FileText className="w-3 h-3" /> Factures
-                        </button>
-                    </div>
+                    <h2 className="text-base font-semibold text-slate-800">Objectifs Factures par département</h2>
                     <Select value={String(year)} onChange={(val) => setYear(Number(val))} options={yearOptions} variant="accent" className="w-24" />
                 </div>
                 <button onClick={saveAll} disabled={saving}

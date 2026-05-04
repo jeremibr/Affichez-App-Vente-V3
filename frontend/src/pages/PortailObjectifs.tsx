@@ -17,15 +17,6 @@ const MONTH_LABELS = [
 ];
 const MONTH_SHORT = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
 
-const DEPT_SHORT: Record<string, string> = {
-    'MULTI-ANNONCEURS':        'Multi-Ann.',
-    'PROMOTIONNEL':            'Promo',
-    'DIST. PUBLICITAIRE SOLO': 'Solo',
-    'NUMERIQUE':               'Numérique',
-    'APPLICATION':             'Application',
-    'SERVICES IA':             'Services IA',
-};
-
 const NOW_MONTH = new Date().getMonth() + 1;
 const NOW_YEAR  = new Date().getFullYear();
 

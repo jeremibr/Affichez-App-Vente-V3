@@ -1,17 +1,16 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import {
-    Loader2, DollarSign, CheckCircle2, Clock,
-    TrendingUp, Users, Wallet, AlertCircle, Pencil, Check, X, User,
+    Loader2, CheckCircle2, Clock,
+    TrendingUp, Users, Wallet, AlertCircle, Pencil, Check, X,
+    ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { MONTHS, OFFICES } from '../lib/constants';
+import { OFFICES } from '../lib/constants';
 import { fetchAllCommRates, saveCommRate } from '../utils/commRates';
-import { useRepList } from '../hooks/useRepList';
-import PortailPaye from './PortailPaye';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,7 +46,7 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
 
     if (editing) {
         return (
-            <div className="flex items-center gap-1">
+            <div className="inline-flex items-center gap-1">
                 <input
                     autoFocus
                     type="number"
@@ -56,7 +55,7 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-                    className="w-16 px-2 py-1 text-xs border border-brand-main rounded-lg focus:outline-none text-center font-semibold"
+                    className="w-14 px-2 py-1 text-xs border border-brand-main rounded-lg focus:outline-none text-center font-semibold"
                 />
                 <span className="text-xs text-slate-400">%</span>
                 <button onClick={commit} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-colors"><Check className="w-3 h-3" /></button>
@@ -68,7 +67,7 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
     return (
         <button
             onClick={() => setEditing(true)}
-            className="flex items-center gap-1.5 group text-left"
+            className="inline-flex items-center gap-1.5 group"
         >
             <span className="text-sm font-bold text-slate-700 tabular-nums">{Math.round(value * 100)}%</span>
             <Pencil className="w-3 h-3 text-slate-300 group-hover:text-brand-main transition-colors opacity-0 group-hover:opacity-100" />
@@ -156,32 +155,43 @@ function KPICard({ title, value, sub, icon: Icon, color }: {
     );
 }
 
-// ─── Month label helper ────────────────────────────────────────────────────────
+// ─── Month navigation helpers (mirrors MonthlyDetail) ────────────────────────
 
-const MONTH_LABEL: Record<number, string> = {
-    1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril',
-    5: 'Mai', 6: 'Juin', 7: 'Juillet', 8: 'Août',
-    9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre',
-};
+const MONTH_FULL = [
+    '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+const MONTH_SHORT = [
+    '', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+    'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc',
+];
+
+function prevMonth(y: number, m: number): [number, number] { return m === 1  ? [y - 1, 12] : [y, m - 1]; }
+function nextMonth(y: number, m: number): [number, number] { return m === 12 ? [y + 1,  1] : [y, m + 1]; }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Paye() {
     const { isAdmin } = useAuth();
-    const repList = useRepList();
-    const [selectedPayeRep, setSelectedPayeRep] = useState('');
 
+    const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
     const [year, setYear] = useState(2026);
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
     const [selectedOffice, setSelectedOffice] = useState('Toutes');
     const [loading, setLoading] = useState(false);
 
     const [repData, setRepData] = useState<RepMonthlyData[]>([]);
-    // Paye records keyed by rep_name — in-memory for now (will be persisted in DB later)
     const [payeRecords, setPayeRecords] = useState<Record<string, PayeRecord>>({});
 
-    const monthParam = selectedMonth;
+    const monthParam = viewMode === 'monthly' ? selectedMonth : null;
     const officeParam = selectedOffice === 'Toutes' ? null : selectedOffice;
+
+    // Month navigation (used in monthly view)
+    const [py, pm] = prevMonth(year, selectedMonth);
+    const [ny, nm] = nextMonth(year, selectedMonth);
+    const now = new Date();
+    const isFuture = ny > now.getFullYear() || (ny === now.getFullYear() && nm > now.getMonth() + 1);
+    const goTo = (y: number, m: number) => { setYear(y); setSelectedMonth(m); };
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -258,7 +268,6 @@ export default function Paye() {
     const pendingCount = repData.length - paidCount;
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = MONTHS.map(m => ({ value: String(m.value), label: m.label }));
     const officeOptions = [{ value: 'Toutes', label: 'Tous les sièges' }, ...OFFICES];
 
     if (!isAdmin) {
@@ -273,35 +282,81 @@ export default function Paye() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
 
             {/* ─── Header ─── */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                        Paye des Représentants
+                        Commissions
                     </h1>
                     <p className="text-sm text-slate-400 mt-0.5">
-                        Suivi des commissions · {MONTH_LABEL[selectedMonth]} {year}
+                        {viewMode === 'annual'
+                            ? `Vue annuelle · ${year}`
+                            : `${MONTH_FULL[selectedMonth]} ${year}`}
                     </p>
                 </div>
 
-                {/* Period badge */}
-                <div className="flex items-center gap-2 px-4 py-2 bg-brand-main/5 border border-brand-main/20 rounded-xl">
-                    <DollarSign className="w-4 h-4 text-brand-main" />
-                    <span className="text-sm font-bold text-brand-main">{MONTH_LABEL[selectedMonth]} {year}</span>
+                {/* Annual / Monthly toggle */}
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl">
+                    {(['annual', 'monthly'] as const).map(mode => (
+                        <button
+                            key={mode}
+                            onClick={() => setViewMode(mode)}
+                            className={cn(
+                                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
+                                viewMode === mode
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-slate-500 hover:text-slate-700'
+                            )}
+                        >
+                            {mode === 'annual' ? 'Annuel' : 'Mensuel'}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* ─── Filters ─── */}
-            <FilterBar>
-                <FilterGroup label="Année">
-                    <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
-                </FilterGroup>
-                <FilterGroup label="Mois">
-                    <Select value={String(selectedMonth)} onChange={v => setSelectedMonth(Number(v))} options={monthOptions} className="w-44" />
-                </FilterGroup>
-                <FilterGroup label="Siège">
-                    <Select value={selectedOffice} onChange={setSelectedOffice} options={officeOptions} className="w-44" />
-                </FilterGroup>
-            </FilterBar>
+            {/* ─── Filters (annual) / Month switcher (monthly) ─── */}
+            {viewMode === 'annual' ? (
+                <FilterBar>
+                    <FilterGroup label="Année">
+                        <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
+                    </FilterGroup>
+                    <FilterGroup label="Siège">
+                        <Select value={selectedOffice} onChange={setSelectedOffice} options={officeOptions} className="w-44" />
+                    </FilterGroup>
+                </FilterBar>
+            ) : (
+                <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-3">
+                    <button
+                        onClick={() => goTo(py, pm)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all"
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                        {MONTH_SHORT[pm]} {py}
+                    </button>
+
+                    <div className="text-center">
+                        <h3 className="text-base font-bold text-slate-900">
+                            {MONTH_FULL[selectedMonth]} {year}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                            Commissions
+                        </p>
+                    </div>
+
+                    <button
+                        onClick={() => goTo(ny, nm)}
+                        disabled={isFuture}
+                        className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                            isFuture
+                                ? "text-slate-200 cursor-not-allowed"
+                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        )}
+                    >
+                        {MONTH_SHORT[nm]} {ny}
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+            )}
 
             {/* ─── Summary KPIs ─── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -364,15 +419,15 @@ export default function Paye() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50/60">
-                                    <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentant</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturé</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nb Fact.</th>
+                                    <th className="px-5 py-3 text-left   text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentant</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturé</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nb Fact.</th>
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taux</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Statut</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date payé</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notes</th>
+                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date payé</th>
+                                    <th className="px-4 py-3 text-left   text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notes</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
@@ -405,19 +460,19 @@ export default function Paye() {
                                             </td>
 
                                             {/* Office */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 text-center">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-full">
                                                     {rep.office}
                                                 </span>
                                             </td>
 
                                             {/* Facturé */}
-                                            <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums">
+                                            <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">
                                                 {formatCurrencyCAD(rep.total_amount)}
                                             </td>
 
                                             {/* Nb factures */}
-                                            <td className="px-4 py-3 text-right text-slate-500 tabular-nums">
+                                            <td className="px-4 py-3 text-center text-slate-500 tabular-nums">
                                                 {rep.deal_count}
                                             </td>
 
@@ -427,7 +482,7 @@ export default function Paye() {
                                             </td>
 
                                             {/* Commission calculée */}
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-4 py-3 text-center">
                                                 <span className="font-bold text-brand-main tabular-nums text-sm">
                                                     {formatCurrencyCAD(paye.commission)}
                                                 </span>
@@ -439,7 +494,7 @@ export default function Paye() {
                                             </td>
 
                                             {/* Date payé */}
-                                            <td className="px-4 py-3">
+                                            <td className="px-4 py-3 text-center">
                                                 {paye.paid && paye.paid_date ? (
                                                     <span className="text-xs text-emerald-600 font-medium">{paye.paid_date}</span>
                                                 ) : (
@@ -459,21 +514,22 @@ export default function Paye() {
                             {/* Footer totals */}
                             <tfoot>
                                 <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                    <td colSpan={2} className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                    <td className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                         Total — {repData.length} reps
                                     </td>
-                                    <td className="px-4 py-3 text-right font-bold text-slate-900 tabular-nums">
+                                    <td className="px-4 py-3" />
+                                    <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">
                                         {formatCurrencyCAD(totalFacture)}
                                     </td>
-                                    <td className="px-4 py-3 text-right text-slate-500 tabular-nums font-bold">
+                                    <td className="px-4 py-3 text-center text-slate-500 tabular-nums font-bold">
                                         {repData.reduce((s, r) => s + r.deal_count, 0)}
                                     </td>
                                     <td className="px-4 py-3" />
-                                    <td className="px-4 py-3 text-right font-bold text-brand-main tabular-nums">
+                                    <td className="px-4 py-3 text-center font-bold text-brand-main tabular-nums">
                                         {formatCurrencyCAD(totalCommission)}
                                     </td>
-                                    <td colSpan={3} className="px-4 py-3">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="inline-flex items-center gap-2">
                                             <span className="text-[10px] font-bold text-emerald-600 uppercase">
                                                 {paidCount} payés
                                             </span>
@@ -487,31 +543,12 @@ export default function Paye() {
                                             )}
                                         </div>
                                     </td>
+                                    <td className="px-4 py-3" />
+                                    <td className="px-4 py-3" />
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
-                )}
-            </div>
-
-            {/* ─── Per-rep pay detail ─── */}
-            <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <User className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="text-sm font-semibold text-slate-600 shrink-0">Paye détaillée :</span>
-                    <Select
-                        value={selectedPayeRep}
-                        onChange={setSelectedPayeRep}
-                        options={[
-                            { value: '', label: 'Sélectionner un représentant...' },
-                            ...repList.map(r => ({ value: r, label: r })),
-                        ]}
-                        variant={selectedPayeRep ? 'accent' : 'default'}
-                        className="w-64"
-                    />
-                </div>
-                {selectedPayeRep && (
-                    <PortailPaye propRepName={selectedPayeRep} />
                 )}
             </div>
 

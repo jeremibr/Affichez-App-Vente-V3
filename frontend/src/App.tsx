@@ -13,11 +13,13 @@ import FWeeklyDetail from './pages/FWeeklyDetail';
 import FQuarterlyAverages from './pages/FQuarterlyAverages';
 import AdminReps from './pages/AdminReps';
 import Paye from './pages/Paye';
+import PayeRepSettings from './pages/PayeRepSettings';
 import PortailDevis from './pages/PortailDevis';
 import PortailFactures from './pages/PortailFactures';
 import PortailPaye from './pages/PortailPaye';
 import PortailObjectifs from './pages/PortailObjectifs';
 import PortailParametres from './pages/PortailParametres';
+import ObjectifsEquipe from './pages/ObjectifsEquipe';
 
 function AppRoutes() {
     const { user, loading, canAccessFactures, isAdmin } = useAuth();
@@ -64,6 +66,8 @@ function AppRoutes() {
                     <>
                         <Route path="reps" element={<AdminReps />} />
                         <Route path="paye" element={<Paye />} />
+                        <Route path="paye/settings" element={<PayeRepSettings />} />
+                        <Route path="objectifs/equipe" element={<ObjectifsEquipe />} />
                     </>
                 )}
             </Route>
