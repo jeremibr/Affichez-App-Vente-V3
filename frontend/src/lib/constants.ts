@@ -36,4 +36,5 @@ export const INVOICE_STATUSES = [
     { value: 'partial',  label: 'Partiel' },
     { value: 'sent',     label: 'Envoyé' },
     { value: 'overdue',  label: 'En retard' },
+    { value: 'avoir',    label: 'Avoir (crédit)' },
 ] as const;

@@ -110,7 +110,7 @@ export default function FDashboard() {
     }, []);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Payé + Partiel' }, ...INVOICE_STATUSES], []);
+    const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
     const repOptions = useMemo(() => [{ value: 'Tous', label: 'Toute l\'équipe' }, ...allReps.map(r => ({ value: r, label: r }))], [allReps]);
