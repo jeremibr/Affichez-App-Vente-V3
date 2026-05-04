@@ -39,6 +39,85 @@ function getSectionKey(pathname: string): string {
     return 'ensemble';
 }
 
+// ─── Module-level components (must NOT be defined inside Layout) ──────────────
+// Defining components inside a parent causes React to see a new type on every
+// render, which unmounts/remounts the subtree and kills CSS transitions.
+
+function SubItems({ items, open }: { items: NavItem[]; open: boolean }) {
+    return (
+        <div style={{
+            display: 'grid',
+            gridTemplateRows: open ? '1fr' : '0fr',
+            transition: 'grid-template-rows 300ms ease-in-out',
+        }}>
+            <div className="overflow-hidden">
+                <div className="ml-3 pl-3 border-l-2 border-slate-100 mt-0.5 mb-1 space-y-0.5">
+                    {items.map((item, i) =>
+                        item.isLabel ? (
+                            <p key={`label-${i}`} className="px-3 pt-2.5 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest first:pt-1">
+                                {item.name}
+                            </p>
+                        ) : (
+                            <NavLink
+                                key={item.href}
+                                to={item.href}
+                                end={item.end}
+                                className={({ isActive }) => cn(
+                                    "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all",
+                                    isActive
+                                        ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
+                                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                                )}
+                            >
+                                {({ isActive }) => (
+                                    <>
+                                        <item.icon className={cn(
+                                            "w-4 h-4 shrink-0",
+                                            isActive ? "text-white/90" : "text-slate-400"
+                                        )} />
+                                        {item.name}
+                                    </>
+                                )}
+                            </NavLink>
+                        )
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SectionHeader({ sectionKey, label, icon: Icon, activeColor, items, open, active, onToggle }: {
+    sectionKey: string;
+    label: string;
+    icon: React.ElementType;
+    activeColor: string;
+    items: NavItem[];
+    open: boolean;
+    active: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <div>
+            <button
+                onClick={onToggle}
+                className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all select-none",
+                    active ? "text-slate-900" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+                )}
+            >
+                <Icon className={cn("w-4 h-4 shrink-0 transition-colors", active ? activeColor : "text-slate-400")} />
+                <span className="flex-1 text-left">{label}</span>
+                <ChevronDown className={cn(
+                    "w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-300",
+                    open && "rotate-180"
+                )} />
+            </button>
+            <SubItems items={items} open={open} />
+        </div>
+    );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Layout() {
@@ -120,80 +199,6 @@ export default function Layout() {
             (item.end ? location.pathname === item.href : location.pathname.startsWith(item.href))
         );
 
-    // ─── Sub-items list ───────────────────────────────────────────────────────
-
-    const SubItems = ({ items, open }: { items: NavItem[]; open: boolean }) => (
-        <div className={cn(
-            "overflow-hidden transition-all duration-200 ease-in-out",
-            open ? "max-h-[500px]" : "max-h-0"
-        )}>
-            <div className="ml-3 pl-3 border-l-2 border-slate-100 mt-0.5 mb-1 space-y-0.5">
-                {items.map((item, i) =>
-                    item.isLabel ? (
-                        <p key={`label-${i}`} className="px-3 pt-2.5 pb-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest first:pt-1">
-                            {item.name}
-                        </p>
-                    ) : (
-                        <NavLink
-                            key={item.href}
-                            to={item.href}
-                            end={item.end}
-                            className={({ isActive }) => cn(
-                                "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                                isActive
-                                    ? "bg-brand-main text-white shadow-sm shadow-brand-main/20"
-                                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-                            )}
-                        >
-                            {({ isActive }) => (
-                                <>
-                                    <item.icon className={cn(
-                                        "w-4 h-4 shrink-0",
-                                        isActive ? "text-white/90" : "text-slate-400"
-                                    )} />
-                                    {item.name}
-                                </>
-                            )}
-                        </NavLink>
-                    )
-                )}
-            </div>
-        </div>
-    );
-
-    // ─── Section header ───────────────────────────────────────────────────────
-
-    const SectionHeader = ({
-        sectionKey, label, icon: Icon, activeColor, items,
-    }: { sectionKey: string; label: string; icon: React.ElementType; activeColor: string; items: NavItem[] }) => {
-        const open = openSections.has(sectionKey);
-        const active = isSectionActive(items);
-
-        return (
-            <div>
-                <button
-                    onClick={() => toggle(sectionKey)}
-                    className={cn(
-                        "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all select-none",
-                        active
-                            ? "text-slate-900"
-                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                    )}
-                >
-                    <Icon className={cn(
-                        "w-4 h-4 shrink-0 transition-colors",
-                        active ? activeColor : "text-slate-400"
-                    )} />
-                    <span className="flex-1 text-left">{label}</span>
-                    <ChevronDown className={cn(
-                        "w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-200",
-                        open && "rotate-180"
-                    )} />
-                </button>
-                <SubItems items={items} open={open} />
-            </div>
-        );
-    };
 
     // ─── Sidebar content ──────────────────────────────────────────────────────
 
@@ -215,6 +220,9 @@ export default function Layout() {
                         icon={s.icon}
                         activeColor={s.activeColor}
                         items={s.items}
+                        open={openSections.has(s.key)}
+                        active={isSectionActive(s.items)}
+                        onToggle={() => toggle(s.key)}
                     />
                 ))}
             </nav>
@@ -224,28 +232,16 @@ export default function Layout() {
 
                 {/* Admin section — hidden when viewing as rep */}
                 {isAdmin && !viewAsRep && (
-                    <div>
-                        <button
-                            onClick={() => toggle('admin')}
-                            className={cn(
-                                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all select-none",
-                                isSectionActive(adminItems)
-                                    ? "text-slate-900"
-                                    : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
-                            )}
-                        >
-                            <Settings className={cn(
-                                "w-4 h-4 shrink-0",
-                                isSectionActive(adminItems) ? "text-slate-500" : "text-slate-400"
-                            )} />
-                            <span className="flex-1 text-left">Administration</span>
-                            <ChevronDown className={cn(
-                                "w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-200",
-                                openSections.has('admin') && "rotate-180"
-                            )} />
-                        </button>
-                        <SubItems items={adminItems} open={openSections.has('admin')} />
-                    </div>
+                    <SectionHeader
+                        sectionKey="admin"
+                        label="Administration"
+                        icon={Settings}
+                        activeColor="text-slate-500"
+                        items={adminItems}
+                        open={openSections.has('admin')}
+                        active={isSectionActive(adminItems)}
+                        onToggle={() => toggle('admin')}
+                    />
                 )}
 
                 {/* User row */}

@@ -106,6 +106,11 @@ export function MonthlyDetail({
         const [ny, nm] = nextMonth(year, month);
         const dateEnd   = `${ny}-${paddedMonth(nm)}-01`;
 
+        const { data: excludedData } = await supabase
+            .from('excluded_clients')
+            .select('client_name');
+        const excluded = new Set((excludedData ?? []).map((r: { client_name: string }) => r.client_name));
+
         if (module === 'factures') {
             let q = supabase
                 .from('invoices')
@@ -115,7 +120,7 @@ export function MonthlyDetail({
                 .order('invoice_date', { ascending: true });
             if (repName) q = q.eq('rep_name', repName);
             const { data } = await q;
-            setRows((data ?? []) as InvoiceRow[]);
+            setRows(((data ?? []) as InvoiceRow[]).filter(r => !excluded.has(r.client_name)));
         } else {
             let q = supabase
                 .from('sales')
@@ -125,7 +130,7 @@ export function MonthlyDetail({
                 .order('sale_date', { ascending: true });
             if (repName) q = q.eq('rep_name', repName);
             const { data } = await q;
-            setRows((data ?? []) as SaleRow[]);
+            setRows(((data ?? []) as SaleRow[]).filter(r => !excluded.has(r.client_name)));
         }
         setLoading(false);
     }, [module, repName, year, month]);

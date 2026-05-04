@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import {
-    Settings, Loader2, Check, X, Save, User, ClipboardList, FileText, Wand2, ChevronRight,
+    Settings, Loader2, Check, X, Save, User, ClipboardList, FileText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -141,12 +141,6 @@ export default function PortailParametres({ propRepName }: Props) {
     const [objectives, setObjectives]     = useState<Record<string, number>>({});  // dept key: `month-dept`
     const [monthTargets, setMonthTargets] = useState<Record<string, number>>({});  // `module-month`
 
-    // Quick-fill
-    const [annualInput, setAnnualInput] = useState('');
-    const [splitMonths, setSplitMonths] = useState(true);
-    const [splitDepts, setSplitDepts]   = useState(false);
-    const [applying, setApplying]       = useState(false);
-
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     const deptKey = (month: number, dept: string) => `${month}-${dept}`;
@@ -215,62 +209,6 @@ export default function PortailParametres({ propRepName }: Props) {
         setSaving(null);
     };
 
-    // ── Quick fill ────────────────────────────────────────────────────────────
-
-    const applyQuickFill = async () => {
-        const total = parseFloat(annualInput.replace(/[^0-9.]/g, '')) || 0;
-        if (total <= 0 || !splitMonths) return;
-        setApplying(true);
-
-        const perMonth = Math.round((total / 12) * 100) / 100;
-
-        if (splitDepts) {
-            // Fill every dept × month cell equally AND save monthly totals
-            const perCell = Math.round((total / 12 / DEPARTMENTS.length) * 100) / 100;
-            const deptRows = [];
-            const newDeptMap: Record<string, number> = { ...objectives };
-            const monthRows = [];
-            const newMonthMap: Record<string, number> = { ...monthTargets };
-
-            for (let m = 1; m <= 12; m++) {
-                for (const dept of DEPARTMENTS) {
-                    deptRows.push({
-                        rep_name: repName, module, year, month: m, department: dept,
-                        target_amount: perCell, updated_at: new Date().toISOString(),
-                    });
-                    newDeptMap[deptKey(m, dept)] = perCell;
-                }
-                monthRows.push({
-                    rep_name: repName, module, year, month: m,
-                    target_amount: perMonth, updated_at: new Date().toISOString(),
-                });
-                newMonthMap[`${module}-${m}`] = perMonth;
-            }
-            await Promise.all([
-                supabase.from('rep_objectives_dept').upsert(deptRows, { onConflict: 'rep_name,module,year,month,department' }),
-                supabase.from('rep_objectives').upsert(monthRows, { onConflict: 'rep_name,module,year,month' }),
-            ]);
-            setObjectives(newDeptMap);
-            setMonthTargets(newMonthMap);
-        } else {
-            // Only monthly totals → save to rep_objectives
-            const monthRows = [];
-            const newMonthMap: Record<string, number> = { ...monthTargets };
-            for (let m = 1; m <= 12; m++) {
-                monthRows.push({
-                    rep_name: repName, module, year, month: m,
-                    target_amount: perMonth, updated_at: new Date().toISOString(),
-                });
-                newMonthMap[`${module}-${m}`] = perMonth;
-            }
-            await supabase.from('rep_objectives').upsert(monthRows, { onConflict: 'rep_name,module,year,month' });
-            setMonthTargets(newMonthMap);
-        }
-
-        setApplying(false);
-        setAnnualInput('');
-    };
-
     // ── Derived totals ────────────────────────────────────────────────────────
 
     const deptSumForMonth = (month: number) =>
@@ -285,13 +223,6 @@ export default function PortailParametres({ propRepName }: Props) {
         MONTHS.reduce((s, m) => s + (objectives[deptKey(m.value, dept)] ?? 0), 0);
 
     const grandTotal = MONTHS.reduce((s, m) => s + effectiveMonthTotal(m.value), 0);
-
-    const perCellPreview = (() => {
-        const v = parseFloat(annualInput.replace(/[^0-9.]/g, '')) || 0;
-        if (v <= 0 || !splitMonths) return null;
-        if (splitDepts) return Math.round(v / 12 / DEPARTMENTS.length * 100) / 100;
-        return Math.round(v / 12 * 100) / 100;
-    })();
 
     // ── Render ────────────────────────────────────────────────────────────────
 
@@ -355,59 +286,6 @@ export default function PortailParametres({ propRepName }: Props) {
                         {m === 'devis' ? 'Objectifs Devis' : 'Objectifs Factures'}
                     </button>
                 ))}
-            </div>
-
-            {/* ── Quick-fill panel ── */}
-            <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-100 p-5">
-                <div className="flex items-center gap-2 mb-4">
-                    <div className="w-7 h-7 rounded-lg bg-brand-main/10 flex items-center justify-center shrink-0">
-                        <Wand2 className="w-3.5 h-3.5 text-brand-main" />
-                    </div>
-                    <div>
-                        <p className="text-sm font-bold text-slate-800">Remplissage automatique</p>
-                        <p className="text-xs text-slate-400">Entrez un objectif annuel et choisissez comment le répartir</p>
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap items-end gap-4">
-                    <div className="flex-1 min-w-[180px]">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                            Objectif annuel total
-                        </label>
-                        <input
-                            type="text"
-                            value={annualInput}
-                            onChange={e => setAnnualInput(e.target.value)}
-                            placeholder="ex: 500000"
-                            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-brand-main font-semibold tabular-nums"
-                        />
-                    </div>
-
-                    <div className="flex flex-col gap-2">
-                        <CheckBox checked={splitMonths} onChange={setSplitMonths} label="Répartir sur 12 mois" />
-                        <CheckBox checked={splitDepts} onChange={setSplitDepts} label={`Répartir entre les ${DEPARTMENTS.length} départements`} />
-                    </div>
-
-                    <div>
-                        {perCellPreview !== null && (
-                            <p className="text-[10px] text-slate-400 mb-1.5 tabular-nums">
-                                = {formatCurrencyCAD(perCellPreview)} / {splitDepts ? 'cellule' : 'mois'}
-                            </p>
-                        )}
-                        <button
-                            onClick={applyQuickFill}
-                            disabled={applying || !annualInput || !splitMonths}
-                            className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm hover:bg-brand-main/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
-                            Appliquer
-                        </button>
-                    </div>
-                </div>
-
-                <p className="text-[10px] text-slate-300 mt-3">
-                    La modification manuelle de chaque cellule reste disponible dans le tableau ci-dessous.
-                </p>
             </div>
 
             {/* ── Objectives grid ── */}
@@ -542,21 +420,3 @@ export default function PortailParametres({ propRepName }: Props) {
     );
 }
 
-// ─── CheckBox ─────────────────────────────────────────────────────────────────
-
-function CheckBox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-    return (
-        <label className="flex items-center gap-2.5 cursor-pointer">
-            <div
-                onClick={() => onChange(!checked)}
-                className={cn(
-                    'w-4 h-4 rounded border-2 flex items-center justify-center transition-all cursor-pointer shrink-0',
-                    checked ? 'bg-brand-main border-brand-main' : 'border-slate-300 bg-white'
-                )}
-            >
-                {checked && <Check className="w-2.5 h-2.5 text-white" />}
-            </div>
-            <span className="text-xs font-medium text-slate-700">{label}</span>
-        </label>
-    );
-}
