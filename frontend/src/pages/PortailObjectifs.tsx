@@ -168,19 +168,6 @@ export default function PortailObjectifs({ propRepName }: Props) {
         Object.values(deptData[dept] ?? {}).some(({ target, actual, prevActual }) => target > 0 || actual > 0 || prevActual > 0)
     );
 
-    // Per-month column totals for dept matrix footer
-    const colTotals: Record<number, { target: number; actual: number; prevActual: number }> = {};
-    for (let m = 1; m <= 12; m++) {
-        colTotals[m] = DEPARTMENTS.reduce(
-            (acc, dept) => ({
-                target:     acc.target     + (deptData[dept]?.[m]?.target ?? 0),
-                actual:     acc.actual     + (deptData[dept]?.[m]?.actual ?? 0),
-                prevActual: acc.prevActual + (deptData[dept]?.[m]?.prevActual ?? 0),
-            }),
-            { target: 0, actual: 0, prevActual: 0 }
-        );
-    }
-
     // ─── Guard ────────────────────────────────────────────────────────────────
 
     if (!repName && !isAdmin) {
@@ -352,7 +339,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                         </div>
                     </div>
 
-                    {/* ── Department × Month matrix ── */}
+                    {/* ── Department cards ── */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
                             <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
@@ -361,8 +348,9 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             <div>
                                 <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
                                 <p className="text-xs text-slate-400">
-                                    Objectif · <span className="text-amber-500 font-medium">Réalisé {year}</span>
-                                    {' · '}<span className="text-slate-400 font-medium">{prevYear}</span>
+                                    <span className="text-slate-400 font-medium">{prevYear}</span>
+                                    {' · '}<span className="text-amber-500 font-medium">{year}</span>
+                                    {' · '}Objectif
                                 </p>
                             </div>
                         </div>
@@ -374,179 +362,107 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                 <p className="text-xs text-slate-300">Rendez-vous dans Paramètres pour définir vos objectifs par département.</p>
                             </div>
                         ) : (
-                            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs border-collapse">
-                                        <thead>
-                                            <tr className="bg-slate-50 border-b-2 border-slate-200">
-                                                <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50 z-10 border-r border-slate-200 min-w-[110px]">
-                                                    Département
-                                                </th>
-                                                {MONTH_SHORT.map((m, i) => (
-                                                    <th key={i} className={cn(
-                                                        'px-2 py-3 text-center text-[10px] font-bold uppercase tracking-widest border-r border-slate-100 min-w-[60px]',
-                                                        (i + 1) === NOW_MONTH && year === NOW_YEAR
-                                                            ? 'text-brand-main bg-brand-main/5'
-                                                            : 'text-slate-400'
-                                                    )}>
-                                                        {m}
-                                                    </th>
-                                                ))}
-                                                <th className="px-3 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-widest border-l-2 border-slate-200 min-w-[100px]">
-                                                    Total
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {DEPARTMENTS.map(dept => {
-                                                const monthCells = deptData[dept] ?? {};
-                                                const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0 || c.prevActual > 0);
-                                                if (!hasRow) return null;
+                            <div className="space-y-3">
+                                {DEPARTMENTS.map(dept => {
+                                    const monthCells = deptData[dept] ?? {};
+                                    const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0 || c.prevActual > 0);
+                                    if (!hasRow) return null;
 
-                                                const rowTotal = Object.values(monthCells).reduce(
-                                                    (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual, prevActual: acc.prevActual + c.prevActual }),
-                                                    { target: 0, actual: 0, prevActual: 0 }
-                                                );
+                                    const rowTotal = Object.values(monthCells).reduce(
+                                        (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual, prevActual: acc.prevActual + c.prevActual }),
+                                        { target: 0, actual: 0, prevActual: 0 }
+                                    );
+                                    const pct = rowTotal.target > 0 ? Math.round((rowTotal.actual / rowTotal.target) * 100) : null;
+                                    const pctColor = pct === null ? '' : pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-600' : 'text-red-500';
+                                    const barColor = pct === null ? '' : pct >= 100 ? 'bg-emerald-400' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400';
 
-                                                return (
-                                                    <tr key={dept} className="border-b border-slate-100 hover:bg-slate-50/60 transition-colors group">
-                                                        <td className="px-4 py-2.5 font-semibold text-slate-700 sticky left-0 bg-white group-hover:bg-slate-50/60 border-r border-slate-200 text-xs whitespace-nowrap z-10">
-                                                            {DEPT_SHORT[dept] ?? dept}
-                                                        </td>
-                                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                                            const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
-                                                            const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
-                                                            const hasAny = cell.target > 0 || cell.actual > 0 || cell.prevActual > 0;
-                                                            return (
-                                                                <td key={m} className={cn(
-                                                                    'px-2 py-2.5 text-center border-r border-slate-100',
-                                                                    isCurrent && 'bg-brand-main/5'
-                                                                )}>
-                                                                    {hasAny ? (
-                                                                        <div className="leading-tight space-y-px">
-                                                                            {cell.target > 0 && (
-                                                                                <div className="font-semibold text-slate-600 tabular-nums">{fmtK(cell.target)}</div>
-                                                                            )}
-                                                                            {cell.actual > 0 && (
-                                                                                <div className={cn(
-                                                                                    'font-bold tabular-nums',
-                                                                                    cell.target > 0
-                                                                                        ? (cell.actual >= cell.target ? 'text-emerald-500' : cell.actual >= cell.target * 0.7 ? 'text-amber-500' : 'text-brand-main')
-                                                                                        : 'text-amber-600'
-                                                                                )}>
-                                                                                    {fmtK(cell.actual)}
-                                                                                </div>
-                                                                            )}
-                                                                            {cell.prevActual > 0 && (
-                                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums">
-                                                                                    {fmtK(cell.prevActual)}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-slate-100">·</span>
-                                                                    )}
-                                                                </td>
-                                                            );
-                                                        })}
-                                                        {/* Row total */}
-                                                        <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
-                                                            {rowTotal.target > 0 && (
-                                                                <div className="font-semibold text-slate-700 tabular-nums whitespace-nowrap">
-                                                                    {formatCurrencyCAD(rowTotal.target)}
+                                    return (
+                                        <div key={dept} className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+
+                                            {/* Card header */}
+                                            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
+                                                <span className="text-sm font-bold text-slate-800">{dept}</span>
+                                                <div className="flex items-start gap-0 mt-2 divide-x divide-slate-200">
+                                                    <div className="pr-4">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{year}</p>
+                                                        <p className="text-sm font-bold text-amber-700 tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.actual)}</p>
+                                                    </div>
+                                                    {rowTotal.target > 0 && (
+                                                        <div className="px-4">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Objectif</p>
+                                                            <p className="text-sm font-semibold text-slate-600 tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.target)}</p>
+                                                        </div>
+                                                    )}
+                                                    {pct !== null && (
+                                                        <div className="pl-4">
+                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Atteinte</p>
+                                                            <div className="flex items-center gap-2 mt-1">
+                                                                <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                                    <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.min(pct, 100)}%` }} />
                                                                 </div>
-                                                            )}
-                                                            {rowTotal.actual > 0 && (
-                                                                <div className={cn(
-                                                                    'font-bold tabular-nums text-[11px] whitespace-nowrap',
-                                                                    rowTotal.target > 0
-                                                                        ? (rowTotal.actual >= rowTotal.target ? 'text-emerald-500' : 'text-brand-main')
-                                                                        : 'text-amber-600'
-                                                                )}>
-                                                                    {formatCurrencyCAD(rowTotal.actual)}
-                                                                </div>
-                                                            )}
-                                                            {rowTotal.prevActual > 0 && (
-                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums whitespace-nowrap mt-0.5">
-                                                                    {formatCurrencyCAD(rowTotal.prevActual)}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50 border-r border-slate-200 z-10">
-                                                    Total
-                                                </td>
-                                                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
-                                                    const col = colTotals[m] ?? { target: 0, actual: 0, prevActual: 0 };
-                                                    const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
-                                                    return (
-                                                        <td key={m} className={cn(
-                                                            'px-2 py-2.5 text-center border-r border-slate-100',
-                                                            isCurrent && 'bg-brand-main/5'
-                                                        )}>
-                                                            <div className="leading-tight space-y-px">
-                                                                {col.target > 0 && (
-                                                                    <div className="font-bold text-slate-700 tabular-nums">{fmtK(col.target)}</div>
-                                                                )}
-                                                                {col.actual > 0 && (
-                                                                    <div className={cn(
-                                                                        'font-bold tabular-nums',
-                                                                        col.target > 0
-                                                                            ? (col.actual >= col.target ? 'text-emerald-500' : 'text-amber-500')
-                                                                            : 'text-amber-600'
-                                                                    )}>
-                                                                        {fmtK(col.actual)}
-                                                                    </div>
-                                                                )}
-                                                                {col.prevActual > 0 && (
-                                                                    <div className="text-[10px] font-medium text-slate-400 tabular-nums">
-                                                                        {fmtK(col.prevActual)}
-                                                                    </div>
-                                                                )}
+                                                                <span className={cn('text-sm font-bold tabular-nums', pctColor)}>{pct}%</span>
                                                             </div>
-                                                        </td>
-                                                    );
-                                                })}
-                                                {/* Grand total */}
-                                                {(() => {
-                                                    const gt = Object.values(colTotals).reduce(
-                                                        (acc, c) => ({ target: acc.target + c.target, actual: acc.actual + c.actual, prevActual: acc.prevActual + c.prevActual }),
-                                                        { target: 0, actual: 0, prevActual: 0 }
-                                                    );
-                                                    return (
-                                                        <td className="px-3 py-2.5 text-right border-l-2 border-slate-200">
-                                                            {gt.target > 0 && (
-                                                                <div className="font-bold text-slate-900 tabular-nums whitespace-nowrap text-xs">
-                                                                    {formatCurrencyCAD(gt.target)}
-                                                                </div>
-                                                            )}
-                                                            {gt.actual > 0 && (
-                                                                <div className={cn(
-                                                                    'font-bold tabular-nums text-[11px] whitespace-nowrap',
-                                                                    gt.target > 0
-                                                                        ? (gt.actual >= gt.target ? 'text-emerald-500' : 'text-brand-main')
-                                                                        : 'text-amber-600'
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Month table — one clean row per metric */}
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-xs">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100">
+                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest w-20 shrink-0" />
+                                                            {MONTH_SHORT.map((m, i) => (
+                                                                <th key={i} className={cn(
+                                                                    'px-3 py-2 text-center text-[10px] font-bold uppercase tracking-widest min-w-[52px]',
+                                                                    (i + 1) === NOW_MONTH && year === NOW_YEAR
+                                                                        ? 'text-brand-main' : 'text-slate-400'
                                                                 )}>
-                                                                    {formatCurrencyCAD(gt.actual)}
-                                                                </div>
-                                                            )}
-                                                            {gt.prevActual > 0 && (
-                                                                <div className="text-[10px] font-medium text-slate-400 tabular-nums whitespace-nowrap mt-0.5">
-                                                                    {formatCurrencyCAD(gt.prevActual)}
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    );
-                                                })()}
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
+                                                                    {m}
+                                                                </th>
+                                                            ))}
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {/* current year row */}
+                                                        <tr className="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
+                                                            <td className="px-4 py-2.5 text-[10px] font-bold text-amber-500 uppercase tracking-widest whitespace-nowrap">{year}</td>
+                                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                                                const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
+                                                                const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
+                                                                const cellColor = cell.target > 0
+                                                                    ? (cell.actual >= cell.target ? 'text-emerald-500' : cell.actual >= cell.target * 0.7 ? 'text-amber-500' : 'text-red-400')
+                                                                    : 'text-amber-600';
+                                                                return (
+                                                                    <td key={m} className={cn(
+                                                                        'px-3 py-2.5 text-center tabular-nums font-bold',
+                                                                        cellColor,
+                                                                        isCurrent && 'bg-brand-main/5'
+                                                                    )}>
+                                                                        {cell.actual > 0 ? fmtK(cell.actual) : <span className="text-slate-150 font-normal">—</span>}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                        {/* objective row */}
+                                                        <tr className="hover:bg-slate-50/40 transition-colors">
+                                                            <td className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">Objectif</td>
+                                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                                                                const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
+                                                                return (
+                                                                    <td key={m} className="px-3 py-2.5 text-center tabular-nums text-slate-500 font-semibold">
+                                                                        {cell.target > 0 ? fmtK(cell.target) : <span className="text-slate-150 font-normal">—</span>}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

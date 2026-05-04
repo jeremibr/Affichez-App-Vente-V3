@@ -123,13 +123,25 @@ function extractDept(record: Record<string, unknown>): { label: string; mapped: 
   return { label, mapped };
 }
 
+/**
+ * Zoho credit notes store reference_number as e.g. "MTL-01892" (5-digit) while our DB
+ * stores invoice_number as "MTL-001892" (6-digit zero-padded). Normalize before lookup.
+ */
+function normalizeInvoiceRef(ref: string): string {
+  const match = ref.match(/^([A-Z]+-?)(\d+)$/);
+  if (!match) return ref;
+  const [, prefix, num] = match;
+  return prefix + num.padStart(6, '0');
+}
+
 /** Batch-lookup dept from invoices table using credit note reference_number → invoice_number */
 async function lookupDeptByInvoiceNumber(
   invoiceNumbers: string[],
   office: string,
 ): Promise<Map<string, { label: string; mapped: string }>> {
   if (invoiceNumbers.length === 0) return new Map();
-  const nums = invoiceNumbers.map((n) => encodeURIComponent(n)).join(',');
+  const normalized = invoiceNumbers.map(normalizeInvoiceRef);
+  const nums = normalized.map((n) => encodeURIComponent(n)).join(',');
   const res = await fetch(
     `${SUPABASE_URL}/rest/v1/invoices?select=invoice_number,department,zoho_department_label&office=eq.${office}&invoice_number=in.(${nums})`,
     { headers: SB_HEADERS },
@@ -260,7 +272,8 @@ async function syncCreditNotes(
       const deptByInv = await lookupDeptByInvoiceNumber(refNums, org.office);
       for (const p of needsLookup) {
         const ref = (p.note.reference_number as string)?.trim();
-        if (ref && deptByInv.has(ref)) p.dept = deptByInv.get(ref)!;
+        const normalizedRef = ref ? normalizeInvoiceRef(ref) : null;
+        if (normalizedRef && deptByInv.has(normalizedRef)) p.dept = deptByInv.get(normalizedRef)!;
       }
     }
 

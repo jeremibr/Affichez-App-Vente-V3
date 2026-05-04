@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
@@ -14,7 +14,6 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
 import { fetchCommRate } from '../utils/commRates';
-import { MONTHS } from '../lib/constants';
 
 interface DashboardKPIs {
     ytd_total: number;
@@ -36,9 +35,6 @@ export default function PortailDevis({ propRepName }: Props) {
 
     const [tab, setTab] = useUrlState('tab', 'apercu') as ['apercu' | 'mensuel', (v: 'apercu' | 'mensuel') => void];
     const [year, setYear] = useUrlStateNumber('year', 2026);
-    const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
-    const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     const [commRate, setCommRate] = useState(0.05);
 
     const [loading, setLoading] = useState(true);
@@ -48,7 +44,6 @@ export default function PortailDevis({ propRepName }: Props) {
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [showClients, setShowClients] = useState(false);
 
-    const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
     const repParam = repName || null;
 
     useEffect(() => {
@@ -67,15 +62,15 @@ export default function PortailDevis({ propRepName }: Props) {
         ] = await Promise.all([
             supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
             supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: monthParam, p_dept: null, p_rep: repParam }),
+            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: null, p_dept: null, p_rep: repParam }),
+            supabase.rpc('get_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: null, p_dept: null, p_rep: repParam }),
         ]);
         setGrandTotal(grandData || []);
         setPrevGrandTotal(prevGrandData || []);
         setKpis(kpiData?.[0] || null);
         setTopClients(clientData || []);
         setLoading(false);
-    }, [year, monthParam, repParam, isAdmin]);
+    }, [year, repParam, isAdmin]);
 
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
@@ -91,10 +86,6 @@ export default function PortailDevis({ propRepName }: Props) {
     }, [repName]);
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = useMemo(() => [
-        { value: 'Toutes', label: 'Année complète' },
-        ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))
-    ], []);
 
     if (!repName && !isAdmin) {
         return (
@@ -157,14 +148,6 @@ export default function PortailDevis({ propRepName }: Props) {
                 <FilterBar>
                     <FilterGroup label="Année">
                         <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
-                    </FilterGroup>
-                    <FilterGroup label="Mois">
-                        <Select
-                            value={String(selectedMonth)}
-                            onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))}
-                            options={monthOptions}
-                            className="w-44"
-                        />
                     </FilterGroup>
                 </FilterBar>
 
@@ -241,7 +224,7 @@ export default function PortailDevis({ propRepName }: Props) {
                         data={grandTotal}
                         prevYearData={prevGrandTotal}
                         year={year}
-                        selectedMonth={selectedMonth}
+                        selectedMonth="Toutes"
                         dealLabel="devis"
                     />
                     </>

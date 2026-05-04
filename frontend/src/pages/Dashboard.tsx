@@ -154,7 +154,7 @@ export default function Dashboard() {
                     {/* KPI Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
                         <KPICard
-                            title="Chiffre d'affaires YTD"
+                            title="Total Devis YTD"
                             value={formatCurrencyCAD(kpis?.ytd_total || 0)}
                             subText="Revenus cumulés"
                             icon={TrendingUp}

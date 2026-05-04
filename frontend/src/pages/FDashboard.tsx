@@ -166,7 +166,7 @@ export default function FDashboard() {
             ) : (
                 <>
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Revenus facturés cumulés" icon={TrendingUp} trend={kpis?.pct_of_target} />
+                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Net après avoirs" icon={TrendingUp} trend={kpis?.pct_of_target} />
                         <KPICard title="Nb Factures" value={String(kpis?.ytd_count || 0)} subText="Factures (filtres actifs)" icon={FileText} />
                         <KPICard title="Montant Moyen" value={formatCurrencyCAD(kpis?.avg_deal_size || 0)} subText="Par facture" icon={Briefcase} />
                         <KPICard title="Objectif Annuel" value={formatCurrencyCAD(kpis?.annual_target || 0)} subText="Planifié pour l'année" icon={Target} />

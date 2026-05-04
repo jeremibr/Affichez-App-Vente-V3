@@ -140,23 +140,28 @@ export function MonthlyDetail({
     const totalVentes     = regularRows.reduce((s, r) => s + r.amount, 0);
     const totalAvoirs     = avoirRows.reduce((s, r)   => s + r.amount, 0); // already negative
     const totalNet        = totalVentes + totalAvoirs;
-    // Commission applies only to regular invoices — avoirs are excluded
-    const totalCommission = totalVentes * commRate;
+    // Commission is based on net revenue (avoirs reduce the commission base)
+    const totalCommission = totalNet * commRate;
 
-    // Department breakdown (only for non-avoirs)
+    // Department breakdown — include avoirs so dept totals are net
     const deptMap = new Map<string, DeptSummary>();
     for (const dept of DEPARTMENTS) {
         deptMap.set(dept, { department: dept, total: 0, commission: 0, count: 0 });
     }
-    for (const r of regularRows) {
+    for (const r of rows) {
+        const avoir = isAvoir(r);
         const key = r.department ?? '';
         const cur = deptMap.get(key) ?? { department: key, total: 0, commission: 0, count: 0 };
-        cur.total += r.amount;
-        cur.commission += r.amount * commRate;
-        cur.count++;
+        cur.total += r.amount; // avoirs are negative — naturally subtract
+        if (!avoir) { cur.commission += r.amount * commRate; cur.count++; }
         deptMap.set(key, cur);
     }
-    const deptSummaries = [...deptMap.values()].filter(d => d.total > 0);
+    // Recalculate dept commissions on net totals to be consistent
+    for (const [key, d] of deptMap) {
+        d.commission = d.total * commRate;
+        deptMap.set(key, d);
+    }
+    const deptSummaries = [...deptMap.values()].filter(d => d.total !== 0);
 
     // Navigation
     const [py, pm] = prevMonth(year, month);
@@ -227,8 +232,8 @@ export function MonthlyDetail({
                     <SummaryCard
                         icon={TrendingUp}
                         label={isFactures ? 'Total Facturé' : 'Total Ventes'}
-                        value={formatCurrencyCAD(totalVentes)}
-                        sub={`${regularRows.length} ${isFactures ? 'factures' : 'devis'}`}
+                        value={formatCurrencyCAD(totalNet)}
+                        sub={`${regularRows.length} ${isFactures ? 'factures' : 'devis'}${avoirRows.length > 0 ? ` · ${avoirRows.length} avoir${avoirRows.length > 1 ? 's' : ''}` : ''}`}
                         color="bg-blue-50 text-blue-500"
                     />
                     <SummaryCard
@@ -240,10 +245,10 @@ export function MonthlyDetail({
                     />
                     <SummaryCard
                         icon={TrendingUp}
-                        label="Net (avoirs inclus)"
-                        value={formatCurrencyCAD(totalNet)}
+                        label="Avant avoirs"
+                        value={formatCurrencyCAD(totalVentes)}
                         sub={totalAvoirs !== 0 ? `dont ${formatCurrencyCAD(totalAvoirs)} avoirs` : 'Aucun avoir'}
-                        color="bg-emerald-50 text-emerald-500"
+                        color="bg-slate-50 text-slate-500"
                     />
                     <SummaryCard
                         icon={MinusCircle}
@@ -293,11 +298,11 @@ export function MonthlyDetail({
                                                     <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                                         <div
                                                             className="h-full bg-brand-main rounded-full"
-                                                            style={{ width: `${totalVentes > 0 ? Math.min((d.total / totalVentes) * 100, 100) : 0}%` }}
+                                                            style={{ width: `${totalNet > 0 ? Math.min((d.total / totalNet) * 100, 100) : 0}%` }}
                                                         />
                                                     </div>
                                                     <span className="text-xs font-semibold text-slate-400 w-8 text-right tabular-nums">
-                                                        {totalVentes > 0 ? Math.round((d.total / totalVentes) * 100) : 0}%
+                                                        {totalNet > 0 ? Math.round((d.total / totalNet) * 100) : 0}%
                                                     </span>
                                                 </div>
                                             </td>
@@ -306,7 +311,7 @@ export function MonthlyDetail({
                                     {/* Total row */}
                                     <tr className="border-t-2 border-slate-200 bg-slate-50/80">
                                         <td className="px-5 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">Total</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(totalVentes)}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(totalNet)}</td>
                                         <td className="px-4 py-2.5 text-right font-bold text-brand-main tabular-nums">{formatCurrencyCAD(totalCommission)}</td>
                                         <td className="px-4 py-2.5 text-right font-bold text-slate-600 tabular-nums">{regularRows.length}</td>
                                         <td className="px-5 py-2.5" />

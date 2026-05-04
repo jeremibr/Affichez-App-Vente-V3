@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, TrendingUp, Target, Briefcase, FileText,
-    MinusCircle, User, X, ChevronRight,
+    User, X, ChevronRight,
 } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
@@ -14,7 +14,6 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
 import { fetchCommRate } from '../utils/commRates';
-import { MONTHS } from '../lib/constants';
 
 interface InvKPIs {
     ytd_total: number;
@@ -37,9 +36,6 @@ export default function PortailFactures({ propRepName }: Props) {
 
     const [tab, setTab] = useUrlState('tab', 'apercu') as ['apercu' | 'mensuel', (v: 'apercu' | 'mensuel') => void];
     const [year, setYear] = useUrlStateNumber('year', 2026);
-    const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
-    const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     const [commRate, setCommRate] = useState(0.05);
 
     const [loading, setLoading] = useState(true);
@@ -49,7 +45,6 @@ export default function PortailFactures({ propRepName }: Props) {
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [showClients, setShowClients] = useState(false);
 
-    const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
     const repParam = repName || null;
 
     useEffect(() => {
@@ -68,15 +63,15 @@ export default function PortailFactures({ propRepName }: Props) {
         ] = await Promise.all([
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
-            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: monthParam, p_dept: null, p_rep: repParam }),
+            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: null, p_dept: null, p_rep: repParam }),
+            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: null, p_dept: null, p_rep: repParam }),
         ]);
         setGrandTotal(grandData || []);
         setPrevGrandTotal(prevGrandData || []);
         setKpis(kpiData?.[0] || null);
         setTopClients(clientData || []);
         setLoading(false);
-    }, [year, monthParam, repParam, isAdmin]);
+    }, [year, repParam, isAdmin]);
 
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
@@ -92,10 +87,6 @@ export default function PortailFactures({ propRepName }: Props) {
     }, [repName]);
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = useMemo(() => [
-        { value: 'Toutes', label: 'Année complète' },
-        ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))
-    ], []);
 
     if (!repName && !isAdmin) {
         return (
@@ -159,14 +150,6 @@ export default function PortailFactures({ propRepName }: Props) {
                     <FilterGroup label="Année">
                         <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
                     </FilterGroup>
-                    <FilterGroup label="Mois">
-                        <Select
-                            value={String(selectedMonth)}
-                            onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))}
-                            options={monthOptions}
-                            className="w-44"
-                        />
-                    </FilterGroup>
                 </FilterBar>
 
                 {loading ? (
@@ -180,7 +163,7 @@ export default function PortailFactures({ propRepName }: Props) {
                         <KPICard
                             title="Facturé YTD"
                             value={new Intl.NumberFormat('fr-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(kpis?.ytd_total ?? 0).replace(/\s*CA$/, '').trim()}
-                            sub="Revenus facturés cumulés"
+                            sub="Net après avoirs"
                             icon={TrendingUp}
                             trend={kpis?.pct_of_target}
                             accent
@@ -200,20 +183,11 @@ export default function PortailFactures({ propRepName }: Props) {
                         <KPICard
                             title="Objectif Annuel"
                             value={formatCurrencyCAD(kpis?.annual_target ?? 0)}
-                            sub={`Avoirs: ${formatCurrencyCAD(kpis?.avoir_total ?? 0)}`}
+                            sub={(kpis?.avoir_total ?? 0) < 0 ? `Avoirs: ${formatCurrencyCAD(kpis?.avoir_total ?? 0)}` : 'Aucun avoir'}
                             icon={Target}
                         />
                     </div>
 
-                    {(kpis?.avoir_total ?? 0) < 0 && (
-                        <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50 border border-red-100 rounded-xl">
-                            <MinusCircle className="w-4 h-4 text-red-400 shrink-0" />
-                            <p className="text-xs text-red-600">
-                                <span className="font-semibold">Avoirs émis ce {selectedMonth === 'Toutes' ? 'année' : 'mois'} :</span>{' '}
-                                Payé: {formatCurrencyCAD(kpis?.paid_total ?? 0)} · Partiel: {formatCurrencyCAD(kpis?.partial_total ?? 0)} · Avoirs: {formatCurrencyCAD(kpis?.avoir_total ?? 0)}
-                            </p>
-                        </div>
-                    )}
 
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -249,7 +223,7 @@ export default function PortailFactures({ propRepName }: Props) {
                         data={grandTotal}
                         prevYearData={prevGrandTotal}
                         year={year}
-                        selectedMonth={selectedMonth}
+                        selectedMonth="Toutes"
                         dealLabel="factures"
                     />
                     </>
