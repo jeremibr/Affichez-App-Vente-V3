@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, MinusCircle } from 'lucide-react';
+import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
 import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES } from '../lib/constants';
@@ -9,7 +9,6 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { SyncButton } from '../components/SyncButton';
 
 interface InvDashboardKPIs {
     ytd_total: number;
@@ -119,20 +118,12 @@ export default function FDashboard() {
     return (
         <>
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-                        Factures — Tableau de Bord
-                        {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
-                    </h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance de facturation et indicateurs clés</p>
-                </div>
-                <SyncButton
-                    functionName="zoho-invoice-sync"
-                    logPattern="sync_invoices%"
-                    onSyncComplete={() => fetchDataRef.current()}
-                   
-                />
+            <div>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                    Factures — Tableau de Bord
+                    {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
+                </h1>
+                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance de facturation et indicateurs clés</p>
             </div>
 
             <FilterBar>
@@ -165,17 +156,11 @@ export default function FDashboard() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                         <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Net après avoirs" icon={TrendingUp} trend={kpis?.pct_of_target} />
                         <KPICard title="Nb Factures" value={String(kpis?.ytd_count || 0)} subText="Factures (filtres actifs)" icon={FileText} />
                         <KPICard title="Montant Moyen" value={formatCurrencyCAD(kpis?.avg_deal_size || 0)} subText="Par facture" icon={Briefcase} />
                         <KPICard title="Objectif Annuel" value={formatCurrencyCAD(kpis?.annual_target || 0)} subText="Planifié pour l'année" icon={Target} />
-                        <KPICard
-                            title="Avoirs (Crédits)"
-                            value={formatCurrencyCAD(kpis?.avoir_total || 0)}
-                            subText={`Payé: ${formatCurrencyCAD(kpis?.paid_total || 0)} | Partiel: ${formatCurrencyCAD(kpis?.partial_total || 0)}`}
-                            icon={MinusCircle}
-                        />
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

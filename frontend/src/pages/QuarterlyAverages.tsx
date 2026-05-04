@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
-import { SyncButton } from '../components/SyncButton';
 import type { YoYRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
 import { OFFICES } from '../lib/constants';
@@ -49,12 +48,9 @@ export default function QuarterlyAverages() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             {/* Header */}
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
-                </div>
-                <SyncButton onSyncComplete={fetchAverages} />
+            <div>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
+                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
             </div>
 
             {/* Filters */}

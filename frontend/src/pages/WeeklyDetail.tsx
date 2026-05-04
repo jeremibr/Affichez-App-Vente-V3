@@ -3,11 +3,12 @@ import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { formatCurrencyCAD } from '../lib/utils';
 import { Loader2, Calendar, TrendingUp, Briefcase, Users, ChevronLeft, ChevronRight } from 'lucide-react';
-import { SyncButton } from '../components/SyncButton';
 import type { AvailableWeek, ZoneA_SummaryRow, ZoneA_DeptTotal, ZoneB_DetailRow } from '../types/database';
 import { ZoneAPivotTable } from '../components/weekly/ZoneAPivotTable';
 import { ZoneBTable } from '../components/weekly/ZoneBTable';
 import { cn } from '../lib/utils';
+import { Select } from '../components/Select';
+import { useRepList } from '../hooks/useRepList';
 
 // ─── Week label helpers ───────────────────────────────────────────────────────
 
@@ -24,9 +25,11 @@ function fmtWeekRange(start: string, end: string): string {
 export default function WeeklyDetail() {
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
     const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
+    const [selectedRep, setSelectedRep] = useState('');
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);
     const [lineItems, setLineItems] = useState<ZoneB_DetailRow[]>([]);
+    const repList = useRepList();
 
     const clearData = () => { setSummaryData([]); setLineItems([]); };
 
@@ -71,26 +74,34 @@ export default function WeeklyDetail() {
     const prevWeekObj = currentIdx < availableWeeks.length - 1 ? availableWeeks[currentIdx + 1] : null;
     const nextWeekObj = currentIdx > 0 ? availableWeeks[currentIdx - 1] : null;
 
+    const filteredSummary = useMemo(() =>
+        selectedRep ? summaryData.filter(r => r.rep_name === selectedRep) : summaryData,
+        [summaryData, selectedRep]);
+
+    const filteredLineItems = useMemo(() =>
+        selectedRep ? lineItems.filter(r => r.rep_name === selectedRep) : lineItems,
+        [lineItems, selectedRep]);
+
     const grandTotal = useMemo(() =>
-        summaryData.reduce((sum, row) => sum + Number(row.total_amount), 0), [summaryData]);
+        filteredSummary.reduce((sum, row) => sum + Number(row.total_amount), 0), [filteredSummary]);
 
     const avgTicket = useMemo(() =>
-        lineItems.length > 0 ? grandTotal / lineItems.length : 0, [grandTotal, lineItems]);
+        filteredLineItems.length > 0 ? grandTotal / filteredLineItems.length : 0, [grandTotal, filteredLineItems]);
 
     const deptTotals = useMemo(() => {
         const map = new Map<string, ZoneA_DeptTotal>();
-        summaryData.forEach(row => {
+        filteredSummary.forEach(row => {
             if (!map.has(row.department)) map.set(row.department, { department: row.department, total_amount: 0, num_sales: 0 });
             const dt = map.get(row.department)!;
             dt.total_amount += Number(row.total_amount);
             dt.num_sales += Number(row.num_sales);
         });
         return Array.from(map.values());
-    }, [summaryData]);
+    }, [filteredSummary]);
 
     const repPivotRows = useMemo(() => {
         const repsMap = new Map<string, Record<string, number>>();
-        summaryData.forEach(row => {
+        filteredSummary.forEach(row => {
             if (!repsMap.has(row.rep_name)) repsMap.set(row.rep_name, { "Total": 0 });
             const r = repsMap.get(row.rep_name)!;
             r[row.department] = (r[row.department] || 0) + Number(row.total_amount);
@@ -98,7 +109,7 @@ export default function WeeklyDetail() {
         });
         return Array.from(repsMap.entries()).map(([repName, depts]) => ({ repName, ...depts }))
             .sort((a, b) => a.repName.localeCompare(b.repName));
-    }, [summaryData]);
+    }, [filteredSummary]);
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
@@ -108,7 +119,18 @@ export default function WeeklyDetail() {
                     <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Détail Hebdomadaire</h1>
                     <p className="text-xs md:text-sm text-slate-400 mt-0.5">Devis — Vue équipe complète</p>
                 </div>
-                <SyncButton onSyncComplete={() => { fetchAvailableWeeks(false); if (selectedWeek) fetchWeekData(selectedWeek, false); }} />
+                <div className="rounded-lg border border-brand-main/40">
+                    <Select
+                        value={selectedRep}
+                        onChange={setSelectedRep}
+                        options={[
+                            { value: '', label: 'Tous les reps' },
+                            ...repList.map(r => ({ value: r, label: r })),
+                        ]}
+                        variant={selectedRep ? 'accent' : 'default'}
+                        className="w-48"
+                    />
+                </div>
             </div>
 
             {/* Week switcher */}
@@ -184,7 +206,7 @@ export default function WeeklyDetail() {
                         <div className="bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
                             <div className="min-w-0">
                                 <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Volume</p>
-                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{lineItems.length} <span className="text-xs md:text-base">Devis</span></p>
+                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{filteredLineItems.length} <span className="text-xs md:text-base">Devis</span></p>
                             </div>
                             <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2 hidden sm:flex">
                                 <Users className="w-4 h-4 md:w-6 md:h-6" />
@@ -193,7 +215,7 @@ export default function WeeklyDetail() {
                     </div>
 
                     <ZoneAPivotTable repPivotRows={repPivotRows} grandTotal={grandTotal} deptTotals={deptTotals} />
-                    <ZoneBTable lineItems={lineItems} />
+                    <ZoneBTable lineItems={filteredLineItems} />
                 </div>
             )}
         </div>

@@ -35,7 +35,7 @@ export function ZoneAPivotTable({
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/50">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
                                 Représentant
                             </th>
                             <th
@@ -87,7 +87,7 @@ export function ZoneAPivotTable({
                     </tbody>
                     <tfoot>
                         <tr className="bg-brand-main text-white font-black">
-                            <td className="px-5 py-4 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total</td>
+                            <td className="px-5 py-4 text-xs uppercase tracking-wider whitespace-nowrap">Total</td>
                             <td className="px-4 py-4 text-right font-black tabular-nums whitespace-nowrap">
                                 {formatCurrencyCAD(grandTotal)}
                             </td>
