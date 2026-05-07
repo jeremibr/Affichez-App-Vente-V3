@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, CheckCircle2, Clock,
@@ -174,10 +175,10 @@ function nextMonth(y: number, m: number): [number, number] { return m === 12 ? [
 export default function Paye() {
     const { isAdmin } = useAuth();
 
-    const [viewMode, setViewMode] = useState<'annual' | 'monthly'>('annual');
-    const [year, setYear] = useState(2026);
-    const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
-    const [selectedOffice, setSelectedOffice] = useState('Toutes');
+    const [viewMode, setViewMode] = useUrlState('view', 'annual') as ['annual' | 'monthly', (v: 'annual' | 'monthly') => void];
+    const [year, setYear] = useUrlStateNumber('year', 2026);
+    const [selectedMonth, setSelectedMonth] = useUrlStateNumber('month', new Date().getMonth() + 1);
+    const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [loading, setLoading] = useState(false);
 
     const [repData, setRepData] = useState<RepMonthlyData[]>([]);

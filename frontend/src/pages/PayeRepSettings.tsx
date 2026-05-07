@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Users } from 'lucide-react';
+import { useUrlState } from '../hooks/useUrlState';
 import { useRepList } from '../hooks/useRepList';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -11,7 +11,7 @@ import PortailPaye from './PortailPaye';
 export default function PayeRepSettings() {
     const { isAdmin } = useAuth();
     const repList = useRepList();
-    const [selectedRep, setSelectedRep] = useState('');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', '');
 
     if (!isAdmin) {
         return (

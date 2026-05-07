@@ -107,7 +107,7 @@ export default function PortailParametres({ propRepName }: Props) {
     const { repName: authRepName, isAdmin } = useAuth();
     const { viewAsRep } = useAdminView();
     const repList = useRepList();
-    const [adminPickedRep, setAdminPickedRep] = useState('');
+    const [adminPickedRep, setAdminPickedRep] = useUrlState('rep', '');
 
     // Admin accessing directly (no propRepName, not in view-as-rep): use their own picker
     // Admin in view-as-rep mode or with propRepName: use that rep

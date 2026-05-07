@@ -339,14 +339,16 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                         <X className="w-3 h-3" />
                                     </button>
                                 </div>
-                            ) : (
+                            ) : canEdit ? (
                                 <button
                                     onClick={() => { setRateDraft(String(Math.round(commRate * 100))); setEditingRate(true); }}
                                     className="flex items-center gap-1 group"
                                 >
                                     <span className="text-xs font-bold text-brand-main tabular-nums">{Math.round(commRate * 100)}%</span>
-                                    {canEdit && <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-brand-main transition-colors" />}
+                                    <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-brand-main transition-colors" />
                                 </button>
+                            ) : (
+                                <span className="text-xs font-bold text-brand-main tabular-nums">{Math.round(commRate * 100)}%</span>
                             )}
                         </div>
                     </div>
