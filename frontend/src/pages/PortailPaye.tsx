@@ -45,7 +45,7 @@ function n(v: number | null | undefined): number { return v ?? 0; }
 
 function fmt(v: number | null): string {
     if (v === null || v === undefined || v === 0) return '';
-    return String(v);
+    return v.toFixed(2);
 }
 
 function formatPayDate(d: string): string {
@@ -547,12 +547,33 @@ function Th({ children, align, color, className }: {
 }
 
 function NumInput({ value, onChange, color }: { value: string; onChange: (v: string) => void; color: string }) {
+    const [focused, setFocused] = useState(false);
+    const [draft, setDraft] = useState(value);
+
+    useEffect(() => { if (!focused) setDraft(value); }, [value, focused]);
+
+    const handleBlur = () => {
+        setFocused(false);
+        const trimmed = draft.trim();
+        if (trimmed === '') return;
+        const parsed = parseFloat(trimmed.replace(/[$,\s]/g, '').replace(',', '.'));
+        if (isNaN(parsed)) return;
+        const formatted = parsed.toFixed(2);
+        if (formatted !== draft) onChange(formatted);
+    };
+
     return (
         <td className="px-3 py-2 border-r border-slate-200">
             <input
                 type="text"
-                value={value}
-                onChange={e => onChange(e.target.value)}
+                value={focused ? draft : value}
+                onFocus={() => { setFocused(true); setDraft(value); }}
+                onChange={e => {
+                    const v = e.target.value.replace(/,/g, '.');
+                    setDraft(v);
+                    onChange(v);
+                }}
+                onBlur={handleBlur}
                 placeholder="—"
                 className={cn(
                     "w-full bg-transparent text-right font-semibold placeholder:text-slate-200 focus:outline-none tabular-nums text-sm min-w-[90px]",
