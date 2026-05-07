@@ -234,7 +234,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
     const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
 
     const commissionFacturees = invoiceTotal * commRate;
-    const bankBalance         = commissionFacturees - totals.commission;
+    const bankBalance         = n(meta.previous_year_balance) + commissionFacturees - totals.commission;
 
     const netTotal = grandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
 
