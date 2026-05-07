@@ -32,36 +32,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [perms, setPerms]         = useState<Permissions>(DEFAULT_PERMS);
 
     const resolvePerms = useCallback(async (u: User | null) => {
-        if (!u) { setPerms(DEFAULT_PERMS); return; }
+        if (!u?.email) { setPerms(DEFAULT_PERMS); return; }
 
-        const meta = u.user_metadata ?? {};
+        // Always read live from allowed_users so role/permission changes take effect
+        // on the user's next page load — no need to log out + back in.
+        const { data } = await supabase
+            .from('allowed_users')
+            .select('role, can_access_factures, rep_name')
+            .eq('email', u.email)
+            .maybeSingle();
 
-        if (meta.role) {
-            // Metadata already set by zoho-auth — use it directly
-            const isAdmin = meta.role === 'admin';
+        if (data) {
+            const isAdmin = data.role === 'admin';
             setPerms({
                 isAdmin,
-                canAccessFactures: isAdmin || meta.can_access_factures === true,
-                repName: (meta.rep_name as string | null) ?? null,
+                canAccessFactures: isAdmin || data.can_access_factures === true,
+                repName: (data.rep_name as string | null) ?? null,
             });
         } else {
-            // Metadata missing (old session) — fall back to allowed_users table
-            const { data } = await supabase
-                .from('allowed_users')
-                .select('role, can_access_factures, rep_name')
-                .eq('email', u.email)
-                .maybeSingle();
-
-            if (data) {
-                const isAdmin = data.role === 'admin';
-                setPerms({
-                    isAdmin,
-                    canAccessFactures: isAdmin || data.can_access_factures === true,
-                    repName: (data.rep_name as string | null) ?? null,
-                });
-            } else {
-                setPerms(DEFAULT_PERMS);
-            }
+            setPerms(DEFAULT_PERMS);
         }
     }, []);
 
@@ -81,6 +70,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => subscription.unsubscribe();
     }, [resolvePerms]);
+
+    // Live-refresh perms when this user's allowed_users row changes.
+    // Also refresh the JWT so admin RLS policies (which read user_metadata
+    // from the JWT) pick up the new role without requiring a re-login.
+    useEffect(() => {
+        if (!user?.email) return;
+        const channel = supabase.channel(`perms-${user.email}`)
+            .on('postgres_changes',
+                { event: '*', schema: 'public', table: 'allowed_users', filter: `email=eq.${user.email}` },
+                async () => {
+                    await supabase.auth.refreshSession();
+                    resolvePerms(user);
+                }
+            ).subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [user, resolvePerms]);
 
     const signOut = async () => { await supabase.auth.signOut(); };
 

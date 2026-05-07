@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, TrendingUp, Target, Briefcase, FileText,
-    MinusCircle, ClipboardList, User, ChevronDown, X,
+    ClipboardList, User, ChevronDown, X,
     BarChart2, Trophy, ChevronRight,
 } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
@@ -386,11 +386,11 @@ export default function RepDashboard() {
                         </div>
                     ) : (
                         <>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             <KPICard
                                 title="Facturé YTD"
                                 value={formatCurrencyCAD(invKpis?.ytd_total ?? 0)}
-                                subText="Revenus facturés cumulés"
+                                subText="Net après avoirs"
                                 icon={TrendingUp}
                                 trend={invKpis?.pct_of_target}
                                 trendLabel="de l'objectif"
@@ -407,12 +407,6 @@ export default function RepDashboard() {
                                 value={formatCurrencyCAD(invKpis?.avg_deal_size ?? 0)}
                                 subText="Par facture"
                                 icon={Briefcase}
-                            />
-                            <KPICard
-                                title="Avoirs (Crédits)"
-                                value={formatCurrencyCAD(invKpis?.avoir_total ?? 0)}
-                                subText={`Payé: ${formatCurrencyCAD(invKpis?.paid_total ?? 0)} · Partiel: ${formatCurrencyCAD(invKpis?.partial_total ?? 0)}`}
-                                icon={MinusCircle}
                             />
                         </div>
 

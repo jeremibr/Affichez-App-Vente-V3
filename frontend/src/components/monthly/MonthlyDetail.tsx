@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     Loader2, ChevronLeft, ChevronRight, TrendingUp,
-    DollarSign, FileText, MinusCircle, ClipboardList,
+    DollarSign, FileText, ClipboardList,
 } from 'lucide-react';
 import { formatCurrencyCAD, cn } from '../../lib/utils';
 import { DEPARTMENTS } from '../../lib/constants';
@@ -147,9 +147,7 @@ export function MonthlyDetail({
     const regularRows = rows.filter(r => !isAvoir(r));
     const avoirRows   = rows.filter(r => isAvoir(r));
 
-    const totalVentes     = regularRows.reduce((s, r) => s + r.amount, 0);
-    const totalAvoirs     = avoirRows.reduce((s, r)   => s + r.amount, 0); // already negative
-    const totalNet        = totalVentes + totalAvoirs;
+    const totalNet        = rows.reduce((s, r) => s + r.amount, 0);
     // Commission is based on net revenue (avoirs reduce the commission base)
     const totalCommission = totalNet * commRate;
 
@@ -238,7 +236,7 @@ export function MonthlyDetail({
             ) : (
                 <>
                 {/* ─── Summary KPIs ─── */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <SummaryCard
                         icon={TrendingUp}
                         label={isFactures ? 'Total Facturé' : 'Total Ventes'}
@@ -252,20 +250,6 @@ export function MonthlyDetail({
                         value={formatCurrencyCAD(totalCommission)}
                         sub={`Taux: ${Math.round(commRate * 100)}%`}
                         color="bg-brand-main/10 text-brand-main"
-                    />
-                    <SummaryCard
-                        icon={TrendingUp}
-                        label="Avant avoirs"
-                        value={formatCurrencyCAD(totalVentes)}
-                        sub={totalAvoirs !== 0 ? `dont ${formatCurrencyCAD(totalAvoirs)} avoirs` : 'Aucun avoir'}
-                        color="bg-slate-50 text-slate-500"
-                    />
-                    <SummaryCard
-                        icon={MinusCircle}
-                        label="Avoirs"
-                        value={formatCurrencyCAD(totalAvoirs)}
-                        sub={`${avoirRows.length} note${avoirRows.length > 1 ? 's' : ''} de crédit`}
-                        color={totalAvoirs < 0 ? "bg-red-50 text-red-400" : "bg-slate-50 text-slate-400"}
                     />
                 </div>
 
@@ -361,8 +345,8 @@ export function MonthlyDetail({
                             <tbody className="divide-y divide-slate-50">
                                 {rows.map(r => {
                                     const avoir = isAvoir(r);
-                                    // Avoirs don't generate commission
-                                    const comm  = avoir ? 0 : r.amount * commRate;
+                                    // Avoirs generate negative commission (amount is already negative)
+                                    const comm  = r.amount * commRate;
                                     const dateStr = getDate(r);
                                     const formattedDate = dateStr
                                         ? new Date(dateStr).toLocaleDateString('fr-CA', { day: '2-digit', month: '2-digit' })

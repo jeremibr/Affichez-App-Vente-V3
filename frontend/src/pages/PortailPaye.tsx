@@ -92,6 +92,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
     const [entries, setEntries]   = useState<PayEntry[]>([]);
     const [meta, setMeta]         = useState<PayMeta>(EMPTY_META);
     const [commRate, setCommRate] = useState(0.05);
+    const [invoiceTotal, setInvoiceTotal] = useState(0);
     const [generating, setGenerating] = useState(false);
 
     // Inline commission rate editing
@@ -105,7 +106,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
     const fetchAll = useCallback(async () => {
         if (!repName) { setLoading(false); return; }
         setLoading(true);
-        const [entriesRes, metaRes, rate] = await Promise.all([
+        const [entriesRes, metaRes, rate, invRes] = await Promise.all([
             supabase
                 .from('paye_entries')
                 .select('*')
@@ -119,10 +120,21 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                 .eq('year', year)
                 .single(),
             fetchCommRate(repName),
+            supabase
+                .from('invoices')
+                .select('amount')
+                .eq('rep_name', repName)
+                .gte('invoice_date', `${year}-01-01`)
+                .lte('invoice_date', `${year}-12-31`)
+                .neq('status', 'void'),
         ]);
         setEntries((entriesRes.data ?? []) as PayEntry[]);
         setMeta((metaRes.data as PayMeta | null) ?? EMPTY_META);
         setCommRate(rate);
+        const invSum = (invRes.data ?? []).reduce(
+            (s: number, r: { amount: number | string }) => s + Number(r.amount ?? 0), 0
+        );
+        setInvoiceTotal(invSum);
         setLoading(false);
     }, [repName, year]);
 
@@ -221,6 +233,9 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
     );
     const grandTotal = Object.values(totals).reduce((s, v) => s + v, 0);
 
+    const commissionFacturees = invoiceTotal * commRate;
+    const bankBalance         = commissionFacturees - totals.commission;
+
     const netTotal = grandTotal + n(meta.previous_year_balance) + n(meta.annual_bonus);
 
     // ─── Guard ────────────────────────────────────────────────────────────────
@@ -274,8 +289,8 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <MetaCard label="Solde Année Précédente"            value={meta.previous_year_balance} onChange={v => updateMeta('previous_year_balance', v)} bg="bg-blue-50 border-blue-100"           text="text-blue-700"    readOnly={!canEdit} />
                 <MetaCard label="Bonus Annuel"                       value={meta.annual_bonus}          onChange={v => updateMeta('annual_bonus', v)}          bg="bg-brand-main/5 border-brand-main/20" text="text-brand-main"  readOnly={!canEdit} />
-                <MetaCard label={`Commission ${year - 1} Facturées`} value={meta.commission_prev_year}  onChange={v => updateMeta('commission_prev_year', v)}   bg="bg-amber-50 border-amber-100"          text="text-amber-700"  readOnly={!canEdit} />
-                <MetaCard label="Montant en Banque"                  value={meta.bank_balance}          onChange={v => updateMeta('bank_balance', v)}           bg="bg-emerald-50 border-emerald-100"      text="text-emerald-700" readOnly={!canEdit} />
+                <MetaCard label={`Commission ${year} Facturées`}     value={commissionFacturees}                                                                bg="bg-amber-50 border-amber-100"          text="text-amber-700"   readOnly />
+                <MetaCard label="Montant en Banque"                  value={bankBalance}                                                                        bg="bg-emerald-50 border-emerald-100"      text="text-emerald-700" readOnly />
             </div>
 
             {/* ─── Payroll table ───────────────────────────────────────────── */}
@@ -563,7 +578,7 @@ function TotalCell({ value, color }: { value: number; color: string }) {
 }
 
 function MetaCard({ label, value, onChange, bg, text, readOnly }: {
-    label: string; value: number; onChange: (v: string) => void; bg: string; text: string; readOnly?: boolean;
+    label: string; value: number; onChange?: (v: string) => void; bg: string; text: string; readOnly?: boolean;
 }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(value === 0 ? '' : String(value));
@@ -583,7 +598,7 @@ function MetaCard({ label, value, onChange, bg, text, readOnly }: {
                     value={editing ? draft : (value === 0 ? '' : formatCurrencyCAD(value))}
                     onFocus={() => { setEditing(true); setDraft(value === 0 ? '' : String(value)); }}
                     onChange={e => setDraft(e.target.value)}
-                    onBlur={() => { setEditing(false); onChange(draft); }}
+                    onBlur={() => { setEditing(false); onChange?.(draft); }}
                     placeholder="0,00$"
                     className={cn("text-base md:text-xl font-bold w-full bg-transparent focus:outline-none placeholder:text-slate-300 tabular-nums", text)}
                 />
