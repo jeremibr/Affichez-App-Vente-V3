@@ -349,7 +349,10 @@ export function MonthlyDetail({
                                     const comm  = r.amount * commRate;
                                     const dateStr = getDate(r);
                                     const formattedDate = dateStr
-                                        ? new Date(dateStr).toLocaleDateString('fr-CA', { day: '2-digit', month: '2-digit' })
+                                        ? (() => {
+                                            const dt = new Date(dateStr);
+                                            return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
+                                        })()
                                         : '—';
 
                                     return (

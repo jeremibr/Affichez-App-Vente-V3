@@ -57,6 +57,23 @@ function formatPayDate(d: string): string {
     return d;
 }
 
+// ─── DD/MM/YYYY <-> YYYY-MM-DD helpers ───────────────────────────────────────
+function isoToDDMMYYYY(iso: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+function ddmmyyyyToISO(s: string): string | null {
+    const m = /^(\d{1,2})[\/\-\s.](\d{1,2})[\/\-\s.](\d{2,4})$/.exec(s.trim());
+    if (!m) return null;
+    let [, dd, mm, yy] = m;
+    if (yy.length === 2) yy = `20${yy}`;
+    const day = parseInt(dd, 10), month = parseInt(mm, 10), year = parseInt(yy, 10);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
 // ─── Schedule generator ───────────────────────────────────────────────────────
 
 function generateBiweeklyDates(startDate: string, year: number): string[] {
@@ -404,11 +421,9 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                         {/* Date */}
                                         <td className="px-3 py-2 border-r border-slate-200">
                                             {canEdit ? (
-                                                <input
-                                                    type="date"
-                                                    value={dateVal}
-                                                    onChange={e => updateField(entry.id, 'pay_date', e.target.value)}
-                                                    className="w-full bg-transparent text-slate-700 font-medium focus:outline-none text-sm cursor-pointer"
+                                                <DateDDMMInput
+                                                    isoValue={dateVal}
+                                                    onChange={iso => updateField(entry.id, 'pay_date', iso)}
                                                 />
                                             ) : (
                                                 <span className="text-slate-700 font-medium text-sm">{formatPayDate(entry.pay_date) || '—'}</span>
@@ -543,6 +558,46 @@ function Th({ children, align, color, className }: {
         )}>
             {children}
         </th>
+    );
+}
+
+function DateDDMMInput({ isoValue, onChange }: { isoValue: string; onChange: (iso: string) => void }) {
+    const [focused, setFocused] = useState(false);
+    const [draft, setDraft] = useState(isoToDDMMYYYY(isoValue));
+
+    useEffect(() => { if (!focused) setDraft(isoToDDMMYYYY(isoValue)); }, [isoValue, focused]);
+
+    const handleBlur = () => {
+        setFocused(false);
+        const trimmed = draft.trim();
+        if (trimmed === '') {
+            if (isoValue) onChange('');
+            return;
+        }
+        const iso = ddmmyyyyToISO(trimmed);
+        if (iso) {
+            if (iso !== isoValue) onChange(iso);
+            setDraft(isoToDDMMYYYY(iso));
+        } else {
+            // Invalid input → revert to last good value
+            setDraft(isoToDDMMYYYY(isoValue));
+        }
+    };
+
+    // Pretty French long format when not editing; compact DD/MM/YYYY when typing.
+    const displayValue = focused ? draft : (formatPayDate(isoValue) === '—' ? '' : formatPayDate(isoValue));
+
+    return (
+        <input
+            type="text"
+            inputMode={focused ? 'numeric' : undefined}
+            value={displayValue}
+            placeholder="JJ/MM/AAAA"
+            onFocus={() => { setFocused(true); setDraft(isoToDDMMYYYY(isoValue)); }}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={handleBlur}
+            className="w-full bg-transparent text-slate-700 font-medium focus:outline-none text-sm placeholder:text-slate-300 tabular-nums"
+        />
     );
 }
 
