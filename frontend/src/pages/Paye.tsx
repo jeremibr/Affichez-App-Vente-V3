@@ -2,8 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
-    Loader2, CheckCircle2, Clock,
-    TrendingUp, Users, Wallet, AlertCircle, Pencil, Check, X,
+    Loader2,
+    TrendingUp, Users, Wallet, Pencil, Check, X,
     ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
@@ -72,25 +72,6 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
         >
             <span className="text-sm font-bold text-slate-700 tabular-nums">{Math.round(value * 100)}%</span>
             <Pencil className="w-3 h-3 text-slate-300 group-hover:text-brand-main transition-colors opacity-0 group-hover:opacity-100" />
-        </button>
-    );
-}
-
-// ─── Paid status toggle ───────────────────────────────────────────────────────
-
-function PaidToggle({ paid, onToggle }: { paid: boolean; onToggle: () => void }) {
-    return (
-        <button
-            onClick={onToggle}
-            className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                paid
-                    ? "bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100"
-                    : "bg-slate-50 text-slate-400 border-slate-200 hover:bg-amber-50 hover:text-amber-600 hover:border-amber-200"
-            )}
-        >
-            {paid ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
-            {paid ? 'Payé' : 'À payer'}
         </button>
     );
 }
@@ -248,25 +229,13 @@ export default function Paye() {
             return { ...prev, [rep]: { ...prev[rep], taux, commission: total * taux } };
         });
     };
-    const togglePaid = (rep: string) => {
-        setPayeRecords(prev => ({
-            ...prev,
-            [rep]: {
-                ...prev[rep],
-                paid: !prev[rep]?.paid,
-                paid_date: !prev[rep]?.paid ? new Date().toLocaleDateString('fr-CA') : null,
-            },
-        }));
-    };
     const setNotes = (rep: string, notes: string) => {
         setPayeRecords(prev => ({ ...prev, [rep]: { ...prev[rep], notes } }));
     };
 
     // Summary KPIs
     const totalFacture = repData.reduce((s, r) => s + r.total_amount, 0);
-    const totalCommission = repData.reduce((s, r) => s + (payeRecords[r.rep_name]?.commission ?? r.total_amount * 0.05), 0);
-    const paidCount = Object.values(payeRecords).filter(p => p.paid && repData.some(r => r.rep_name === p.rep_name)).length;
-    const pendingCount = repData.length - paidCount;
+    const totalCommission = repData.reduce((s, r) => s + (payeRecords[r.rep_name]?.commission ?? 0), 0);
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const officeOptions = [{ value: 'Toutes', label: 'Tous les sièges' }, ...OFFICES];
@@ -375,24 +344,6 @@ export default function Paye() {
                     icon={Wallet}
                     color="bg-brand-main/10 text-brand-main"
                 />
-                <KPICard
-                    title="Reps Payés"
-                    value={String(paidCount)}
-                    sub={`sur ${repData.length} représentants`}
-                    icon={CheckCircle2}
-                    color="bg-emerald-50 text-emerald-500"
-                />
-                <KPICard
-                    title="En Attente"
-                    value={String(pendingCount)}
-                    sub={`${formatCurrencyCAD(
-                        repData
-                            .filter(r => !payeRecords[r.rep_name]?.paid)
-                            .reduce((s, r) => s + (payeRecords[r.rep_name]?.commission ?? r.total_amount * 0.05), 0)
-                    )} à payer`}
-                    icon={AlertCircle}
-                    color="bg-amber-50 text-amber-500"
-                />
             </div>
 
             {/* ─── Main Table ─── */}
@@ -426,8 +377,6 @@ export default function Paye() {
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nb Fact.</th>
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taux</th>
                                     <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Statut</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date payé</th>
                                     <th className="px-4 py-3 text-left   text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notes</th>
                                 </tr>
                             </thead>
@@ -489,20 +438,6 @@ export default function Paye() {
                                                 </span>
                                             </td>
 
-                                            {/* Statut payé */}
-                                            <td className="px-4 py-3 text-center">
-                                                <PaidToggle paid={paye.paid} onToggle={() => togglePaid(rep.rep_name)} />
-                                            </td>
-
-                                            {/* Date payé */}
-                                            <td className="px-4 py-3 text-center">
-                                                {paye.paid && paye.paid_date ? (
-                                                    <span className="text-xs text-emerald-600 font-medium">{paye.paid_date}</span>
-                                                ) : (
-                                                    <span className="text-xs text-slate-300">—</span>
-                                                )}
-                                            </td>
-
                                             {/* Notes */}
                                             <td className="px-4 py-3">
                                                 <NotesCell value={paye.notes} onSave={v => setNotes(rep.rep_name, v)} />
@@ -529,22 +464,6 @@ export default function Paye() {
                                     <td className="px-4 py-3 text-center font-bold text-brand-main tabular-nums">
                                         {formatCurrencyCAD(totalCommission)}
                                     </td>
-                                    <td className="px-4 py-3 text-center">
-                                        <div className="inline-flex items-center gap-2">
-                                            <span className="text-[10px] font-bold text-emerald-600 uppercase">
-                                                {paidCount} payés
-                                            </span>
-                                            {pendingCount > 0 && (
-                                                <>
-                                                    <span className="text-slate-300">·</span>
-                                                    <span className="text-[10px] font-bold text-amber-500 uppercase">
-                                                        {pendingCount} en attente
-                                                    </span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3" />
                                     <td className="px-4 py-3" />
                                 </tr>
                             </tfoot>

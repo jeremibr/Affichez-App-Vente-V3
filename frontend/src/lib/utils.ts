@@ -12,6 +12,10 @@ export function cn(...inputs: ClassValue[]) {
 // Rules: '1 287 016,80 $', space as thousands separator, comma for decimals, $ after
 // The native Intl.NumberFormat for fr-CA gets very close to this automatically.
 export function formatCurrencyCAD(amount: number): string {
+    // Normalize -0 and any value that rounds to 0 at 2 decimals → display as 0.
+    // Avoids "-0,00 $" from floating-point math or 0 × -rate.
+    if (!Number.isFinite(amount) || Math.abs(amount) < 0.005) amount = 0;
+
     // Use Intl.NumberFormat to handle the heavy lifting
     const formatter = new Intl.NumberFormat('fr-CA', {
         style: 'currency',
@@ -58,6 +62,7 @@ export function formatShortDate(dateString: string | Date): string {
 }
 
 export function formatPercentage(value: number): string {
+    if (!Number.isFinite(value) || Math.abs(value) < 0.005) value = 0;
     const formatter = new Intl.NumberFormat('fr-CA', {
         style: 'percent',
         minimumFractionDigits: 2,
