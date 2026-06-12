@@ -308,21 +308,31 @@ export default function FDashboard() {
                                 )}
                             </div>
                             <div className="divide-y divide-slate-50">
-                                {leaderboard.slice(0, 5).map((rep, idx) => (
-                                    <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold", idx === 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400")}>{idx + 1}</span>
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-700">{rep.rep_name}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase font-bold">{rep.office}</p>
+                                {(() => {
+                                    const top5 = leaderboard.slice(0, 5);
+                                    const venteInterne = leaderboard.find(r => r.rep_name === 'Vente Interne');
+                                    const inTop5 = top5.some(r => r.rep_name === 'Vente Interne');
+                                    const display = inTop5 || !venteInterne ? top5 : [...top5, venteInterne];
+                                    return display.map((rep, idx) => (
+                                        <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <span className={cn(
+                                                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                                    rep.rep_name === 'Vente Interne' ? "bg-slate-200 text-slate-500" :
+                                                    idx === 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"
+                                                )}>{rep.rep_name === 'Vente Interne' ? '—' : idx + 1}</span>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-700">{rep.rep_name}</p>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{rep.office}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
+                                                <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
-                                            <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         </div>
 
