@@ -49,7 +49,10 @@ export default function FDashboard() {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [allReps, setAllReps] = useState<string[]>([]);
 
-    const repParam = isAdmin ? (selectedRep === 'Tous' ? null : selectedRep) : (authRepName ?? null);
+    // "Vente Interne" is handled by the supplementary query when repParam is null
+    const repParam = isAdmin
+        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
+        : (authRepName ?? null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -203,7 +206,8 @@ export default function FDashboard() {
                 .sort((a, b) => b.total_amount - a.total_amount)
                 .map((r, i) => ({ ...r, rank: i + 1 }));
             setLeaderboard(lb);
-            if (isAdmin && allReps.length === 0 && lb.length > 0) {
+            // Always rebuild rep list from the clean leaderboard so stale names never persist
+            if (isAdmin && lb.length > 0) {
                 setAllReps(lb.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
             }
         } else {
@@ -213,9 +217,6 @@ export default function FDashboard() {
             setPrevDeptData(prevDData || []);
             setKpis(kpiData?.[0] || null);
             setLeaderboard(baseLeader);
-            if (isAdmin && allReps.length === 0 && baseLeader.length > 0) {
-                setAllReps(baseLeader.map((r: LeaderboardEntry) => r.rep_name).sort());
-            }
         }
 
         setLoading(false);
@@ -243,7 +244,11 @@ export default function FDashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Toute l\'équipe' }, ...allReps.map(r => ({ value: r, label: r }))], [allReps]);
+    const repOptions = useMemo(() => [
+        { value: 'Tous', label: 'Toute l\'équipe' },
+        { value: 'Vente Interne', label: 'Vente Interne' },
+        ...allReps.map(r => ({ value: r, label: r })),
+    ], [allReps]);
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (
