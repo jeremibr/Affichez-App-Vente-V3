@@ -44,5 +44,5 @@ export const INTERNAL_REP_NAMES = [
     'Magasin Affichez',
     'Charles Côté',
     'Pier-Alexandre Lévesque',
-    'Vente Interne',
+    'Vente interne',
 ] as const;
