@@ -38,3 +38,11 @@ export const INVOICE_STATUSES = [
     { value: 'overdue',  label: 'En retard' },
     { value: 'avoir',    label: 'Avoir (crédit)' },
 ] as const;
+
+export const INTERNAL_REP_NAMES = [
+    'Simon Fortin',
+    'Magasin Affichez',
+    'Charles Cote',
+    'Pier-Alexandre',
+    'Vente Interne',
+] as const;
