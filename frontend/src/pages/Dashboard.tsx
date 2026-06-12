@@ -8,6 +8,7 @@ import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES, INTERNAL_REP_NAMES } from 
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 interface DashboardKPIs {
     ytd_total: number;
@@ -36,6 +37,8 @@ interface LeaderboardEntry {
 }
 
 export default function Dashboard() {
+    const { isAdmin, repName: authRepName } = useAuth();
+
     const [year, setYear] = useUrlStateNumber('year', 2026);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
@@ -43,6 +46,11 @@ export default function Dashboard() {
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
+
+    const repParam = isAdmin
+        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
+        : (authRepName ?? null);
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -54,6 +62,7 @@ export default function Dashboard() {
     const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [allReps, setAllReps] = useState<string[]>([]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -71,11 +80,11 @@ export default function Dashboard() {
             { data: clientData },
             { data: leaderData }
         ] = await Promise.all([
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam }),
+            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
             supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
+            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
             supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam }),
+            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
             supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam }),
             supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam })
         ]);
@@ -100,8 +109,12 @@ export default function Dashboard() {
         baseLeader.sort((a, b) => Number(b.total_amount) - Number(a.total_amount));
         baseLeader.forEach((r, i) => { r.rank = i + 1; });
         setLeaderboard(baseLeader);
+        if (isAdmin && baseLeader.length > 0) {
+            setAllReps(baseLeader.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
+        }
         setLoading(false);
-    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam]);
 
     // Always keep a current reference so the Realtime callback never goes stale
     const fetchDataRef = useRef(fetchData);
@@ -123,6 +136,11 @@ export default function Dashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
+    const repOptions = useMemo(() => [
+        { value: 'Tous', label: "Toute l'équipe" },
+        { value: 'Vente Interne', label: 'Vente Interne' },
+        ...allReps.map(r => ({ value: r, label: r })),
+    ], [allReps]);
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (
@@ -130,7 +148,10 @@ export default function Dashboard() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Tableau de Bord</h1>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                    Tableau de Bord
+                    {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
+                </h1>
                 <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance et indicateurs clés de vente</p>
             </div>
 
@@ -151,6 +172,11 @@ export default function Dashboard() {
                 <FilterGroup label="Mois">
                     <Select value={String(selectedMonth)} onChange={(val) => setSelectedMonth(val === 'Toutes' ? 'Toutes' : Number(val))} options={monthOptions} className="w-40" />
                 </FilterGroup>
+                {isAdmin && (
+                    <FilterGroup label="Représentant">
+                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                    </FilterGroup>
+                )}
             </FilterBar>
 
             {loading ? (
