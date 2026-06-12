@@ -40,9 +40,9 @@ export const INVOICE_STATUSES = [
 ] as const;
 
 export const INTERNAL_REP_NAMES = [
-    'Simon Fortin',
+    'Simon Fortin Massé',
     'Magasin Affichez',
-    'Charles Cote',
-    'Pier-Alexandre',
+    'Charles Côté',
+    'Pier-Alexandre Lévesque',
     'Vente Interne',
 ] as const;
