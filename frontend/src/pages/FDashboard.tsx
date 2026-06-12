@@ -61,6 +61,9 @@ export default function FDashboard() {
         const deptParam = selectedDept === 'Toutes' ? null : selectedDept;
         const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
 
+        const { data: excludedClientData } = await supabase.from('excluded_clients').select('client_name');
+        const excludedClients = (excludedClientData ?? []).map((r: { client_name: string }) => r.client_name);
+
         const [
             { data: grandData },
             { data: dData },
@@ -101,6 +104,7 @@ export default function FDashboard() {
                     .in('rep_name', [...INTERNAL_REP_NAMES])
                     .gte('invoice_date', `${y}-01-01`)
                     .lt('invoice_date', `${y + 1}-01-01`);
+                excludedClients.forEach((c: string) => { q = q.neq('client_name', c); });
                 if (officeParam) q = q.eq('office', officeParam);
                 if (statusParam) q = q.eq('status', statusParam as any);
                 if (deptParam)   q = q.eq('department', deptParam);
