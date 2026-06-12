@@ -49,7 +49,10 @@ export default function FDashboard() {
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [allReps, setAllReps] = useState<string[]>([]);
 
-    const repParam = isAdmin ? (selectedRep === 'Tous' ? null : selectedRep) : (authRepName ?? null);
+    // "Vente Interne" is handled by the supplementary query when repParam is null
+    const repParam = isAdmin
+        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
+        : (authRepName ?? null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -203,7 +206,8 @@ export default function FDashboard() {
                 .sort((a, b) => b.total_amount - a.total_amount)
                 .map((r, i) => ({ ...r, rank: i + 1 }));
             setLeaderboard(lb);
-            if (isAdmin && allReps.length === 0 && lb.length > 0) {
+            // Always rebuild rep list from the clean leaderboard so stale names never persist
+            if (isAdmin && lb.length > 0) {
                 setAllReps(lb.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
             }
         } else {
@@ -213,9 +217,6 @@ export default function FDashboard() {
             setPrevDeptData(prevDData || []);
             setKpis(kpiData?.[0] || null);
             setLeaderboard(baseLeader);
-            if (isAdmin && allReps.length === 0 && baseLeader.length > 0) {
-                setAllReps(baseLeader.map((r: LeaderboardEntry) => r.rep_name).sort());
-            }
         }
 
         setLoading(false);
@@ -243,7 +244,11 @@ export default function FDashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Toute l\'équipe' }, ...allReps.map(r => ({ value: r, label: r }))], [allReps]);
+    const repOptions = useMemo(() => [
+        { value: 'Tous', label: 'Toute l\'équipe' },
+        { value: 'Vente Interne', label: 'Vente Interne' },
+        ...allReps.map(r => ({ value: r, label: r })),
+    ], [allReps]);
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (
@@ -308,21 +313,31 @@ export default function FDashboard() {
                                 )}
                             </div>
                             <div className="divide-y divide-slate-50">
-                                {leaderboard.slice(0, 5).map((rep, idx) => (
-                                    <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-3">
-                                            <span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold", idx === 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400")}>{idx + 1}</span>
-                                            <div>
-                                                <p className="text-sm font-semibold text-slate-700">{rep.rep_name}</p>
-                                                <p className="text-[10px] text-slate-400 uppercase font-bold">{rep.office}</p>
+                                {(() => {
+                                    const top5 = leaderboard.slice(0, 5);
+                                    const venteInterne = leaderboard.find(r => r.rep_name === 'Vente Interne');
+                                    const inTop5 = top5.some(r => r.rep_name === 'Vente Interne');
+                                    const display = inTop5 || !venteInterne ? top5 : [...top5, venteInterne];
+                                    return display.map((rep, idx) => (
+                                        <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <span className={cn(
+                                                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                                    rep.rep_name === 'Vente Interne' ? "bg-slate-200 text-slate-500" :
+                                                    idx === 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"
+                                                )}>{rep.rep_name === 'Vente Interne' ? '—' : idx + 1}</span>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-slate-700">{rep.rep_name}</p>
+                                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{rep.office}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
+                                                <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
-                                            <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ));
+                                })()}
                             </div>
                         </div>
 

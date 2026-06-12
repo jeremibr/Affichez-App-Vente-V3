@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
-import { OFFICES } from '../lib/constants';
+import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,13 +18,49 @@ export default function FQuarterlyAverages() {
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
 
-    const repParam = isAdmin ? (selectedRep === 'Tous' ? null : selectedRep) : (authRepName ?? null);
+    // When "Vente Interne" is selected, fetch all reps and group on the frontend
+    const repParam = isAdmin
+        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
+        : (authRepName ?? null);
+
+    // Merge all internal rep rows into a single "Vente Interne" entry per quarter
+    const groupedYoyData = useMemo((): YoYRow[] => {
+        const internalNames = INTERNAL_REP_NAMES as readonly string[];
+        const internals = yoyData.filter(r => internalNames.includes(r.rep_name));
+        const others = yoyData.filter(r => !internalNames.includes(r.rep_name));
+        if (internals.length === 0) return yoyData;
+
+        const byQuarter = new Map<number, YoYRow[]>();
+        internals.forEach(r => {
+            if (!byQuarter.has(r.quarter)) byQuarter.set(r.quarter, []);
+            byQuarter.get(r.quarter)!.push(r);
+        });
+
+        const venteInterneRows: YoYRow[] = [];
+        for (const [quarter, rows] of byQuarter) {
+            const totalCount = rows.reduce((s, r) => s + Number(r.deal_count), 0);
+            const totalCurrentRev = rows.reduce((s, r) => s + Number(r.current_avg) * Number(r.deal_count), 0);
+            const totalPrevRev    = rows.reduce((s, r) => s + Number(r.previous_avg) * Number(r.deal_count), 0);
+            const current_avg  = totalCount > 0 ? totalCurrentRev / totalCount : 0;
+            const previous_avg = totalCount > 0 ? totalPrevRev    / totalCount : 0;
+            venteInterneRows.push({
+                quarter,
+                rep_name: 'Vente Interne',
+                office: '—',
+                current_avg,
+                previous_avg,
+                resultat: current_avg - previous_avg,
+                deal_count: totalCount,
+            });
+        }
+        return [...others, ...venteInterneRows];
+    }, [yoyData]);
 
     const uniqueReps = useMemo(() => {
         const reps = new Set<string>();
-        yoyData.forEach(row => reps.add(row.rep_name));
+        groupedYoyData.forEach(row => reps.add(row.rep_name));
         return Array.from(reps).sort((a, b) => a.localeCompare(b));
-    }, [yoyData]);
+    }, [groupedYoyData]);
 
     const fetchAverages = useCallback(async () => {
         setLoading(true);
@@ -85,7 +121,7 @@ export default function FQuarterlyAverages() {
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {[1, 2, 3, 4].map((q) => {
-                        const dataForQuarter = yoyData
+                        const dataForQuarter = groupedYoyData
                             .filter(d => d.quarter === q)
                             .filter(d => !isAdmin || selectedRep === 'Tous' || d.rep_name === selectedRep);
                         return (
