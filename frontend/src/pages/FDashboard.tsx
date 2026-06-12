@@ -79,9 +79,15 @@ export default function FDashboard() {
             supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam })
         ]);
 
+        // NFC-normalize both sides to handle é/è/etc. encoding differences between DB and JS strings
+        const internalNamesNFC = new Set(
+            (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
+        );
+        const isInternal = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
+
         // Always strip individual internal-rep entries from the leaderboard (they'll be grouped below)
         const baseLeader: LeaderboardEntry[] = (leaderData || []).filter(
-            (r: LeaderboardEntry) => !(INTERNAL_REP_NAMES as readonly string[]).includes(r.rep_name)
+            (r: LeaderboardEntry) => !isInternal(r.rep_name)
         );
 
         setTopClients(clientData || []);

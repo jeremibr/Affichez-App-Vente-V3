@@ -7,11 +7,13 @@ import { SortIcon } from '../SortIcon';
 export function QuarterBlock({
     quarter,
     data,
-    currentYear
+    currentYear,
+    dealLabel = 'devis',
 }: {
     quarter: number;
     data: YoYRow[];
     currentYear: number;
+    dealLabel?: string;
 }) {
     const previousYear = currentYear - 1;
     const { sortedData, sortConfig, handleSort } = useSort(data);
@@ -54,7 +56,7 @@ export function QuarterBlock({
                                 onClick={() => handleSort('deal_count')}
                             >
                                 <div className="flex items-center justify-end gap-2">
-                                    Devis <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
+                                    {dealLabel.charAt(0).toUpperCase() + dealLabel.slice(1)} <SortIcon order={sortConfig.key === 'deal_count' ? sortConfig.order : null} />
                                 </div>
                             </th>
                             <th
@@ -98,7 +100,7 @@ export function QuarterBlock({
                                         <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-slate-700 whitespace-nowrap sticky left-0 bg-white z-10">{row.rep_name}</td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
                                             <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
-                                            <span className="text-[10px] text-slate-400 ml-1">devis</span>
+                                            <span className="text-[10px] text-slate-400 ml-1">{dealLabel}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right font-semibold text-slate-800 tabular-nums group-hover:text-brand-main transition-colors whitespace-nowrap">
                                             {formatCurrencyCAD(row.current_avg)}
@@ -121,7 +123,7 @@ export function QuarterBlock({
                             <td className="px-3 md:px-5 py-3 md:py-3.5 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total équipe</td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                 <span className="text-sm font-black tabular-nums">{totalDeals}</span>
-                                <span className="text-[10px] text-white/60 ml-1">devis</span>
+                                <span className="text-[10px] text-white/60 ml-1">{dealLabel}</span>
                             </td>
                             <td className="px-4 py-3.5 text-right font-black tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalCurrent)}</td>
                             <td className="px-4 py-3.5 text-right text-white/50 tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalPrevious)}</td>
