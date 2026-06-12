@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
-import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES } from '../lib/constants';
+import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -76,17 +76,148 @@ export default function FDashboard() {
             supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam })
         ]);
 
-        setGrandTotalData(grandData || []);
-        setDeptData(dData || []);
-        setPrevGrandTotalData(prevGrandData || []);
-        setPrevDeptData(prevDData || []);
-        setKpis(kpiData?.[0] || null);
+        // Always strip individual internal-rep entries from the leaderboard (they'll be grouped below)
+        const baseLeader: LeaderboardEntry[] = (leaderData || []).filter(
+            (r: LeaderboardEntry) => !(INTERNAL_REP_NAMES as readonly string[]).includes(r.rep_name)
+        );
+
         setTopClients(clientData || []);
-        const lb: LeaderboardEntry[] = leaderData || [];
-        setLeaderboard(lb);
-        if (isAdmin && allReps.length === 0 && lb.length > 0) {
-            setAllReps(lb.map((r: LeaderboardEntry) => r.rep_name).sort());
+
+        if (repParam === null) {
+            // Build an internal-rep supplementary query for a given year
+            const buildIntQuery = (y: number) => {
+                let q = supabase
+                    .from('invoices')
+                    .select('invoice_date, amount, is_avoir')
+                    .in('rep_name', [...INTERNAL_REP_NAMES])
+                    .gte('invoice_date', `${y}-01-01`)
+                    .lt('invoice_date', `${y + 1}-01-01`);
+                if (officeParam) q = q.eq('office', officeParam);
+                if (statusParam) q = q.eq('status', statusParam as any);
+                if (deptParam)   q = q.eq('department', deptParam);
+                if (monthParam) {
+                    const nm = monthParam === 12 ? 1 : monthParam + 1;
+                    const ny2 = monthParam === 12 ? y + 1 : y;
+                    const ms = String(monthParam).padStart(2, '0');
+                    const me = `${ny2}-${String(nm).padStart(2, '0')}-01`;
+                    q = q.gte('invoice_date', `${y}-${ms}-01`).lt('invoice_date', me);
+                }
+                return q;
+            };
+
+            const [{ data: intData }, { data: intPrevData }] = await Promise.all([
+                buildIntQuery(year),
+                buildIntQuery(year - 1),
+            ]);
+
+            // Aggregate invoice rows into a month → {amount, count} map
+            const aggByMonth = (rows: any[]): Map<number, { amount: number; count: number }> => {
+                const map = new Map<number, { amount: number; count: number }>();
+                for (const r of (rows || [])) {
+                    const m = parseInt((r.invoice_date as string).split('-')[1], 10);
+                    const cur = map.get(m) || { amount: 0, count: 0 };
+                    cur.amount += Number(r.amount);
+                    if (!r.is_avoir) cur.count++;
+                    map.set(m, cur);
+                }
+                return map;
+            };
+
+            const intMonthly     = aggByMonth(intData     || []);
+            const intPrevMonthly = aggByMonth(intPrevData || []);
+
+            // Merge a month-map into an array of SommaireRows (adds amounts + deal counts)
+            const mergeInto = (base: SommaireRow[], extra: Map<number, { amount: number; count: number }>): SommaireRow[] => {
+                const result: SommaireRow[] = (base || []).map(r => {
+                    const ex = extra.get(r.month);
+                    if (!ex) return r;
+                    const newAmt = r.actual_amount + ex.amount;
+                    return {
+                        ...r,
+                        actual_amount: newAmt,
+                        deal_count: r.deal_count + ex.count,
+                        pct_atteint: r.objectif > 0 ? (newAmt / r.objectif) * 100 : 0,
+                    };
+                });
+                // Months present in extra but not in base
+                for (const [m, ex] of extra) {
+                    if (!result.find(r => r.month === m)) {
+                        result.push({ month: m, objectif: 0, actual_amount: ex.amount, pct_atteint: 0, deal_count: ex.count });
+                    }
+                }
+                return result;
+            };
+
+            setGrandTotalData(mergeInto(grandData || [], intMonthly));
+            setPrevGrandTotalData(mergeInto(prevGrandData || [], intPrevMonthly));
+
+            // Dept data: only merge when a specific dept is active (intMonthly is already dept-filtered then)
+            if (deptParam) {
+                const mergeDept = (base: SommaireRow[], extra: Map<number, { amount: number; count: number }>): SommaireRow[] => {
+                    const result: SommaireRow[] = (base || []).map(r => {
+                        if (r.department !== deptParam) return r;
+                        const ex = extra.get(r.month);
+                        if (!ex) return r;
+                        const newAmt = r.actual_amount + ex.amount;
+                        return { ...r, actual_amount: newAmt, deal_count: r.deal_count + ex.count, pct_atteint: r.objectif > 0 ? (newAmt / r.objectif) * 100 : 0 };
+                    });
+                    for (const [m, ex] of extra) {
+                        if (!result.find(r => r.month === m && r.department === deptParam)) {
+                            result.push({ month: m, department: deptParam, objectif: 0, actual_amount: ex.amount, pct_atteint: 0, deal_count: ex.count });
+                        }
+                    }
+                    return result;
+                };
+                setDeptData(mergeDept(dData || [], intMonthly));
+                setPrevDeptData(mergeDept(prevDData || [], intPrevMonthly));
+            } else {
+                setDeptData(dData || []);
+                setPrevDeptData(prevDData || []);
+            }
+
+            // KPI adjustment
+            const intYtdTotal = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
+            const intYtdCount = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
+            const baseKpi = kpiData?.[0] ?? null;
+            if (baseKpi) {
+                const newTotal = baseKpi.ytd_total + intYtdTotal;
+                const newCount = baseKpi.ytd_count + intYtdCount;
+                setKpis({
+                    ...baseKpi,
+                    ytd_total: newTotal,
+                    ytd_count: newCount,
+                    avg_deal_size: newCount > 0 ? newTotal / newCount : 0,
+                    pct_of_target: baseKpi.annual_target > 0 ? Math.round((newTotal / baseKpi.annual_target) * 100) : 0,
+                });
+            } else {
+                setKpis(null);
+            }
+
+            // Leaderboard — append "Vente Interne" group entry and re-rank
+            const intTotal = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
+            const intCount = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
+            const withInternal: LeaderboardEntry[] = (intTotal !== 0 || intCount !== 0)
+                ? [...baseLeader, { rep_name: 'Vente Interne', office: '—', total_amount: intTotal, deal_count: intCount, avg_deal: intCount > 0 ? intTotal / intCount : 0, rank: 0 }]
+                : baseLeader;
+            const lb = withInternal
+                .sort((a, b) => b.total_amount - a.total_amount)
+                .map((r, i) => ({ ...r, rank: i + 1 }));
+            setLeaderboard(lb);
+            if (isAdmin && allReps.length === 0 && lb.length > 0) {
+                setAllReps(lb.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
+            }
+        } else {
+            setGrandTotalData(grandData || []);
+            setDeptData(dData || []);
+            setPrevGrandTotalData(prevGrandData || []);
+            setPrevDeptData(prevDData || []);
+            setKpis(kpiData?.[0] || null);
+            setLeaderboard(baseLeader);
+            if (isAdmin && allReps.length === 0 && baseLeader.length > 0) {
+                setAllReps(baseLeader.map((r: LeaderboardEntry) => r.rep_name).sort());
+            }
         }
+
         setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam]);

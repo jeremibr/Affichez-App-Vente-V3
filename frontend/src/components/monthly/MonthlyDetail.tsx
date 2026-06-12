@@ -106,15 +106,10 @@ export function MonthlyDetail({
         const [ny, nm] = nextMonth(year, month);
         const dateEnd   = `${ny}-${paddedMonth(nm)}-01`;
 
-        const [{ data: excludedClientData }, { data: excludedRepData }] = await Promise.all([
-            supabase.from('excluded_clients').select('client_name'),
-            supabase.from('excluded_reps').select('rep_name'),
-        ]);
+        const { data: excludedClientData } = await supabase.from('excluded_clients').select('client_name');
         const excludedClients = new Set((excludedClientData ?? []).map((r: { client_name: string }) => r.client_name));
-        const excludedReps    = new Set((excludedRepData    ?? []).map((r: { rep_name: string })    => r.rep_name));
 
-        const isExcluded = (r: Row) =>
-            excludedClients.has(r.client_name) || (r.rep_name != null && excludedReps.has(r.rep_name));
+        const isExcluded = (r: Row) => excludedClients.has(r.client_name);
 
         if (module === 'factures') {
             let q = supabase
