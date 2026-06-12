@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
-import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES } from '../lib/constants';
+import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -86,7 +86,20 @@ export default function Dashboard() {
         setPrevDeptData(prevDData || []);
         setKpis(kpiData?.[0] || null);
         setTopClients(clientData || []);
-        setLeaderboard(leaderData || []);
+
+        // Group internal reps into a single "Vente Interne" leaderboard entry
+        const internalNamesNFC = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
+        const isInt = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
+        const baseLeader: LeaderboardEntry[] = (leaderData || []).filter((r: LeaderboardEntry) => !isInt(r.rep_name));
+        const internalRows: LeaderboardEntry[] = (leaderData || []).filter((r: LeaderboardEntry) => isInt(r.rep_name));
+        if (internalRows.length > 0) {
+            const totalAmount = internalRows.reduce((s, r) => s + Number(r.total_amount), 0);
+            const dealCount   = internalRows.reduce((s, r) => s + Number(r.deal_count), 0);
+            baseLeader.push({ rep_name: 'Vente Interne', office: '—', total_amount: totalAmount, deal_count: dealCount, avg_deal: dealCount > 0 ? totalAmount / dealCount : 0, rank: 0 });
+        }
+        baseLeader.sort((a, b) => Number(b.total_amount) - Number(a.total_amount));
+        baseLeader.forEach((r, i) => { r.rank = i + 1; });
+        setLeaderboard(baseLeader);
         setLoading(false);
     }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth]);
 
@@ -200,7 +213,7 @@ export default function Dashboard() {
                                 )}
                             </div>
                             <div className="divide-y divide-slate-50">
-                                {leaderboard.slice(0, 5).map((rep, idx) => (
+                                {((): LeaderboardEntry[] => { const t5 = leaderboard.slice(0, 5); const vi = leaderboard.find(r => r.rep_name === 'Vente Interne'); return t5.some(r => r.rep_name === 'Vente Interne') || !vi ? t5 : [...t5, vi]; })().map((rep, idx) => (
                                     <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <span className={cn(

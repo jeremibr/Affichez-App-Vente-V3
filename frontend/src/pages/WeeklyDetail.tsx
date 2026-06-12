@@ -9,6 +9,7 @@ import { ZoneBTable } from '../components/weekly/ZoneBTable';
 import { cn } from '../lib/utils';
 import { Select } from '../components/Select';
 import { useRepList } from '../hooks/useRepList';
+import { INTERNAL_REP_NAMES } from '../lib/constants';
 
 // ─── Week label helpers ───────────────────────────────────────────────────────
 
@@ -74,13 +75,22 @@ export default function WeeklyDetail() {
     const prevWeekObj = currentIdx < availableWeeks.length - 1 ? availableWeeks[currentIdx + 1] : null;
     const nextWeekObj = currentIdx > 0 ? availableWeeks[currentIdx - 1] : null;
 
-    const filteredSummary = useMemo(() =>
-        selectedRep ? summaryData.filter(r => r.rep_name === selectedRep) : summaryData,
-        [summaryData, selectedRep]);
+    const internalNamesNFC = new Set(
+        (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
+    );
+    const isInternalRep = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
 
-    const filteredLineItems = useMemo(() =>
-        selectedRep ? lineItems.filter(r => r.rep_name === selectedRep) : lineItems,
-        [lineItems, selectedRep]);
+    const filteredSummary = useMemo(() => {
+        if (!selectedRep) return summaryData;
+        if (selectedRep === 'Vente Interne') return summaryData.filter(r => isInternalRep(r.rep_name));
+        return summaryData.filter(r => r.rep_name === selectedRep);
+    }, [summaryData, selectedRep]);
+
+    const filteredLineItems = useMemo(() => {
+        if (!selectedRep) return lineItems;
+        if (selectedRep === 'Vente Interne') return lineItems.filter(r => isInternalRep(r.rep_name));
+        return lineItems.filter(r => r.rep_name === selectedRep);
+    }, [lineItems, selectedRep]);
 
     const grandTotal = useMemo(() =>
         filteredSummary.reduce((sum, row) => sum + Number(row.total_amount), 0), [filteredSummary]);
@@ -102,8 +112,9 @@ export default function WeeklyDetail() {
     const repPivotRows = useMemo(() => {
         const repsMap = new Map<string, Record<string, number>>();
         filteredSummary.forEach(row => {
-            if (!repsMap.has(row.rep_name)) repsMap.set(row.rep_name, { "Total": 0 });
-            const r = repsMap.get(row.rep_name)!;
+            const displayName = isInternalRep(row.rep_name) ? 'Vente Interne' : row.rep_name;
+            if (!repsMap.has(displayName)) repsMap.set(displayName, { "Total": 0 });
+            const r = repsMap.get(displayName)!;
             r[row.department] = (r[row.department] || 0) + Number(row.total_amount);
             r["Total"] += Number(row.total_amount);
         });
@@ -125,7 +136,8 @@ export default function WeeklyDetail() {
                         onChange={setSelectedRep}
                         options={[
                             { value: '', label: 'Tous les reps' },
-                            ...repList.map(r => ({ value: r, label: r })),
+                            { value: 'Vente Interne', label: 'Vente Interne' },
+                            ...repList.filter(r => !isInternalRep(r)).map(r => ({ value: r, label: r })),
                         ]}
                         variant={selectedRep ? 'accent' : 'default'}
                         className="w-48"

@@ -11,7 +11,7 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { MONTHS } from '../lib/constants';
+import { MONTHS, INTERNAL_REP_NAMES } from '../lib/constants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -210,7 +210,11 @@ export default function RepDashboard() {
             p_month: null, p_dept: null, p_rep: null,
         });
         if (data && data.length > 0) {
-            const names = (data as LeaderboardEntry[]).map(r => r.rep_name).sort();
+            const internalSet = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
+            const names = (data as LeaderboardEntry[])
+                .map(r => r.rep_name)
+                .filter(n => !internalSet.has(n.normalize('NFC')))
+                .sort();
             setAllReps(names);
             if (!selectedRep) setSelectedRep(names[0] ?? '');
             repsLoadedRef.current = true;

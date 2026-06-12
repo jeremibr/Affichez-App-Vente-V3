@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Loader2, ClipboardList, FileText, Wallet, User, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { INTERNAL_REP_NAMES } from '../lib/constants';
 import PortailDevis from './PortailDevis';
 import PortailFactures from './PortailFactures';
 import PortailPaye from './PortailPaye';
@@ -100,7 +101,11 @@ export default function AdminReps() {
             p_month: null, p_dept: null, p_rep: null,
         });
         if (data && Array.isArray(data) && data.length > 0) {
-            const names = (data as { rep_name: string }[]).map(r => r.rep_name).sort();
+            const internalSet = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
+            const names = (data as { rep_name: string }[])
+                .map(r => r.rep_name)
+                .filter(n => !internalSet.has(n.normalize('NFC')))
+                .sort();
             setAllReps(names);
             setSelectedRep(names[0] ?? '');
         }
