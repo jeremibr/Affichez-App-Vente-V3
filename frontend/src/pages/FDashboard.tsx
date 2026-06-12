@@ -88,7 +88,11 @@ export default function FDashboard() {
         );
         const isInternal = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
 
-        // Always strip individual internal-rep entries from the leaderboard (they'll be grouped below)
+        // Split internal reps: those already included in RPC results vs the one excluded at DB level
+        // Only 'Vente interne' is in excluded_reps — the other 4 are already in RPC numbers
+        const internalFromLeader: LeaderboardEntry[] = (leaderData || []).filter(
+            (r: LeaderboardEntry) => isInternal(r.rep_name)
+        );
         const baseLeader: LeaderboardEntry[] = (leaderData || []).filter(
             (r: LeaderboardEntry) => !isInternal(r.rep_name)
         );
@@ -96,12 +100,13 @@ export default function FDashboard() {
         setTopClients(clientData || []);
 
         if (repParam === null) {
-            // Build an internal-rep supplementary query for a given year
+            // Supplementary query ONLY for 'Vente interne' — the one rep actually excluded from RPC results
+            // (Simon, Magasin, Charles, Pier-Alexandre are already in the RPC numbers; fetching them again would double-count)
             const buildIntQuery = (y: number) => {
                 let q = supabase
                     .from('invoices')
                     .select('invoice_date, amount, is_avoir')
-                    .in('rep_name', [...INTERNAL_REP_NAMES])
+                    .eq('rep_name', 'Vente interne')
                     .gte('invoice_date', `${y}-01-01`)
                     .lt('invoice_date', `${y + 1}-01-01`);
                 excludedClients.forEach((c: string) => { q = q.neq('client_name', c); });
@@ -206,9 +211,13 @@ export default function FDashboard() {
                 setKpis(null);
             }
 
-            // Leaderboard — append "Vente Interne" group entry and re-rank
-            const intTotal = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
-            const intCount = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
+            // Leaderboard — combine Vente interne (from supplementary) with the other 4 internal reps (from leaderboard)
+            const suppTotal   = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
+            const suppCount   = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
+            const leaderTotal = internalFromLeader.reduce((s, r) => s + Number(r.total_amount), 0);
+            const leaderCount = internalFromLeader.reduce((s, r) => s + Number(r.deal_count), 0);
+            const intTotal = suppTotal + leaderTotal;
+            const intCount = suppCount + leaderCount;
             const withInternal: LeaderboardEntry[] = (intTotal !== 0 || intCount !== 0)
                 ? [...baseLeader, { rep_name: 'Vente Interne', office: '—', total_amount: intTotal, deal_count: intCount, avg_deal: intCount > 0 ? intTotal / intCount : 0, rank: 0 }]
                 : baseLeader;
