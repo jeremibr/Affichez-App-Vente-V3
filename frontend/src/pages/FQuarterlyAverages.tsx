@@ -25,9 +25,12 @@ export default function FQuarterlyAverages() {
 
     // Merge all internal rep rows into a single "Vente Interne" entry per quarter
     const groupedYoyData = useMemo((): YoYRow[] => {
-        const internalNames = INTERNAL_REP_NAMES as readonly string[];
-        const internals = yoyData.filter(r => internalNames.includes(r.rep_name));
-        const others = yoyData.filter(r => !internalNames.includes(r.rep_name));
+        const internalNamesNFC = new Set(
+            (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
+        );
+        const isInt = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
+        const internals = yoyData.filter(r => isInt(r.rep_name));
+        const others = yoyData.filter(r => !isInt(r.rep_name));
         if (internals.length === 0) return yoyData;
 
         const byQuarter = new Map<number, YoYRow[]>();
@@ -125,7 +128,7 @@ export default function FQuarterlyAverages() {
                             .filter(d => d.quarter === q)
                             .filter(d => !isAdmin || selectedRep === 'Tous' || d.rep_name === selectedRep);
                         return (
-                            <QuarterBlock key={`q${q}`} quarter={q} data={dataForQuarter} currentYear={year} />
+                            <QuarterBlock key={`q${q}`} quarter={q} data={dataForQuarter} currentYear={year} dealLabel="facture" />
                         );
                     })}
                 </div>

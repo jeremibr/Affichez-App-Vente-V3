@@ -80,7 +80,10 @@ export default function FWeeklyDetail() {
     const prevWeekObj = currentIdx < availableWeeks.length - 1 ? availableWeeks[currentIdx + 1] : null;
     const nextWeekObj = currentIdx > 0 ? availableWeeks[currentIdx - 1] : null;
 
-    const isInternalRep = (name: string) => (INTERNAL_REP_NAMES as readonly string[]).includes(name);
+    const internalNamesNFC = new Set(
+        (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
+    );
+    const isInternalRep = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
 
     const filteredSummary = useMemo(() => {
         if (!selectedRep) return summaryData;
