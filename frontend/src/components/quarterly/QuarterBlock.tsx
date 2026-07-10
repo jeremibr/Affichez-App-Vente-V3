@@ -9,17 +9,22 @@ export function QuarterBlock({
     data,
     currentYear,
     dealLabel = 'devis',
+    previousTotalOverride,
 }: {
     quarter: number;
     data: YoYRow[];
     currentYear: number;
     dealLabel?: string;
+    // When provided (whole-team view), the "Total équipe" last-year figure uses the
+    // true company total for the year — including reps who left or had a dry quarter —
+    // instead of only summing the reps shown this year. See get_quarterly_yoy_totals.
+    previousTotalOverride?: number;
 }) {
     const previousYear = currentYear - 1;
     const { sortedData, sortConfig, handleSort } = useSort(data);
 
     const totalCurrent = data.reduce((sum, row) => sum + Number(row.current_avg || 0), 0);
-    const totalPrevious = data.reduce((sum, row) => sum + Number(row.previous_avg || 0), 0);
+    const totalPrevious = previousTotalOverride ?? data.reduce((sum, row) => sum + Number(row.previous_avg || 0), 0);
     const totalResultat = totalCurrent - totalPrevious;
     const totalDeals = data.reduce((sum, row) => sum + Number(row.deal_count || 0), 0);
 

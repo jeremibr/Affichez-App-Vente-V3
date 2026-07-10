@@ -54,6 +54,16 @@ export type YoYRow = {
     deal_count: number;
 };
 
+// True per-quarter team totals (all reps active in each year), from
+// get_quarterly_yoy_totals / get_inv_quarterly_yoy_totals. Used to show the real
+// last-year comparison in the "Total équipe" row instead of only summing reps
+// active in the current year.
+export type QuarterTotalsRow = {
+    quarter: number;
+    current_total: number;
+    previous_total: number;
+};
+
 export type InvDetailRow = {
     invoice_date: string;
     client_name: string;

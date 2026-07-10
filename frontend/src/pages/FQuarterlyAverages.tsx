@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
-import type { YoYRow } from '../types/database';
+import type { YoYRow, QuarterTotalsRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
 import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
@@ -17,6 +17,7 @@ export default function FQuarterlyAverages() {
     const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
+    const [teamTotals, setTeamTotals] = useState<QuarterTotalsRow[]>([]);
 
     // When "Vente Interne" is selected, fetch all reps and group on the frontend
     const repParam = isAdmin
@@ -41,11 +42,11 @@ export default function FQuarterlyAverages() {
 
         const venteInterneRows: YoYRow[] = [];
         for (const [quarter, rows] of byQuarter) {
-            const totalCount = rows.reduce((s, r) => s + Number(r.deal_count), 0);
-            const totalCurrentRev = rows.reduce((s, r) => s + Number(r.current_avg) * Number(r.deal_count), 0);
-            const totalPrevRev    = rows.reduce((s, r) => s + Number(r.previous_avg) * Number(r.deal_count), 0);
-            const current_avg  = totalCount > 0 ? totalCurrentRev / totalCount : 0;
-            const previous_avg = totalCount > 0 ? totalPrevRev    / totalCount : 0;
+            // current_avg / previous_avg are weekly revenue rates (additive across reps),
+            // so the group total is their sum — NOT a deal-count-weighted average.
+            const totalCount   = rows.reduce((s, r) => s + Number(r.deal_count), 0);
+            const current_avg  = rows.reduce((s, r) => s + Number(r.current_avg), 0);
+            const previous_avg = rows.reduce((s, r) => s + Number(r.previous_avg), 0);
             venteInterneRows.push({
                 quarter,
                 rep_name: 'Vente Interne',
@@ -67,16 +68,26 @@ export default function FQuarterlyAverages() {
 
     const fetchAverages = useCallback(async () => {
         setLoading(true);
-        const { data, error } = await supabase.rpc('get_inv_quarterly_yoy', {
-            p_year: year,
-            p_office: selectedOffice === 'Toutes' ? null : selectedOffice,
-            p_status: null,
-            p_rep: repParam,
-        });
+        const p_office = selectedOffice === 'Toutes' ? null : selectedOffice;
+        const [{ data, error }, totalsRes] = await Promise.all([
+            supabase.rpc('get_inv_quarterly_yoy', { p_year: year, p_office, p_status: null, p_rep: repParam }),
+            // True whole-team totals only matter for the admin "Tous" view.
+            isAdmin
+                ? supabase.rpc('get_inv_quarterly_yoy_totals', { p_year: year, p_office, p_status: null })
+                : Promise.resolve({ data: [] as QuarterTotalsRow[], error: null }),
+        ]);
         if (error) console.error('Error fetching invoice quarterly averages:', error);
         else setYoyData(data || []);
+        if (totalsRes.error) console.error('Error fetching invoice quarterly team totals:', totalsRes.error);
+        else setTeamTotals(totalsRes.data || []);
         setLoading(false);
-    }, [year, selectedOffice, repParam]);
+    }, [year, selectedOffice, repParam, isAdmin]);
+
+    const previousTotalByQuarter = useMemo(() => {
+        const m = new Map<number, number>();
+        teamTotals.forEach(t => m.set(t.quarter, Number(t.previous_total)));
+        return m;
+    }, [teamTotals]);
 
     useEffect(() => {
         fetchAverages();
@@ -128,7 +139,14 @@ export default function FQuarterlyAverages() {
                             .filter(d => d.quarter === q)
                             .filter(d => !isAdmin || selectedRep === 'Tous' || d.rep_name === selectedRep);
                         return (
-                            <QuarterBlock key={`q${q}`} quarter={q} data={dataForQuarter} currentYear={year} dealLabel="facture" />
+                            <QuarterBlock
+                                key={`q${q}`}
+                                quarter={q}
+                                data={dataForQuarter}
+                                currentYear={year}
+                                dealLabel="facture"
+                                previousTotalOverride={isAdmin && selectedRep === 'Tous' ? previousTotalByQuarter.get(q) : undefined}
+                            />
                         );
                     })}
                 </div>
