@@ -20,6 +20,10 @@ import PortailPaye from './pages/PortailPaye';
 import PortailObjectifs from './pages/PortailObjectifs';
 import PortailParametres from './pages/PortailParametres';
 import ObjectifsEquipe from './pages/ObjectifsEquipe';
+import LeadsDashboard from './pages/LeadsDashboard';
+import LeadsDetail from './pages/LeadsDetail';
+import PortailLeads from './pages/PortailLeads';
+import TasksDashboard from './pages/TasksDashboard';
 
 function AppRoutes() {
     const { user, loading, canAccessFactures, isAdmin } = useAuth();
@@ -54,11 +58,16 @@ function AppRoutes() {
                     </>
                 )}
 
+                {/* ─── Leads module ─── */}
+                <Route path="leads" element={<LeadsDashboard />} />
+                <Route path="leads/detail" element={<LeadsDetail />} />
+
                 {/* ─── Mon Portail — personal view for every rep ─── */}
                 <Route path="portail" element={<PortailObjectifs />} />
                 <Route path="portail/devis" element={<PortailDevis />} />
                 <Route path="portail/factures" element={<PortailFactures />} />
                 <Route path="portail/paye" element={<PortailPaye />} />
+                <Route path="portail/leads" element={<PortailLeads />} />
                 <Route path="portail/parametres" element={<PortailParametres />} />
 
                 {/* ─── Admin-only ─── */}
@@ -68,6 +77,9 @@ function AppRoutes() {
                         <Route path="paye" element={<Paye />} />
                         <Route path="paye/settings" element={<PayeRepSettings />} />
                         <Route path="objectifs/equipe" element={<ObjectifsEquipe />} />
+
+                        {/* ─── Tâches CRM module (owner-only) — dashboard + weekly tabs ─── */}
+                        <Route path="taches" element={<TasksDashboard />} />
                     </>
                 )}
             </Route>

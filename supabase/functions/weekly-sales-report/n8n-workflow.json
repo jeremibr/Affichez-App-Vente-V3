@@ -1,0 +1,128 @@
+{
+  "name": "Rapports hebdomadaires — Affichez (ventes + mandats)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "1a111111-1111-4111-8111-111111111111",
+      "name": "Chaque vendredi 17h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://auyfucbskylougsmmrks.supabase.co/functions/v1/weekly-sales-report",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-report-secret",
+              "value": "PASTE_YOUR_REPORT_SECRET_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2a222222-2222-4222-8222-222222222222",
+      "name": "Générer le rapport des ventes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "representants@affichez.ca",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "3a333333-3333-4333-8333-333333333333",
+      "name": "Envoyer les ventes (équipe de vente)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [700, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail — Affichez"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://auyfucbskylougsmmrks.supabase.co/functions/v1/weekly-mandates-report",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-report-secret",
+              "value": "PASTE_YOUR_REPORT_SECRET_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4a444444-4444-4444-8444-444444444444",
+      "name": "Générer les mandats signés",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "REPLACE_WITH_WHOLE_TEAM_EMAIL",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "5a555555-5555-4555-8555-555555555555",
+      "name": "Envoyer les mandats (toute l'équipe)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1180, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail — Affichez"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chaque vendredi 17h": {
+      "main": [[{ "node": "Générer le rapport des ventes", "type": "main", "index": 0 }]]
+    },
+    "Générer le rapport des ventes": {
+      "main": [[{ "node": "Envoyer les ventes (équipe de vente)", "type": "main", "index": 0 }]]
+    },
+    "Envoyer les ventes (équipe de vente)": {
+      "main": [[{ "node": "Générer les mandats signés", "type": "main", "index": 0 }]]
+    },
+    "Générer les mandats signés": {
+      "main": [[{ "node": "Envoyer les mandats (toute l'équipe)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
