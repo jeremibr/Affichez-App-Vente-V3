@@ -45,6 +45,7 @@ export const INTERNAL_REP_NAMES = [
     'Charles Côté',
     'Pier-Alexandre Lévesque',
     'Vente interne',
+    'Vincent Dagenais',
 ] as const;
 
 export const LEAD_SOURCES = [
