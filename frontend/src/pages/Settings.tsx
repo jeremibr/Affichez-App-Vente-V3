@@ -225,10 +225,16 @@ function SyncManager() {
                 endpoint="zoho-invoice-sync"
                 actionLabel="sync_invoices_manual"
             />
+            <SyncCard
+                title="Synchronisation Tâches (Zoho CRM)"
+                description="Importe les tâches Zoho CRM (créées, complétées, échéances, propriétaire). Synchronisation incrémentale via Modified_Time."
+                endpoint="zoho-task-sync"
+                actionLabel="sync_tasks_manual"
+            />
             <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                 <span>
-                    Synchronisation automatique planifiée chaque jour à <strong className="text-slate-700">6h00</strong> (heure de Montréal) via pg_cron.
+                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>.
                 </span>
             </div>
         </div>

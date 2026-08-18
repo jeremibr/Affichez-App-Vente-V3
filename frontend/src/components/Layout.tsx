@@ -4,7 +4,8 @@ import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
     DollarSign, ChevronDown, UserCircle,
-    Target, Eye, Building2, BarChart2, Users,
+    Target, Eye, Building2, BarChart2, Users, UserPlus, List,
+    CheckSquare,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -34,8 +35,9 @@ interface Section {
 
 function getSectionKey(pathname: string): string {
     if (pathname.startsWith('/portail')) return 'portail';
+    if (pathname.startsWith('/leads')) return 'ensemble';
     if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
-    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings')) return 'admin';
+    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches')) return 'admin';
     return 'ensemble';
 }
 
@@ -161,6 +163,9 @@ export default function Layout() {
                     { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
                     { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
                 ] : []),
+                { name: 'Leads',           href: '',                    icon: UserPlus,        isLabel: true },
+                { name: 'Tableau de bord', href: '/leads',              icon: LayoutDashboard, end: true },
+                { name: 'Détail leads',    href: '/leads/detail',       icon: List },
             ],
         },
         {
@@ -173,6 +178,7 @@ export default function Layout() {
                 { name: 'Mes Devis',       href: '/portail/devis',       icon: ClipboardList },
                 { name: 'Mes Factures',    href: '/portail/factures',    icon: FileText },
                 { name: 'Ma Paye',         href: '/portail/paye',        icon: Wallet },
+                { name: 'Mes Leads',       href: '/portail/leads',       icon: UserPlus },
             ],
         },
     ];
@@ -184,6 +190,8 @@ export default function Layout() {
         { name: 'Objectifs',        href: '',                     icon: Target,       isLabel: true },
         { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Target,       end: true },
         { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
+        { name: 'Tâches CRM',       href: '',                    icon: CheckSquare,  isLabel: true },
+        { name: 'Tableau de bord', href: '/taches',             icon: LayoutDashboard, end: true },
         { name: 'Système',         href: '',                    icon: Settings,     isLabel: true },
         { name: 'Paramètres',      href: '/settings',           icon: Settings },
     ];
