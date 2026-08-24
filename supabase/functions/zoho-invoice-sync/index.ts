@@ -72,6 +72,17 @@ async function upsertBatch(batch: object[]): Promise<void> {
   if (!res.ok) throw new Error('Supabase upsert failed: ' + await res.text());
 }
 
+async function deleteBatch(zohoIds: string[]): Promise<void> {
+  for (let i = 0; i < zohoIds.length; i += 50) {
+    const chunk = zohoIds.slice(i, i + 50).map(encodeURIComponent).join(',');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/invoices?zoho_id=in.(${chunk})`, {
+      method: 'DELETE',
+      headers: SB_HEADERS,
+    });
+    if (!res.ok) throw new Error('Supabase delete failed: ' + await res.text());
+  }
+}
+
 async function logSync(action: string, statusCode: number, message?: string): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/webhook_log`, {
     method: 'POST',
@@ -157,6 +168,7 @@ async function syncInvoices(
   org: { id: string; office: string },
   accessToken: string,
   lastModified: Date | null,
+  touched: Set<string>,
   statusOverride: string | null = null,
 ): Promise<{ upserted: number; errors: string[] }> {
   let upserted = 0;
@@ -200,6 +212,7 @@ async function syncInvoices(
         if (!mappedStatus) continue;
         const dept = extractDept(inv);
         if (!dept) continue;
+        touched.add(String(inv.invoice_number));
         toUpsert.push({
           zoho_id: String(inv.invoice_id),
           invoice_number: inv.invoice_number,
@@ -230,6 +243,7 @@ async function syncCreditNotes(
   org: { id: string; office: string },
   accessToken: string,
   lastModified: Date | null,
+  touched: Set<string>,
 ): Promise<{ upserted: number; errors: string[] }> {
   let page = 1;
   let hasMore = true;
@@ -280,6 +294,7 @@ async function syncCreditNotes(
     const toUpsert: object[] = [];
     for (const { note, dept } of pending) {
       if (!dept) continue;
+      touched.add(String(note.creditnote_number));
       toUpsert.push({
         zoho_id: String(note.creditnote_id),
         invoice_number: note.creditnote_number,
@@ -303,12 +318,149 @@ async function syncCreditNotes(
   return { upserted, errors };
 }
 
+// ─── Duplicate Reaper ─────────────────────────────────────────────────────────
+// When the payer entity changes, accounting deletes the invoice in Zoho and re-issues
+// it with the SAME number under the new customer account. We only ever upsert on
+// zoho_id and never delete, so the dead row survived here and its amount was counted
+// twice. Zoho is the source of truth: a zoho_id that 404s no longer exists — drop it.
+
+const ORG_BY_OFFICE: Record<string, string> = Object.fromEntries(ORGS.map((o) => [o.office, o.id]));
+
+interface DupRow {
+  zoho_id: string;
+  invoice_number: string;
+  office: string | null;
+  is_avoir: boolean;
+  amount: number;
+  client_name: string;
+}
+
+const DUP_COLS = 'zoho_id,invoice_number,office,is_avoir,amount,client_name';
+
+/** Every invoice row, paged — a bare select is capped at PostgREST's max_rows (1000). */
+async function fetchAllInvoiceRows(): Promise<DupRow[]> {
+  const rows: DupRow[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/invoices` +
+        `?select=${DUP_COLS}&order=zoho_id.asc&limit=${pageSize}&offset=${offset}`,
+      { headers: SB_HEADERS },
+    );
+    if (!res.ok) throw new Error('Invoice scan failed: ' + await res.text());
+    const page = await res.json() as DupRow[];
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
+/** Rows carrying one of the given invoice numbers. */
+async function fetchRowsByNumber(numbers: string[]): Promise<DupRow[]> {
+  const rows: DupRow[] = [];
+  for (let i = 0; i < numbers.length; i += 100) {
+    const list = numbers.slice(i, i + 100)
+      .map((num) => `"${num.replace(/"/g, '\\"')}"`)
+      .map(encodeURIComponent)
+      .join(',');
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/invoices?select=${DUP_COLS}&invoice_number=in.(${list})`,
+      { headers: SB_HEADERS },
+    );
+    if (!res.ok) throw new Error('Invoice lookup failed: ' + await res.text());
+    rows.push(...await res.json() as DupRow[]);
+  }
+  return rows;
+}
+
+/** Group by (invoice_number, office), keeping only the collisions. */
+function duplicateGroups(rows: DupRow[]): Map<string, DupRow[]> {
+  const groups = new Map<string, DupRow[]>();
+  for (const row of rows) {
+    if (!row.invoice_number) continue;
+    const key = `${row.invoice_number}|${row.office ?? ''}`;
+    const group = groups.get(key);
+    if (group) group.push(row); else groups.set(key, [row]);
+  }
+  for (const [key, group] of groups) {
+    if (group.length < 2) groups.delete(key);
+  }
+  return groups;
+}
+
+type Existence = 'alive' | 'deleted' | 'unknown';
+
+/** Ask Zoho whether one record still exists. Anything inconclusive stays 'unknown'. */
+async function checkZohoExistence(row: DupRow, accessToken: string): Promise<Existence> {
+  const orgId = row.office ? ORG_BY_OFFICE[row.office] : undefined;
+  if (!orgId) return 'unknown';
+  const resource = row.is_avoir ? 'creditnotes' : 'invoices';
+  const url = `https://www.zohoapis.com/books/v3/${resource}/${row.zoho_id}` +
+    `?organization_id=${orgId}`;
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  if (res.ok) { await res.body?.cancel(); return 'alive'; }
+
+  let code: number | null = null;
+  try { code = Number((await res.json())?.code ?? NaN); } catch { /* non-JSON error body */ }
+  // 1002 = "the requested resource could not be found or accessed" — deleted in Zoho.
+  if (res.status === 404 || code === 1002) return 'deleted';
+  return 'unknown'; // 401/429/500 etc. — never delete on an answer we can't trust
+}
+
+/**
+ * Resolve every duplicate group against Zoho and delete the rows Zoho no longer has.
+ * Deliberately conservative — a group is left untouched unless every one of its rows
+ * gave an unambiguous answer and at least one of them survives.
+ *
+ * `touched` limits the search to the numbers this run just upserted, which is all an
+ * incremental sync needs: a collision can only appear when a new row lands. Pass null
+ * to sweep the whole table (full sync, or a one-off x-prune-only run).
+ */
+async function pruneDeletedDuplicates(
+  accessToken: string,
+  dryRun: boolean,
+  touched: Set<string> | null,
+): Promise<{ deleted: string[]; skipped: string[] }> {
+  const deleted: string[] = [];
+  const skipped: string[] = [];
+
+  const rows = touched
+    ? (touched.size === 0 ? [] : await fetchRowsByNumber([...touched]))
+    : await fetchAllInvoiceRows();
+
+  for (const [key, group] of duplicateGroups(rows)) {
+    const verdicts = await Promise.all(group.map((r) => checkZohoExistence(r, accessToken)));
+
+    if (verdicts.includes('unknown')) {
+      skipped.push(`${key}: Zoho lookup inconclusive`);
+      continue;
+    }
+    const dead = group.filter((_, i) => verdicts[i] === 'deleted');
+    if (dead.length === 0) {
+      skipped.push(`${key}: all ${group.length} rows still exist in Zoho — number reused, review manually`);
+      continue;
+    }
+    if (dead.length === group.length) {
+      skipped.push(`${key}: all ${group.length} rows gone from Zoho — review manually`);
+      continue;
+    }
+
+    if (!dryRun) await deleteBatch(dead.map((r) => r.zoho_id));
+    for (const r of dead) {
+      deleted.push(`${key} id=${r.zoho_id} ${r.amount} ${r.client_name}`);
+    }
+  }
+
+  return { deleted, skipped };
+}
+
 // ─── Main Handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-sync-source, x-full-sync, x-org, x-status, content-type',
+    'Access-Control-Allow-Headers':
+      'authorization, x-sync-source, x-full-sync, x-org, x-status, x-prune, x-prune-only, x-dry-run, content-type',
   };
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -320,11 +472,19 @@ Deno.serve(async (req: Request) => {
   // x-status: optional — restrict full sync to a single Zoho status (e.g. "Sent", "Overdue").
   // Use this to back-fill a single status without re-fetching all paid/partial records.
   const statusOverride = req.headers.get('x-status') ?? null;
-  const action = isManual
+  // Duplicate reaper: runs after every sync. x-prune: false opts out,
+  // x-prune-only: true skips the sync, x-dry-run: true reports without deleting.
+  const isPruneOnly = req.headers.get('x-prune-only') === 'true';
+  const skipPrune = req.headers.get('x-prune') === 'false';
+  const isDryRun = req.headers.get('x-dry-run') === 'true';
+  const action = isPruneOnly
+    ? 'prune_invoice_duplicates'
+    : isManual
     ? (isFullSync ? 'sync_invoices_manual_full' : 'sync_invoices_manual')
     : 'sync_invoices_auto';
 
   let totalUpserted = 0;
+  let pruneResult: { deleted: string[]; skipped: string[] } = { deleted: [], skipped: [] };
   const allErrors: string[] = [];
 
   const orgsToProcess = orgFilter ? ORGS.filter(o => o.office === orgFilter) : ORGS;
@@ -340,24 +500,54 @@ Deno.serve(async (req: Request) => {
     // Incremental: read last_modified_time from sync_state.
     const lastModified = isFullSync ? null : await readSyncState('invoices');
 
-    for (const org of orgsToProcess) {
-      const invResult = await syncInvoices(org, accessToken, lastModified, statusOverride);
-      totalUpserted += invResult.upserted;
-      allErrors.push(...invResult.errors);
+    const touched = new Set<string>();
 
-      const cnResult = await syncCreditNotes(org, accessToken, lastModified);
-      totalUpserted += cnResult.upserted;
-      allErrors.push(...cnResult.errors);
+    if (!isPruneOnly) {
+      for (const org of orgsToProcess) {
+        const invResult = await syncInvoices(org, accessToken, lastModified, touched, statusOverride);
+        totalUpserted += invResult.upserted;
+        allErrors.push(...invResult.errors);
+
+        const cnResult = await syncCreditNotes(org, accessToken, lastModified, touched);
+        totalUpserted += cnResult.upserted;
+        allErrors.push(...cnResult.errors);
+      }
+    }
+
+    // Reap rows for invoices that were deleted in Zoho and re-issued under the same
+    // number. An incremental run only has to look at what it just touched; a prune-only
+    // or full run sweeps the whole table. Isolated from the sync result — a reaper
+    // failure must not fail the sync.
+    if (!skipPrune) {
+      try {
+        const scope = (isPruneOnly || isFullSync) ? null : touched;
+        pruneResult = await pruneDeletedDuplicates(accessToken, isDryRun, scope);
+      } catch (err) {
+        allErrors.push('prune: ' + (err instanceof Error ? err.message : String(err)));
+      }
     }
 
     // Persist timestamp. Skip on full sync so we don't overwrite the incremental pointer.
-    if (!isFullSync) {
+    if (!isFullSync && !isPruneOnly) {
       await writeSyncState('invoices', syncStart);
     }
 
     const durationMs = Date.now() - startTime;
-    const result = { upserted: totalUpserted, errors: allErrors, duration_ms: durationMs };
-    await logSync(action, 200, allErrors.length > 0 ? allErrors.join(' | ') : undefined);
+    const result = {
+      upserted: totalUpserted,
+      pruned: isDryRun ? 0 : pruneResult.deleted.length,
+      prune_dry_run: isDryRun,
+      prune_deleted: pruneResult.deleted,
+      prune_skipped: pruneResult.skipped,
+      errors: allErrors,
+      duration_ms: durationMs,
+    };
+    const notes = [
+      ...pruneResult.deleted.map((d) => `pruned: ${d}`),
+      ...pruneResult.skipped.map((s) => `prune skipped: ${s}`),
+      ...allErrors,
+    ];
+    await logSync(action, 200, notes.length > 0 ? notes.join(' | ') : undefined);
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

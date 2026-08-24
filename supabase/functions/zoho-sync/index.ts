@@ -72,12 +72,36 @@ async function declineBatch(zohoIds: string[]): Promise<void> {
 }
 
 async function deleteBatch(zohoIds: string[]): Promise<void> {
-  if (zohoIds.length === 0) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?zoho_id=in.(${zohoIds.join(',')})`, {
-    method: 'DELETE',
-    headers: SB_HEADERS,
-  });
-  if (!res.ok) throw new Error('Supabase delete failed: ' + await res.text());
+  for (let i = 0; i < zohoIds.length; i += 50) {
+    const chunk = zohoIds.slice(i, i + 50).map(encodeURIComponent).join(',');
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/sales?zoho_id=in.(${chunk})`, {
+      method: 'DELETE',
+      headers: SB_HEADERS,
+    });
+    if (!res.ok) throw new Error('Supabase delete failed: ' + await res.text());
+  }
+}
+
+/**
+ * Ids of every sale a full sync is expected to see again, paged (a bare select is
+ * capped at PostgREST's max_rows). Restricted to accepted/invoiced because a full sync
+ * filters Zoho by those two statuses — declined rows are never returned and would
+ * otherwise read as orphans and be deleted on every full sync.
+ */
+async function fetchOrphanCandidateIds(): Promise<string[]> {
+  const ids: string[] = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/sales?select=zoho_id&status=in.(accepted,invoiced)` +
+        `&order=zoho_id.asc&limit=${pageSize}&offset=${offset}`,
+      { headers: SB_HEADERS },
+    );
+    if (!res.ok) throw new Error('Sale id lookup failed: ' + await res.text());
+    const rows = await res.json() as Array<{ zoho_id: string }>;
+    ids.push(...rows.map((r) => r.zoho_id));
+    if (rows.length < pageSize) return ids;
+  }
 }
 
 async function logSync(action: string, statusCode: number, message?: string): Promise<void> {
@@ -116,7 +140,8 @@ async function writeSyncState(key: string, ts: Date): Promise<void> {
 Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-sync-source, x-full-sync, x-debug-id, content-type',
+    'Access-Control-Allow-Headers':
+      'authorization, x-sync-source, x-full-sync, x-debug-id, x-dry-run, content-type',
   };
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -146,6 +171,8 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';
   const isFullSync = req.headers.get('x-full-sync') === 'true';
+  // Report which quotes orphan detection would remove, without removing them.
+  const isDryRun = req.headers.get('x-dry-run') === 'true';
   const action = isManual
     ? (isFullSync ? 'sync_manual_full' : 'sync_manual')
     : 'sync_auto';
@@ -233,13 +260,25 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Orphan detection: only safe on full sync
+    // Orphan detection: only safe on a full sync that walked every Zoho page cleanly.
+    // A mid-run Zoho error leaves seenZohoIds short, which reads as mass deletion —
+    // bail out instead. Same guard for an implausibly large orphan set.
     if (isFullSync) {
-      const existingRes = await fetch(`${SUPABASE_URL}/rest/v1/sales?select=zoho_id`, { headers: SB_HEADERS });
-      if (existingRes.ok) {
-        const existing: { zoho_id: string }[] = await existingRes.json();
-        const orphanIds = existing.map(r => r.zoho_id).filter(id => !seenZohoIds.has(id));
-        if (orphanIds.length > 0) { await deleteBatch(orphanIds); totalDeleted += orphanIds.length; }
+      if (errors.length > 0) {
+        errors.push('orphan detection skipped: Zoho paging was incomplete');
+      } else {
+        const existingIds = await fetchOrphanCandidateIds();
+        const orphanIds = existingIds.filter(id => !seenZohoIds.has(id));
+        const maxOrphans = Math.max(50, Math.floor(existingIds.length * 0.05));
+        if (orphanIds.length > maxOrphans) {
+          errors.push(
+            `orphan detection skipped: ${orphanIds.length} of ${existingIds.length} rows unseen ` +
+            `(limit ${maxOrphans}) — investigate before deleting`,
+          );
+        } else if (orphanIds.length > 0) {
+          if (!isDryRun) await deleteBatch(orphanIds);
+          totalDeleted += orphanIds.length;
+        }
       }
     }
 
@@ -250,7 +289,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const durationMs = Date.now() - startTime;
-    const result = { upserted: totalUpserted, deleted: totalDeleted, errors, duration_ms: durationMs };
+    const result = {
+      upserted: totalUpserted,
+      deleted: isDryRun ? 0 : totalDeleted,
+      orphans_found: totalDeleted,
+      dry_run: isDryRun,
+      errors,
+      duration_ms: durationMs,
+    };
     await logSync(action, 200, errors.length > 0 ? errors.join(' | ') : undefined);
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
