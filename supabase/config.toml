@@ -370,6 +370,14 @@ verify_jwt = false
 [functions.zoho-invoice-sync]
 verify_jwt = false
 
+# Called by pg_cron via net.http_post, which sends no JWT — every cron-driven
+# function must be pinned here or a redeploy silently 401s the schedule.
+[functions.zoho-sync]
+verify_jwt = false
+
+[functions.zoho-task-sync]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
