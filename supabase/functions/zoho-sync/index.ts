@@ -104,6 +104,31 @@ async function fetchOrphanCandidateIds(): Promise<string[]> {
   }
 }
 
+/**
+ * Ask Zoho whether one estimate still exists, and with what status.
+ * exists === null means the answer was inconclusive (401/429/500) — never act on it.
+ */
+async function checkEstimateExists(
+  zohoId: string,
+  accessToken: string,
+): Promise<{ exists: boolean | null; status: string | null }> {
+  for (const org of ORGS) {
+    const res = await fetch(
+      `https://www.zohoapis.com/books/v3/estimates/${zohoId}?organization_id=${org.id}`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      return { exists: true, status: String((data.estimate ?? {}).status ?? '') };
+    }
+    let code: number | null = null;
+    try { code = Number((await res.json())?.code ?? NaN); } catch { /* non-JSON body */ }
+    // 1002 = resource not found. Try the other org before concluding it is gone.
+    if (res.status !== 404 && code !== 1002) return { exists: null, status: null };
+  }
+  return { exists: false, status: null };
+}
+
 async function logSync(action: string, statusCode: number, message?: string): Promise<void> {
   await fetch(`${SUPABASE_URL}/rest/v1/webhook_log`, {
     method: 'POST',
@@ -179,6 +204,7 @@ Deno.serve(async (req: Request) => {
 
   let totalUpserted = 0;
   let totalDeleted = 0;
+  let totalDeclined = 0;
   const errors: string[] = [];
 
   try {
@@ -276,8 +302,25 @@ Deno.serve(async (req: Request) => {
             `(limit ${maxOrphans}) — investigate before deleting`,
           );
         } else if (orphanIds.length > 0) {
-          if (!isDryRun) await deleteBatch(orphanIds);
-          totalDeleted += orphanIds.length;
+          // "Unseen" is not the same as "gone". A full sync filters Zoho by Accepted
+          // and Invoiced, so a quote that has since been declined or expired is absent
+          // from seenZohoIds while still existing — deleting it loses the row for good,
+          // because a later full sync will not fetch it back either. Ask Zoho about each
+          // candidate and only delete what Zoho genuinely no longer has.
+          for (const id of orphanIds) {
+            const { exists, status } = await checkEstimateExists(id, accessToken);
+            if (exists === null) {
+              errors.push(`orphan check inconclusive for ${id} — left untouched`);
+            } else if (exists === false) {
+              if (!isDryRun) await deleteBatch([id]);
+              totalDeleted++;
+            } else if (status === 'declined' || status === 'void') {
+              if (!isDryRun) await declineBatch([id]);
+              totalDeclined++;
+            } else {
+              errors.push(`${id} still exists in Zoho as "${status}" — kept`);
+            }
+          }
         }
       }
     }
@@ -292,6 +335,7 @@ Deno.serve(async (req: Request) => {
     const result = {
       upserted: totalUpserted,
       deleted: isDryRun ? 0 : totalDeleted,
+      declined: totalDeclined,
       orphans_found: totalDeleted,
       dry_run: isDryRun,
       errors,
