@@ -37,7 +37,58 @@ function toZohoCrmTimestamp(d: Date): string {
 
 // ─── Zoho Auth ────────────────────────────────────────────────────────────────
 
+// Zoho throttles the OAuth refresh endpoint per refresh token, and every sync
+// function shares one. Access tokens are valid an hour, so they are cached in
+// zoho_oauth_token and reused across functions and invocations — only a miss
+// costs a refresh. Renewed early so a token can never expire mid-run.
+// Cached under its own key: the CRM secrets below may be a different refresh
+// token, with a different scope, from the Books one the other syncs use.
+const TOKEN_CACHE_KEY = 'crm';
+const TOKEN_SKEW_MS = 5 * 60 * 1000;
+
+/** Per-isolate copy, so a warm isolate skips even the PostgREST round trip. */
+let memoToken: { token: string; expiresAt: number } | null = null;
+
+function tokenIsFresh(expiresAt: number): boolean {
+  return Date.now() < expiresAt - TOKEN_SKEW_MS;
+}
+
+async function readCachedToken(): Promise<string | null> {
+  if (memoToken && tokenIsFresh(memoToken.expiresAt)) return memoToken.token;
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/zoho_oauth_token?key=eq.${TOKEN_CACHE_KEY}` +
+      `&select=access_token,expires_at`,
+    { headers: SB_HEADERS },
+  );
+  // A cache miss must never break the sync — fall through to a live refresh.
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<{ access_token: string; expires_at: string }>;
+  if (rows.length === 0) return null;
+  const expiresAt = new Date(rows[0].expires_at).getTime();
+  if (!tokenIsFresh(expiresAt)) return null;
+  memoToken = { token: rows[0].access_token, expiresAt };
+  return rows[0].access_token;
+}
+
+async function writeCachedToken(token: string, expiresInSec: number): Promise<void> {
+  const expiresAt = new Date(Date.now() + expiresInSec * 1000);
+  memoToken = { token, expiresAt: expiresAt.getTime() };
+  await fetch(`${SUPABASE_URL}/rest/v1/zoho_oauth_token?on_conflict=key`, {
+    method: 'POST',
+    headers: { ...SB_HEADERS, Prefer: 'resolution=merge-duplicates' },
+    body: JSON.stringify({
+      key: TOKEN_CACHE_KEY,
+      access_token: token,
+      expires_at: expiresAt.toISOString(),
+      updated_at: new Date().toISOString(),
+    }),
+  });
+}
+
 async function getAccessToken(): Promise<string> {
+  const cached = await readCachedToken();
+  if (cached) return cached;
+
   // Prefer CRM-specific secrets; fall back to the Books secrets so the same
   // OAuth credentials can be reused when the refresh token carries CRM scope.
   const clientId = Deno.env.get('ZOHO_CRM_CLIENT_ID') ?? Deno.env.get('ZOHO_CLIENT_ID')!;
@@ -49,6 +100,8 @@ async function getAccessToken(): Promise<string> {
   const res = await fetch(url, { method: 'POST' });
   const data = await res.json();
   if (!data.access_token) throw new Error('Zoho CRM token refresh failed: ' + JSON.stringify(data));
+  // Zoho reports expires_in in seconds; default to the documented one hour.
+  await writeCachedToken(data.access_token, Number(data.expires_in) || 3600);
   return data.access_token;
 }
 
