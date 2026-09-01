@@ -78,6 +78,56 @@ export type InvDetailRow = {
     zoho_id: string;
 };
 
+/**
+ * A row of `zoho_leads` — one Zoho CRM record, Lead or Contact, told apart by
+ * `stage`. Synced by the zoho-lead-sync edge function; read-only in the app.
+ *
+ * `lead_source` and `service_interest` exist only on Zoho's Leads module. For a
+ * contact they are inherited from the originating lead by a DB trigger, in which
+ * case `attribution_inherited` is true. A contact created directly in Zoho —
+ * which no lead points at — has neither, and both come back empty.
+ */
+export type ZohoLeadRow = {
+    zoho_record_id: string;
+    stage: 'lead' | 'contact';
+
+    full_name: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    company: string | null;
+    phone: string | null;
+    email: string | null;
+
+    owner_name: string | null;
+    owner_email: string | null;
+    rep_name: string | null;
+
+    created_time: string | null;
+    modified_time: string | null;
+
+    lead_source: string | null;
+    service_interest: string[];
+    lead_status: string | null;
+    attribution_inherited: boolean;
+
+    is_converted: boolean;
+    converted_contact_id: string | null;
+    converted_account_id: string | null;
+    converted_deal_id: string | null;
+    converted_time: string | null;
+
+    zoho_crm_url: string | null;
+    synced_at: string;
+};
+
+/** Return shape of the get_zoho_lead_filter_options RPC — distinct values for the filter bar. */
+export type ZohoLeadFilterOptions = {
+    sources: string[];
+    services: string[];
+    reps: string[];
+};
+
+/** Legacy hand-entered leads table, superseded by ZohoLeadRow. Kept as an archive. */
 export type LeadRow = {
     id: string;
     created_at: string;

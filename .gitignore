@@ -13,6 +13,7 @@ node_modules/
 dist/
 dist-ssr/
 
+docs/
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,73 @@
+# Applies migrations and deploys the edge functions whenever supabase/ changes on
+# main. This is the zero-command version of scripts/deploy-supabase.ps1 — merge a
+# PR and production follows.
+#
+# Repo secrets required (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN  — Dashboard → Account → Access Tokens
+#   SUPABASE_DB_PASSWORD   — Dashboard → Settings → Database
+#
+# Function *runtime* secrets (ZOHO_WEBHOOK_SECRET, the Zoho OAuth credentials) are
+# NOT managed here. They live in the Supabase project and survive redeploys; adding
+# them to CI would mean a second copy to keep in sync.
+
+name: Deploy Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/supabase-deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  # Never let two deploys race on the same database.
+  group: supabase-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: auyfucbskylougsmmrks
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$PROJECT_REF"
+
+      - name: Show migration status
+        run: supabase migration list
+
+      - name: Push migrations
+        run: supabase db push
+
+      # Deploys every function rather than only the changed one: it is idempotent,
+      # and it keeps production identical to main even if an earlier run failed
+      # partway through.
+      - name: Deploy edge functions
+        run: |
+          for dir in supabase/functions/*/; do
+            name=$(basename "$dir")
+            [ -f "$dir/index.ts" ] || continue
+            echo "::group::deploy $name"
+            supabase functions deploy "$name" --project-ref "$PROJECT_REF"
+            echo "::endgroup::"
+          done
+
+      - name: Verify Zoho CRM scope
+        # Informational only — a scope problem must not fail the deploy, but it
+        # should be visible in the run log rather than discovered via dead webhooks.
+        continue-on-error: true
+        run: |
+          curl -sS -H "x-check-scope: true" \
+            "https://$PROJECT_REF.supabase.co/functions/v1/zoho-lead-sync"

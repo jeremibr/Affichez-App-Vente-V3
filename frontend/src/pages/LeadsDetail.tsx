@@ -1,458 +1,467 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { Loader2, Plus, ExternalLink, X, Save, Pencil, Trash2 } from 'lucide-react';
-import type { LeadRow } from '../types/database';
-import { LEAD_SOURCES, LEAD_SERVICES, LEAD_STATUSES, MONTHS } from '../lib/constants';
+import { Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { ZohoLeadRow, ZohoLeadFilterOptions } from '../types/database';
+import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { formatCurrencyCAD, cn } from '../lib/utils';
-import { useRepList } from '../hooks/useRepList';
-import { useAuth } from '../contexts/AuthContext';
+import { formatShortDate, cn } from '../lib/utils';
 
-const STATUS_COLORS: Record<string, string> = {
-    active: 'bg-blue-50 text-blue-600',
-    won:    'bg-emerald-50 text-emerald-600',
-    lost:   'bg-red-50 text-red-500',
+const STAGE_LABELS: Record<string, string> = {
+    lead: 'Lead',
+    contact: 'Contact',
 };
 
-const STATUS_LABELS: Record<string, string> = {
-    active: 'Actif',
-    won:    'Vendu',
-    lost:   'Perdu',
+const STAGE_COLORS: Record<string, string> = {
+    lead: 'bg-blue-50 text-blue-600',
+    contact: 'bg-emerald-50 text-emerald-600',
 };
 
-const SOURCE_LABELS: Record<string, string> = Object.fromEntries(LEAD_SOURCES.map(s => [s.value, s.label]));
-const SERVICE_LABELS: Record<string, string> = Object.fromEntries(LEAD_SERVICES.map(s => [s.value, s.label]));
+/** Zoho writes "-None-" into a picklist that was never set. */
+const isBlankPick = (v: string | null): boolean => !v || v === '-None-';
 
-interface LeadFormData {
-    lead_date: string;
-    rep_name: string;
-    source: string;
-    service_interest: string;
-    amount_sold: string;
-    zoho_crm_url: string;
-    notes: string;
-    lead_status: 'active' | 'won' | 'lost';
+/** Zoho timestamps carry an offset (…-04:00); show date + time, they matter here. */
+function formatDateTime(value: string | null): string {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '—';
+    return `${formatShortDate(d)} ${d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-const emptyForm = (): LeadFormData => ({
-    lead_date: new Date().toISOString().split('T')[0],
-    rep_name: '',
-    source: '',
-    service_interest: '',
-    amount_sold: '0',
-    zoho_crm_url: '',
-    notes: '',
-    lead_status: 'active',
-});
+const PAGE_SIZE = 100;
+
+/**
+ * PostgREST's `or` filter is comma-separated and paren-grouped, so those
+ * characters in a search term would corrupt the query rather than match text.
+ * `%` and `_` are ilike wildcards and are escaped so they match literally.
+ */
+function sanitizeSearch(raw: string): string {
+    return raw.replace(/[,()]/g, ' ').replace(/[%_\\]/g, '\\$&').trim();
+}
 
 export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
-    const { repName: authRepName } = useAuth();
-    const repList = useRepList();
-
-    const [year, setYear] = useUrlStateNumber('year', 2026);
+    // 'Toutes' spans every year. Records go back well before 2023, so a mandatory
+    // single-year filter hid most of the data with no way to widen it.
+    const [yearParam, _setYearParam] = useUrlState('year', '2026');
+    const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
-    const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
-    const [selectedStatus, setSelectedStatus] = useUrlState('statut', 'Tous');
+    const [selectedRep, _setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedSource, _setSelectedSource] = useUrlState('source', 'Toutes');
+    const [selectedService, _setSelectedService] = useUrlState('service', 'Tous');
+    const [selectedStage, _setSelectedStage] = useUrlState('stage', 'Tous');
+    const [page, setPage] = useUrlStateNumber('page', 1);
 
-    const [leads, setLeads] = useState<LeadRow[]>([]);
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    // Changing any filter must return to page 1 — otherwise a narrower result set
+    // leaves you stranded on a page that no longer exists, showing nothing.
+    const setYear = (v: number | 'Toutes') => {
+        _setYearParam(v === 'Toutes' ? 'Toutes' : String(v));
+        setPage(1);
+    };
+    const setSelectedMonth = (v: number | 'Toutes') => {
+        _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
+        setPage(1);
+    };
+    const setSelectedRep = (v: string) => { _setSelectedRep(v); setPage(1); };
+    const setSelectedSource = (v: string) => { _setSelectedSource(v); setPage(1); };
+    const setSelectedService = (v: string) => { _setSelectedService(v); setPage(1); };
+    const setSelectedStage = (v: string) => { _setSelectedStage(v); setPage(1); };
+
+    const [rows, setRows] = useState<ZohoLeadRow[]>([]);
+    const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
 
-    const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState<LeadFormData>(emptyForm());
-
-    // Inline edit state for amount_sold and notes
-    const [inlineEdit, setInlineEdit] = useState<{ id: string; field: 'amount_sold' | 'notes'; value: string } | null>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Dropdown options come from the data rather than a hardcoded list: Zoho's
+    // Lead Source picklist has 34 values, most unused, and the service field is a
+    // multi-select. Deriving them keeps the filters honest as the CRM changes.
+    const [allSources, setAllSources] = useState<string[]>([]);
+    const [allServices, setAllServices] = useState<string[]>([]);
+    const [allReps, setAllReps] = useState<string[]>([]);
 
     const effectiveRepName = propRepName ?? null;
+
+    /** null = no date filter at all (every year). */
+    const yearBounds = useMemo(() => {
+        if (year === 'Toutes') return null;
+        if (selectedMonth === 'Toutes') {
+            return { from: `${year}-01-01T00:00:00Z`, to: `${year + 1}-01-01T00:00:00Z` };
+        }
+        const m = Number(selectedMonth);
+        const nextYear = m === 12 ? year + 1 : year;
+        const nextMonth = m === 12 ? 1 : m + 1;
+        return {
+            from: `${year}-${String(m).padStart(2, '0')}-01T00:00:00Z`,
+            to: `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00Z`,
+        };
+    }, [year, selectedMonth]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
 
+        // zoho_leads_unique drops a converted lead when its contact is also synced,
+        // so the same person is not counted twice.
+        // `count: 'exact'` gives the total across all pages, not just this slice.
+        const from = (page - 1) * PAGE_SIZE;
         let query = supabase
-            .from('leads')
-            .select('*')
-            .gte('lead_date', `${year}-01-01`)
-            .lte('lead_date', `${year}-12-31`)
-            .order('lead_date', { ascending: false });
+            .from('zoho_leads_unique')
+            .select('*', { count: 'exact' })
+            .order('created_time', { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
 
-        if (selectedMonth !== 'Toutes') {
-            const pad = String(selectedMonth).padStart(2, '0');
-            query = query
-                .gte('lead_date', `${year}-${pad}-01`)
-                .lte('lead_date', `${year}-${pad}-31`);
+        if (yearBounds) {
+            query = query.gte('created_time', yearBounds.from).lt('created_time', yearBounds.to);
         }
-        if (effectiveRepName) {
-            query = query.eq('rep_name', effectiveRepName);
-        } else if (selectedRep !== 'Tous') {
-            query = query.eq('rep_name', selectedRep);
-        }
-        if (selectedSource !== 'Toutes') query = query.eq('source', selectedSource);
-        if (selectedService !== 'Tous') query = query.eq('service_interest', selectedService);
-        if (selectedStatus !== 'Tous') query = query.eq('lead_status', selectedStatus);
 
-        const { data } = await query;
-        setLeads(data ?? []);
+        if (effectiveRepName) query = query.eq('rep_name', effectiveRepName);
+        else if (selectedRep !== 'Tous') query = query.eq('rep_name', selectedRep);
+
+        if (selectedSource !== 'Toutes') query = query.eq('lead_source', selectedSource);
+        if (selectedService !== 'Tous') query = query.contains('service_interest', [selectedService]);
+        if (selectedStage !== 'Tous') query = query.eq('stage', selectedStage);
+
+        // Searching server-side, not over the loaded page: with 100 rows per page a
+        // client-side filter would quietly search 100 of several thousand records.
+        const term = sanitizeSearch(debouncedSearch);
+        if (term) {
+            const like = `%${term}%`;
+            query = query.or(
+                `full_name.ilike.${like},company.ilike.${like},` +
+                `email.ilike.${like},phone.ilike.${like}`,
+            );
+        }
+
+        const { data, count } = await query;
+        setRows((data as ZohoLeadRow[]) ?? []);
+        setTotal(count ?? 0);
         setLoading(false);
-    }, [year, selectedMonth, selectedRep, selectedSource, selectedService, selectedStatus, effectiveRepName]);
+    }, [yearBounds, selectedRep, selectedSource, selectedService, selectedStage,
+        effectiveRepName, page, debouncedSearch]);
+
+    /**
+     * Options are scoped to the year only, so choosing one filter never empties
+     * the others. The DISTINCT runs in Postgres — pulling rows to the browser and
+     * de-duplicating here would have needed all ~29k of them.
+     */
+    const fetchOptions = useCallback(async () => {
+        const { data, error } = await supabase
+            .rpc('get_zoho_lead_filter_options', { p_year: year === 'Toutes' ? null : year })
+            .single<ZohoLeadFilterOptions>();
+        if (error || !data) return;
+        setAllSources(data.sources ?? []);
+        setAllServices(data.services ?? []);
+        setAllReps(data.reps ?? []);
+    }, [year]);
 
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
     useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { fetchOptions(); }, [fetchOptions]);
 
+    // Coalesced: a full sync upserts ~29k rows, and refetching once per change
+    // event would fire thousands of queries at the browser. One refresh 1.5s after
+    // the last change keeps live updates without the stampede.
     useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
         const sub = supabase
-            .channel('leads-detail-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchDataRef.current())
+            .channel('zoho-leads-detail-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_leads' }, () => {
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(() => fetchDataRef.current(), 1500);
+            })
             .subscribe();
-        return () => { supabase.removeChannel(sub); };
+        return () => {
+            if (timer) clearTimeout(timer);
+            supabase.removeChannel(sub);
+        };
     }, []);
 
-    const openAddForm = () => {
-        setEditingId(null);
-        setForm({ ...emptyForm(), rep_name: effectiveRepName ?? authRepName ?? '' });
-        setShowForm(true);
-    };
+    // One request per pause in typing rather than per keystroke.
+    useEffect(() => {
+        const id = setTimeout(() => {
+            setDebouncedSearch(prev => (prev === search ? prev : search));
+        }, 350);
+        return () => clearTimeout(id);
+    }, [search]);
 
-    const openEditForm = (lead: LeadRow) => {
-        setEditingId(lead.id);
-        setForm({
-            lead_date: lead.lead_date,
-            rep_name: lead.rep_name,
-            source: lead.source,
-            service_interest: lead.service_interest ?? '',
-            amount_sold: String(lead.amount_sold),
-            zoho_crm_url: lead.zoho_crm_url ?? '',
-            notes: lead.notes ?? '',
-            lead_status: lead.lead_status,
-        });
-        setShowForm(true);
-    };
-
-    const handleSave = async () => {
-        if (!form.rep_name || !form.source || !form.lead_date) return;
-        setSaving(true);
-        const payload = {
-            lead_date: form.lead_date,
-            rep_name: form.rep_name,
-            source: form.source,
-            service_interest: form.service_interest || null,
-            amount_sold: parseFloat(form.amount_sold) || 0,
-            zoho_crm_url: form.zoho_crm_url || null,
-            notes: form.notes || null,
-            lead_status: form.lead_status,
-        };
-
-        if (editingId) {
-            await supabase.from('leads').update(payload).eq('id', editingId);
-        } else {
-            await supabase.from('leads').insert(payload);
+    // A new search term changes the result set, so any page beyond the first is
+    // meaningless. Kept separate from the setter wrappers because `search` is
+    // typed, not selected.
+    const lastSearchRef = useRef(debouncedSearch);
+    useEffect(() => {
+        if (lastSearchRef.current !== debouncedSearch) {
+            lastSearchRef.current = debouncedSearch;
+            setPage(1);
         }
-        setSaving(false);
-        setShowForm(false);
-        fetchData();
-    };
+    }, [debouncedSearch, setPage]);
 
-    const handleDelete = async (id: string) => {
-        if (!confirm('Supprimer ce lead ?')) return;
-        await supabase.from('leads').delete().eq('id', id);
-        fetchData();
-    };
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
-    const handleInlineChange = (id: string, field: 'amount_sold' | 'notes', value: string) => {
-        setInlineEdit({ id, field, value });
-        setLeads(prev => prev.map(l => l.id === id ? { ...l, [field]: field === 'amount_sold' ? parseFloat(value) || 0 : value } : l));
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(async () => {
-            await supabase.from('leads').update({ [field]: field === 'amount_sold' ? parseFloat(value) || 0 : value }).eq('id', id);
-            setInlineEdit(null);
-        }, 600);
-    };
+    /** Page numbers around the current one, with ellipses. 293 pages can't all be buttons. */
+    const pageNumbers = useMemo<(number | 'gap')[]>(() => {
+        if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+        const out: (number | 'gap')[] = [1];
+        const lo = Math.max(2, page - 1);
+        const hi = Math.min(totalPages - 1, page + 1);
+        if (lo > 2) out.push('gap');
+        for (let i = lo; i <= hi; i++) out.push(i);
+        if (hi < totalPages - 1) out.push('gap');
+        out.push(totalPages);
+        return out;
+    }, [page, totalPages]);
 
-    useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+    // Counts describe the current page — `total` is the figure for everything.
+    const counts = useMemo(() => ({
+        leads: rows.filter(r => r.stage === 'lead').length,
+        contacts: rows.filter(r => r.stage === 'contact').length,
+    }), [rows]);
 
-    const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
-    const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les mois' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Tous les reps' }, ...repList.map(r => ({ value: r, label: r }))], [repList]);
-    const sourceOptions = useMemo(() => [{ value: 'Toutes', label: 'Toutes sources' }, ...LEAD_SOURCES.map(s => ({ value: s.value, label: s.label }))], []);
-    const serviceOptions = useMemo(() => [{ value: 'Tous', label: 'Tous services' }, ...LEAD_SERVICES.map(s => ({ value: s.value, label: s.label }))], []);
-    const statusOptions = useMemo(() => [{ value: 'Tous', label: 'Tous statuts' }, ...LEAD_STATUSES.map(s => ({ value: s.value, label: s.label }))], []);
+    const yearOptions = [
+        { value: 'Toutes', label: 'Toutes les années' },
+        ...[2027, 2026, 2025, 2024, 2023, 2022].map(y => ({ value: String(y), label: String(y) })),
+    ];
+    const monthOptions = useMemo(
+        () => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))],
+        [],
+    );
+    const repOptions = useMemo(
+        () => [{ value: 'Tous', label: 'Tous les reps' }, ...allReps.map(r => ({ value: r, label: r }))],
+        [allReps],
+    );
+    const sourceOptions = useMemo(
+        () => [{ value: 'Toutes', label: 'Toutes les sources' }, ...allSources.map(s => ({ value: s, label: s }))],
+        [allSources],
+    );
+    const serviceOptions = useMemo(
+        () => [{ value: 'Tous', label: 'Tous les services' }, ...allServices.map(s => ({ value: s, label: s }))],
+        [allServices],
+    );
+    const stageOptions = [
+        { value: 'Tous', label: 'Leads et contacts' },
+        { value: 'lead', label: 'Leads seulement' },
+        { value: 'contact', label: 'Contacts seulement' },
+    ];
 
-    const repFormOptions = useMemo(() => repList.map(r => ({ value: r, label: r })), [repList]);
-    const sourceFormOptions = useMemo(() => LEAD_SOURCES.map(s => ({ value: s.value, label: s.label })), []);
-    const serviceFormOptions = useMemo(() => [{ value: '', label: 'Non spécifié' }, ...LEAD_SERVICES.map(s => ({ value: s.value, label: s.label }))], []);
-    const statusFormOptions = useMemo(() => LEAD_STATUSES.map(s => ({ value: s.value, label: s.label })), []);
+    const pageBtn = 'min-w-[2rem] rounded-lg px-2 py-1.5 text-sm font-medium transition-colors';
 
-    const totalAmount = leads.reduce((s, l) => s + l.amount_sold, 0);
-    const wonCount = leads.filter(l => l.lead_status === 'won').length;
+    const renderPagination = (position: 'top' | 'bottom') => (
+        <div
+            className={cn(
+                'flex flex-wrap items-center justify-between gap-3 px-6 py-3',
+                position === 'top' ? 'border-b border-slate-100' : 'border-t border-slate-100',
+            )}
+        >
+            <span className="text-sm text-slate-500" translate="no">
+                {`${rangeStart}–${rangeEnd} / ${total.toLocaleString('fr-CA')}`}
+            </span>
+            <div className="flex items-center gap-1">
+                <button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page === 1}
+                    aria-label="Page précédente"
+                    className={cn(pageBtn, 'text-slate-600 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40')}
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
+
+                {pageNumbers.map((p, i) =>
+                    p === 'gap' ? (
+                        <span key={`gap-${i}`} className="px-1 text-sm text-slate-300">…</span>
+                    ) : (
+                        <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            aria-current={p === page ? 'page' : undefined}
+                            className={cn(
+                                pageBtn,
+                                p === page
+                                    ? 'bg-brand-main text-white'
+                                    : 'text-slate-600 hover:bg-slate-100',
+                            )}
+                        >
+                            {p}
+                        </button>
+                    ),
+                )}
+
+                <button
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages}
+                    aria-label="Page suivante"
+                    className={cn(pageBtn, 'text-slate-600 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40')}
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </button>
+            </div>
+        </div>
+    );
 
     return (
-        <>
-        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
+        <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-                        {effectiveRepName ? `Leads — ${effectiveRepName}` : 'Leads — Détail'}
-                    </h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Liste complète des leads avec détails</p>
+                    <h1 className="text-2xl font-semibold text-brand-dark">Leads — Détail</h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                        Leads et contacts synchronisés depuis Zoho CRM
+                    </p>
                 </div>
                 <button
-                    onClick={openAddForm}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-main text-white text-sm font-bold hover:bg-amber-600 transition-colors shadow-sm"
+                    onClick={() => { fetchData(); fetchOptions(); }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2
+                               text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
                 >
-                    <Plus className="w-4 h-4" /> Ajouter
+                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+                    Actualiser
                 </button>
             </div>
 
             <FilterBar>
                 <FilterGroup label="Année">
-                    <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
+                    <Select
+                        value={year === 'Toutes' ? 'Toutes' : String(year)}
+                        onChange={v => setYear(v === 'Toutes' ? 'Toutes' : Number(v))}
+                        options={yearOptions}
+                        variant="accent"
+                    />
                 </FilterGroup>
                 <FilterGroup label="Mois">
-                    <Select value={String(selectedMonth)} onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))} options={monthOptions} className="w-40" />
+                    <Select
+                        value={selectedMonth === 'Toutes' ? 'Toutes' : String(selectedMonth)}
+                        onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))}
+                        options={monthOptions}
+                    />
                 </FilterGroup>
                 {!effectiveRepName && (
-                    <FilterGroup label="Représentant">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                    <FilterGroup label="Propriétaire">
+                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} />
                     </FilterGroup>
                 )}
                 <FilterGroup label="Source">
-                    <Select value={selectedSource} onChange={setSelectedSource} options={sourceOptions} className="w-52" />
+                    <Select value={selectedSource} onChange={setSelectedSource} options={sourceOptions} />
                 </FilterGroup>
                 <FilterGroup label="Service">
-                    <Select value={selectedService} onChange={setSelectedService} options={serviceOptions} className="w-48" />
+                    <Select value={selectedService} onChange={setSelectedService} options={serviceOptions} />
                 </FilterGroup>
-                <FilterGroup label="Statut">
-                    <Select value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} className="w-36" />
+                <FilterGroup label="Type">
+                    <Select value={selectedStage} onChange={setSelectedStage} options={stageOptions} />
                 </FilterGroup>
             </FilterBar>
 
-            {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                    <p className="text-sm text-slate-400 font-medium">Chargement des leads...</p>
-                </div>
-            ) : (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <span className="text-sm font-bold text-slate-800">{leads.length} leads</span>
-                            <span className="text-[11px] text-slate-400">{wonCount} vendus · {formatCurrencyCAD(totalAmount)}</span>
-                        </div>
+            <div className="card">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                    <div className="flex items-baseline gap-3">
+                        <span className="text-lg font-semibold text-brand-dark" translate="no">
+                            {`${total.toLocaleString('fr-CA')} ${total === 1 ? 'enregistrement' : 'enregistrements'}`}
+                        </span>
+                        <span className="text-sm text-slate-400" translate="no">
+                            {total > 0
+                                ? `${rangeStart}–${rangeEnd} affichés · ${counts.leads} leads · ${counts.contacts} contacts`
+                                : ''}
+                        </span>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm min-w-[800px]">
-                            <thead>
-                                <tr className="border-b border-slate-50 bg-slate-50/60">
-                                    <th className="th text-left">Date</th>
-                                    {!effectiveRepName && <th className="th text-left">Rep</th>}
-                                    <th className="th text-left">Source</th>
-                                    <th className="th text-left">Service</th>
-                                    <th className="th text-center">Statut</th>
-                                    <th className="th text-right">Montant vendu</th>
-                                    <th className="th text-left">Notes</th>
-                                    <th className="th text-center">CRM</th>
-                                    <th className="th text-center">Actions</th>
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                            type="search"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            placeholder="Nom, entreprise, courriel, téléphone…"
+                            className="w-72 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm
+                                       placeholder:text-slate-400 focus:border-brand-main
+                                       focus:outline-none focus:ring-1 focus:ring-brand-main"
+                        />
+                    </div>
+                </div>
+
+                {totalPages > 1 && renderPagination('top')}
+
+                {loading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                    </div>
+                ) : rows.length === 0 ? (
+                    <div className="px-6 py-20 text-center text-sm text-slate-400">
+                        Aucun enregistrement pour ces filtres.
+                    </div>
+                ) : (
+                    <div className="max-h-[65vh] overflow-auto">
+                        <table className="w-full">
+                            <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_theme(colors.slate.200)]">
+                                <tr>
+                                    <th className="th">Nom</th>
+                                    <th className="th">Entreprise</th>
+                                    <th className="th">Téléphone</th>
+                                    <th className="th">Courriel</th>
+                                    <th className="th">Propriétaire</th>
+                                    <th className="th">Source</th>
+                                    <th className="th">Service</th>
+                                    <th className="th">Type</th>
+                                    <th className="th">Créé le</th>
+                                    <th className="th">Modifié le</th>
+                                    <th className="th">CRM</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {leads.length === 0 && (
-                                    <tr>
-                                        <td colSpan={effectiveRepName ? 8 : 9} className="px-5 py-10 text-center text-sm text-slate-400">
-                                            Aucun lead trouvé
+                            <tbody>
+                                {rows.map(r => (
+                                    <tr key={r.zoho_record_id} className="transition-colors hover:bg-slate-50/70">
+                                        <td className="td font-medium text-brand-dark">{r.full_name ?? '—'}</td>
+                                        <td className="td">{r.company ?? '—'}</td>
+                                        <td className="td whitespace-nowrap tabular-nums">{r.phone ?? '—'}</td>
+                                        <td className="td">
+                                            {r.email
+                                                ? <a href={`mailto:${r.email}`} className="text-brand-main hover:underline">{r.email}</a>
+                                                : '—'}
                                         </td>
-                                    </tr>
-                                )}
-                                {leads.map(lead => (
-                                    <tr key={lead.id} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="td tabular-nums text-slate-500 text-xs whitespace-nowrap">
-                                            {new Date(lead.lead_date).toLocaleDateString('fr-CA')}
-                                        </td>
-                                        {!effectiveRepName && (
-                                            <td className="td font-semibold text-slate-700">{lead.rep_name}</td>
-                                        )}
-                                        <td className="td text-xs text-slate-600 max-w-[160px]">
-                                            <span className="truncate block" title={lead.source}>{SOURCE_LABELS[lead.source] ?? lead.source}</span>
-                                        </td>
-                                        <td className="td text-xs text-slate-500">
-                                            {lead.service_interest ? (SERVICE_LABELS[lead.service_interest] ?? lead.service_interest) : <span className="text-slate-300">—</span>}
-                                        </td>
-                                        <td className="td text-center">
-                                            <span className={cn('px-2 py-0.5 rounded-full text-[10px] font-bold uppercase', STATUS_COLORS[lead.lead_status])}>
-                                                {STATUS_LABELS[lead.lead_status]}
-                                            </span>
-                                        </td>
-                                        <td className="td text-right tabular-nums">
-                                            <input
-                                                type="number"
-                                                className={cn(
-                                                    "w-28 text-right text-sm font-bold tabular-nums bg-transparent border-b border-transparent focus:border-brand-main focus:outline-none transition-colors",
-                                                    lead.amount_sold > 0 ? "text-emerald-600" : "text-slate-400"
-                                                )}
-                                                value={inlineEdit?.id === lead.id && inlineEdit.field === 'amount_sold' ? inlineEdit.value : lead.amount_sold}
-                                                onChange={e => handleInlineChange(lead.id, 'amount_sold', e.target.value)}
-                                            />
-                                        </td>
-                                        <td className="td text-xs text-slate-500 max-w-[180px]">
-                                            <input
-                                                type="text"
-                                                className="w-full text-xs bg-transparent border-b border-transparent focus:border-brand-main focus:outline-none transition-colors text-slate-500 placeholder:text-slate-300"
-                                                placeholder="Ajouter une note..."
-                                                value={inlineEdit?.id === lead.id && inlineEdit.field === 'notes' ? inlineEdit.value : (lead.notes ?? '')}
-                                                onChange={e => handleInlineChange(lead.id, 'notes', e.target.value)}
-                                            />
-                                        </td>
-                                        <td className="td text-center">
-                                            {lead.zoho_crm_url ? (
-                                                <a
-                                                    href={lead.zoho_crm_url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-400 hover:text-brand-main hover:bg-amber-50 transition-colors"
-                                                    title="Ouvrir dans Zoho CRM"
-                                                >
-                                                    <ExternalLink className="w-3.5 h-3.5" />
-                                                </a>
+                                        <td className="td">{r.rep_name ?? r.owner_name ?? '—'}</td>
+                                        <td className="td">
+                                            {isBlankPick(r.lead_source) ? (
+                                                <span className="text-slate-300">—</span>
                                             ) : (
-                                                <span className="text-slate-200">—</span>
+                                                <span title={r.attribution_inherited ? 'Hérité du lead d’origine' : undefined}>
+                                                    {r.lead_source}
+                                                    {r.attribution_inherited && <span className="ml-1 text-slate-400">*</span>}
+                                                </span>
                                             )}
                                         </td>
-                                        <td className="td text-center">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    onClick={() => openEditForm(lead)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-brand-main hover:bg-amber-50 transition-colors"
-                                                    title="Modifier"
+                                        <td className="td">
+                                            {r.service_interest?.length
+                                                ? r.service_interest.join(', ')
+                                                : <span className="text-slate-300">—</span>}
+                                        </td>
+                                        <td className="td">
+                                            <span className={cn('badge', STAGE_COLORS[r.stage])}>
+                                                {STAGE_LABELS[r.stage]}
+                                            </span>
+                                        </td>
+                                        <td className="td whitespace-nowrap text-slate-500">{formatDateTime(r.created_time)}</td>
+                                        <td className="td whitespace-nowrap text-slate-500">{formatDateTime(r.modified_time)}</td>
+                                        <td className="td">
+                                            {r.zoho_crm_url && (
+                                                <a
+                                                    href={r.zoho_crm_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-slate-400 transition-colors hover:text-brand-main"
+                                                    title="Ouvrir dans Zoho CRM"
                                                 >
-                                                    <Pencil className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(lead.id)}
-                                                    className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
+                                                    <ExternalLink className="h-4 w-4" />
+                                                </a>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
 
-        {/* Add / Edit modal */}
-        {showForm && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                <div
-                    className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
-                    onClick={e => e.stopPropagation()}
-                >
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-                        <h3 className="text-sm font-bold text-slate-800">{editingId ? 'Modifier le lead' : 'Ajouter un lead'}</h3>
-                        <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="overflow-y-auto p-5 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <FormField label="Date *">
-                                <input
-                                    type="date"
-                                    className="form-input"
-                                    value={form.lead_date}
-                                    onChange={e => setForm(f => ({ ...f, lead_date: e.target.value }))}
-                                />
-                            </FormField>
-                            <FormField label="Statut">
-                                <Select value={form.lead_status} onChange={v => setForm(f => ({ ...f, lead_status: v as 'active' | 'won' | 'lost' }))} options={statusFormOptions} className="w-full" />
-                            </FormField>
-                        </div>
-
-                        <FormField label="Représentant *">
-                            {effectiveRepName ? (
-                                <p className="text-sm font-semibold text-slate-700 py-2">{effectiveRepName}</p>
-                            ) : (
-                                <Select value={form.rep_name} onChange={v => setForm(f => ({ ...f, rep_name: v }))} options={[{ value: '', label: 'Choisir un rep...' }, ...repFormOptions]} className="w-full" />
-                            )}
-                        </FormField>
-
-                        <FormField label="Source *">
-                            <Select value={form.source} onChange={v => setForm(f => ({ ...f, source: v }))} options={[{ value: '', label: 'Choisir une source...' }, ...sourceFormOptions]} className="w-full" />
-                        </FormField>
-
-                        <FormField label="Service d'intérêt">
-                            <Select value={form.service_interest} onChange={v => setForm(f => ({ ...f, service_interest: v }))} options={serviceFormOptions} className="w-full" />
-                        </FormField>
-
-                        <FormField label="Montant vendu (CAD)">
-                            <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="form-input"
-                                value={form.amount_sold}
-                                onChange={e => setForm(f => ({ ...f, amount_sold: e.target.value }))}
-                            />
-                        </FormField>
-
-                        <FormField label="Lien CRM Zoho">
-                            <input
-                                type="url"
-                                className="form-input"
-                                placeholder="https://crm.zoho.com/..."
-                                value={form.zoho_crm_url}
-                                onChange={e => setForm(f => ({ ...f, zoho_crm_url: e.target.value }))}
-                            />
-                        </FormField>
-
-                        <FormField label="Notes">
-                            <textarea
-                                rows={3}
-                                className="form-input resize-none"
-                                placeholder="Informations complémentaires..."
-                                value={form.notes}
-                                onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                            />
-                        </FormField>
-                    </div>
-                    <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-3 flex-shrink-0">
-                        <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-100 transition-colors">
-                            Annuler
-                        </button>
-                        <button
-                            onClick={handleSave}
-                            disabled={saving || !form.rep_name || !form.source || !form.lead_date}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-main text-white text-sm font-bold hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                            {editingId ? 'Enregistrer' : 'Ajouter'}
-                        </button>
-                    </div>
-                </div>
+                {totalPages > 1 && renderPagination('bottom')}
             </div>
-        )}
-        </>
-    );
-}
-
-function FormField({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="space-y-1.5">
-            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{label}</label>
-            {children}
         </div>
     );
 }

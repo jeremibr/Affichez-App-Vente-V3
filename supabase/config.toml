@@ -370,6 +370,11 @@ verify_jwt = false
 [functions.zoho-invoice-sync]
 verify_jwt = false
 
+# Called directly by Zoho CRM workflow webhooks, which send no Supabase JWT.
+# The webhook path authenticates on its own via the x-webhook-secret header.
+[functions.zoho-lead-sync]
+verify_jwt = false
+
 # Called by pg_cron via net.http_post, which sends no JWT — every cron-driven
 # function must be pinned here or a redeploy silently 401s the schedule.
 [functions.zoho-sync]
