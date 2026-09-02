@@ -383,6 +383,10 @@ verify_jwt = false
 [functions.zoho-task-sync]
 verify_jwt = false
 
+# Cron-driven like the syncs above: pg_cron's net.http_post sends no JWT.
+[functions.zoho-books-customer-link]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

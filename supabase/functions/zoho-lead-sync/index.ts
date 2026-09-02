@@ -346,6 +346,12 @@ function mapRecord(
     service_interest: isLead ? toStringArray(rec[SERVICE_FIELD]) : [],
     lead_status: isLead ? ((rec.Lead_Status as string) ?? null) : null,
 
+    // The account this record belongs to, which is what invoices hang off:
+    // Zoho Books stores a CRM account id on each customer, never a contact id.
+    // A contact points at its account directly; a lead only has one once it has
+    // been converted.
+    account_id: isLead ? (convAccount?.id ?? null) : (account.id ?? null),
+
     is_converted: isLead ? Boolean(rec.Converted__s) : false,
     converted_contact_id: convContact?.id ?? null,
     converted_account_id: convAccount?.id ?? null,

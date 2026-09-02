@@ -2,7 +2,7 @@
 // Syncs Zoho Books invoices + credit notes → Supabase invoices table
 // Incremental: pg_cron every 5 min, uses last_modified_time filter (fast, 0-10 records)
 // Full sync:   manual button in Settings with x-full-sync: true header
-//              Uses date.start=2025-01-01 so only 2025+ data is fetched (fits in 150s)
+//              Uses date_start=2025-01-01 so only 2025+ data is fetched (fits in 150s)
 
 const ORGS = [
   { id: Deno.env.get('ZOHO_ORG_ID_QC') ?? '48244978', office: 'QC' },
@@ -29,8 +29,12 @@ const STATUS_MAP: Record<string, string> = {
   overdue:       'overdue',
 };
 
-// Full sync window: 2025-01-01 — covers all app data, keeps the request well within 150s
-const FULL_SYNC_DATE_START = '2025-01-01';
+// Full sync window: 2025-01-01 — covers all app data, keeps the request well within 150s.
+// Override per run with the x-date-start header. Needed once to back-fill
+// books_customer_id onto the ~6,400 invoices dated before 2025, which the default
+// window does not reach; pair it with x-date-end and x-org to slice a deep
+// back-fill into requests that each finish inside the 150s budget.
+const DEFAULT_FULL_SYNC_DATE_START = '2025-01-01';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -40,6 +44,20 @@ const SB_HEADERS = {
   Authorization: `Bearer ${SUPABASE_KEY}`,
   'Content-Type': 'application/json',
 };
+
+/**
+ * Zoho Books filters a list on the `date` field with `date_start` / `date_end`.
+ *
+ * Not `date.start`: that form is accepted and silently ignored, so the request
+ * comes back completely unfiltered. Verified against the live API on 2026-09-03 —
+ * `date.start=2021-01-01&date.end=2021-12-31` returned byte-identical results to
+ * sending no filter at all, while the underscore form correctly bounded them.
+ * That is why the "full sync anchored at 2025-01-01" was in fact fetching the
+ * entire history on every run.
+ */
+function dateRangeParam(start: string, end: string | null): string {
+  return `&date_start=${start}` + (end ? `&date_end=${end}` : '');
+}
 
 /** Format a Date as Zoho's expected last_modified_time string: "2026-04-13T10:30:45+0000" */
 function toZohoTimestamp(d: Date): string {
@@ -221,16 +239,28 @@ async function syncInvoices(
   lastModified: Date | null,
   touched: Set<string>,
   statusOverride: string | null = null,
+  dateStart: string = DEFAULT_FULL_SYNC_DATE_START,
+  dateEnd: string | null = null,
 ): Promise<{ upserted: number; errors: string[] }> {
   let upserted = 0;
   const errors: string[] = [];
 
-  // Full sync: one Zoho request per status + date.start to stay within 150s limit.
-  //   statusOverride → only that one status (use for targeted back-fills without re-fetching paid).
-  // Incremental: no status filter — last_modified_time window is narrow; STATUS_MAP guards upsert.
-  const statusFilters = lastModified === null
-    ? (statusOverride ? [statusOverride] : ['Paid', 'PartiallyPaid', 'Sent', 'OverDue'])
-    : [null];
+  // Zoho Books ignores date_start/date_end whenever filter_by is also present —
+  // verified against the live API on 2026-09-03: QC with filter_by=Status.Sent and
+  // a two-day 2019 window still returned all 114 Sent invoices. The two are
+  // mutually exclusive, so the full sync picks one.
+  //
+  // It picks the date window. Splitting by status was only ever a way to keep a
+  // request under 150s without a working date filter, and it splits badly — Paid
+  // holds most of the book, so that one slice times out while the other three
+  // return in seconds. A date window splits evenly and needs one pass instead of
+  // four. Statuses we do not store are dropped by STATUS_MAP below, exactly as
+  // the incremental path already does.
+  //
+  // x-status remains for re-fetching a single status without a date bound; it
+  // turns the date filter off because Zoho would ignore it anyway.
+  const useStatusFilter = lastModified === null && statusOverride !== null;
+  const statusFilters = useStatusFilter ? [statusOverride] : [null];
 
   for (const statusFilter of statusFilters) {
     let page = 1;
@@ -241,8 +271,12 @@ async function syncInvoices(
         ? `&last_modified_time=${encodeURIComponent(toZohoTimestamp(lastModified))}`
         : '';
       const statusParam = statusFilter ? `&filter_by=Status.${statusFilter}` : '';
-      // Full sync: anchor to 2025-01-01 so we don't pull years of old invoices
-      const dateParam = lastModified === null ? `&date.start=${FULL_SYNC_DATE_START}` : '';
+      // Full sync: anchor to dateStart so we don't pull years of old invoices, and
+      // optionally cap at dateEnd so a deep back-fill can be sliced by year. Never
+      // sent alongside filter_by, which would silently void it.
+      const dateParam = (lastModified === null && !useStatusFilter)
+        ? dateRangeParam(dateStart, dateEnd)
+        : '';
       const url = `https://www.zohoapis.com/books/v3/invoices` +
         `?organization_id=${org.id}&page=${page}&per_page=200${statusParam}${lastModParam}${dateParam}`;
 
@@ -268,6 +302,10 @@ async function syncInvoices(
           zoho_id: String(inv.invoice_id),
           invoice_number: inv.invoice_number,
           client_name: inv.customer_name,
+          // The Books customer behind this invoice. A DB trigger turns it into
+          // crm_account_id once zoho-books-customer-link has resolved that
+          // customer, which is what ties an invoice to a CRM contact.
+          books_customer_id: String(inv.customer_id ?? '') || null,
           amount: Math.round((Number(inv.total) / 1.14975) * 100) / 100,
           rep_name: (inv.salesperson_name as string)?.trim() || null,
           zoho_department_label: dept.label,
@@ -295,6 +333,8 @@ async function syncCreditNotes(
   accessToken: string,
   lastModified: Date | null,
   touched: Set<string>,
+  dateStart: string = DEFAULT_FULL_SYNC_DATE_START,
+  dateEnd: string | null = null,
 ): Promise<{ upserted: number; errors: string[] }> {
   let page = 1;
   let hasMore = true;
@@ -305,8 +345,8 @@ async function syncCreditNotes(
     const lastModParam = lastModified
       ? `&last_modified_time=${encodeURIComponent(toZohoTimestamp(lastModified))}`
       : '';
-    // Full sync: anchor to 2025-01-01
-    const dateParam = lastModified === null ? `&date.start=${FULL_SYNC_DATE_START}` : '';
+    // Full sync: anchor to dateStart, optionally capped at dateEnd
+    const dateParam = lastModified === null ? dateRangeParam(dateStart, dateEnd) : '';
     const url = `https://www.zohoapis.com/books/v3/creditnotes` +
       `?organization_id=${org.id}&page=${page}&per_page=200${lastModParam}${dateParam}`;
 
@@ -350,6 +390,7 @@ async function syncCreditNotes(
         zoho_id: String(note.creditnote_id),
         invoice_number: note.creditnote_number,
         client_name: note.customer_name,
+        books_customer_id: String(note.customer_id ?? '') || null,
         amount: Math.round((Number(note.total) / 1.14975) * 100) / 100 * -1,
         rep_name: (note.salesperson_name as string)?.trim() || null,
         zoho_department_label: dept.label,
@@ -511,7 +552,8 @@ Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
-      'authorization, x-sync-source, x-full-sync, x-org, x-status, x-prune, x-prune-only, x-dry-run, content-type',
+      'authorization, x-sync-source, x-full-sync, x-org, x-status, x-date-start, ' +
+      'x-date-end, x-prune, x-prune-only, x-dry-run, content-type',
   };
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -523,6 +565,27 @@ Deno.serve(async (req: Request) => {
   // x-status: optional — restrict full sync to a single Zoho status (e.g. "Sent", "Overdue").
   // Use this to back-fill a single status without re-fetching all paid/partial records.
   const statusOverride = req.headers.get('x-status') ?? null;
+  // x-date-start: optional — move the full-sync window back, e.g. "2021-01-01" to
+  // reach invoices older than the default. Rejected unless it is a plain ISO date,
+  // since it goes straight into the Zoho query string.
+  const rawDateStart = req.headers.get('x-date-start');
+  if (rawDateStart && !/^\d{4}-\d{2}-\d{2}$/.test(rawDateStart)) {
+    return new Response(
+      JSON.stringify({ error: 'x-date-start must be YYYY-MM-DD' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+  const dateStart = rawDateStart ?? DEFAULT_FULL_SYNC_DATE_START;
+  // x-date-end: optional upper bound, so a deep back-fill can be run one year at
+  // a time. QC alone has 11k invoices — an unbounded 2021→today pass exceeds 150s.
+  const rawDateEnd = req.headers.get('x-date-end');
+  if (rawDateEnd && !/^\d{4}-\d{2}-\d{2}$/.test(rawDateEnd)) {
+    return new Response(
+      JSON.stringify({ error: 'x-date-end must be YYYY-MM-DD' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+  const dateEnd = rawDateEnd ?? null;
   // Duplicate reaper: runs after every sync. x-prune: false opts out,
   // x-prune-only: true skips the sync, x-dry-run: true reports without deleting.
   const isPruneOnly = req.headers.get('x-prune-only') === 'true';
@@ -555,11 +618,11 @@ Deno.serve(async (req: Request) => {
 
     if (!isPruneOnly) {
       for (const org of orgsToProcess) {
-        const invResult = await syncInvoices(org, accessToken, lastModified, touched, statusOverride);
+        const invResult = await syncInvoices(org, accessToken, lastModified, touched, statusOverride, dateStart, dateEnd);
         totalUpserted += invResult.upserted;
         allErrors.push(...invResult.errors);
 
-        const cnResult = await syncCreditNotes(org, accessToken, lastModified, touched);
+        const cnResult = await syncCreditNotes(org, accessToken, lastModified, touched, dateStart, dateEnd);
         totalUpserted += cnResult.upserted;
         allErrors.push(...cnResult.errors);
       }

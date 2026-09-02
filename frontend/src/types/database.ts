@@ -110,6 +110,13 @@ export type ZohoLeadRow = {
     lead_status: string | null;
     attribution_inherited: boolean;
 
+    /**
+     * CRM account this record belongs to — the join key to invoices. A contact
+     * takes it from Account_Name; a lead only has one once converted. Invoices
+     * are owned by the account, so contacts at the same company share them.
+     */
+    account_id: string | null;
+
     is_converted: boolean;
     converted_contact_id: string | null;
     converted_account_id: string | null;
@@ -225,4 +232,42 @@ export type TasksAvailableWeek = {
     week_end: string;
     nb_created: number;
     nb_completed: number;
+};
+
+/**
+ * One invoice or credit note attached to a CRM account, from get_lead_invoices.
+ * `amount` is pre-tax and negative on an avoir, so a plain sum is the net figure.
+ */
+export type LeadInvoiceRow = {
+    zoho_id: string;
+    invoice_number: string | null;
+    client_name: string;
+    amount: number;
+    invoice_date: string | null;
+    status: 'sent' | 'viewed' | 'paid' | 'partial' | 'overdue' | 'void' | 'avoir';
+    is_avoir: boolean;
+    department: string | null;
+    office: 'QC' | 'MTL' | null;
+    rep_name: string | null;
+    books_customer_id: string | null;
+};
+
+/** Per-account rollup from get_lead_invoice_totals — one row per account with invoices. */
+export type LeadInvoiceTotals = {
+    account_id: string;
+    invoice_count: number;
+    credit_count: number;
+    total_amount: number;
+    last_invoice_date: string | null;
+};
+
+/** Progress of the Books-customer → CRM-account back-fill, from get_invoice_linkage_status. */
+export type InvoiceLinkageStatus = {
+    customers_total: number;
+    customers_pending: number;
+    customers_linked: number;
+    customers_unlinked: number;
+    customers_error: number;
+    invoices_total: number;
+    invoices_with_account: number;
 };

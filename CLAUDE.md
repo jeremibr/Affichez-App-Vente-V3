@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Affichez-App-Vente** is an internal sales performance dashboard for Affichez, a Quebec-based advertising company. It visualizes sales data (revenue, deals, reps, departments) from a Supabase backend. The frontend is a React + TypeScript + Vite SPA inside the `frontend/` directory.
 
-There is no backend in this repo — all data is read directly from Supabase via `@supabase/supabase-js`, using PostgreSQL RPC functions and direct table queries. Real-time updates are handled via Supabase Realtime channels subscribed to the `sales` table.
+The frontend has no server of its own — it reads directly from Supabase via `@supabase/supabase-js`, using PostgreSQL RPC functions and direct table queries. Real-time updates are handled via Supabase Realtime channels subscribed to the `sales` table. Writes into Supabase come from the Deno edge functions in `supabase/functions/`, which pull from Zoho on a schedule (see **Zoho Sync** below).
 
 ## Development Commands
 
@@ -47,6 +47,52 @@ All data flows through `src/lib/supabase.ts` (the singleton Supabase client). Pa
 - `supabase.from('table').select(...)` — for CRUD in Settings (reps, objectives, quarters, webhook_log)
 
 There is no service layer abstraction; Supabase calls are made directly inside page components using `useCallback`-wrapped async functions. Real-time subscriptions (Supabase Realtime) are set up in `useEffect` and cleaned up on unmount.
+
+### Zoho Sync (Supabase Edge Functions)
+
+`supabase/functions/` holds the Deno edge functions that pull from Zoho; the React
+app only ever reads what they have written. Two different Zoho products are
+involved and they do not share ids or credentials:
+
+- **Zoho Books** (`zoho-sync`, `zoho-invoice-sync`) — two organisations, QC and
+  MTL, feeding `quotes` and `invoices`.
+- **Zoho CRM** (`zoho-lead-sync`, `zoho-task-sync`) — one org, feeding
+  `zoho_leads` and `zoho_tasks`.
+
+Two Zoho API quirks are worth knowing before touching `zoho-invoice-sync`:
+
+- Books list endpoints filter dates with `date_start` / `date_end`. The dotted
+  form `date.start` is accepted and **silently ignored**.
+- `date_start` and `filter_by` are mutually exclusive — send both and the date
+  range is dropped without an error.
+
+### Invoices on a lead or contact
+
+An invoice belongs to a CRM **account**, never to a person, so every contact at a
+company shows the same invoices. Zoho Books only links its customers at account
+level (`zcrm_account_id`), so this is the real grain of the data, not a shortcut.
+
+The chain, resolved right to left because that is the cheap direction — 14k
+invoices name only ~3.1k customers, against ~20.6k CRM accounts:
+
+```
+zoho_leads.account_id ◀── Contacts.Account_Name.id   (zoho-lead-sync)
+        ▲
+        │ = invoices.crm_account_id
+        │
+zoho_books_customers.crm_account_id ◀── Books contact.zcrm_account_id
+        ▲                                (zoho-books-customer-link)
+        │ = invoices.books_customer_id ◀── Books invoice.customer_id
+        │                                 (zoho-invoice-sync)
+```
+
+`zoho_books_customers` is a cache of the one hop that costs an API call, filled a
+slice at a time under Zoho's 100-calls/minute/org limit by the
+`zoho-books-customer-link` function (cron, every 30 min). Two triggers keep
+`invoices.crm_account_id` in step in both directions, so neither sync needs to
+know about the other. `get_lead_invoice_totals` / `get_lead_invoices` back the
+Factures column and modal on the Leads page; `get_invoice_linkage_status` reports
+back-fill coverage in Settings.
 
 ### Pages and Routes
 

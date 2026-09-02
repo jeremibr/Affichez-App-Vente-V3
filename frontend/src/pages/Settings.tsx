@@ -5,9 +5,10 @@ import {
     Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
     Zap, Loader2, Users, Trash2, Plus,
-    Ban, Search, X
+    Ban, Search, X, Link2
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
+import type { InvoiceLinkageStatus } from '../types/database';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
@@ -231,13 +232,154 @@ function SyncManager() {
                 endpoint="zoho-task-sync"
                 actionLabel="sync_tasks_manual"
             />
+            <LinkageCard />
             <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                 <span>
-                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>.
+                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>, <strong className="text-slate-700">Liaison factures aux 30 min</strong>.
                 </span>
             </div>
         </div>
+    );
+}
+
+/**
+ * Progress of the Books-customer -> CRM-account bridge, which is what puts an
+ * invoice on a lead.
+ *
+ * Worth its own card rather than a SyncCard: this job is not a plain import. It
+ * works through a queue a slice at a time under Zoho's rate limit (100 calls per
+ * minute per organisation), so the useful thing to show is how much is left, not
+ * how many rows the last run touched. The button takes one slice; press it again,
+ * or wait for the half-hourly cron, until "restant" reaches zero.
+ */
+function LinkageCard() {
+    const [status, setStatus] = useState<InvoiceLinkageStatus | null>(null);
+    const [running, setRunning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [lastRun, setLastRun] = useState<string | null>(null);
+
+    const fetchStatus = async () => {
+        const { data } = await supabase.rpc('get_invoice_linkage_status').single();
+        setStatus((data as InvoiceLinkageStatus) ?? null);
+    };
+
+    // Load once when the Synchronisation tab mounts. The lint rule fires on any
+    // setState reachable from an effect body; here the write happens in the
+    // awaited continuation, not synchronously, so there is no cascading render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { fetchStatus(); }, []);
+
+    const runLink = async () => {
+        setRunning(true); setError(null);
+        try {
+            const res = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/zoho-books-customer-link`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                        'x-sync-source': 'manual',
+                    },
+                },
+            );
+            const data = await res.json();
+            if (!res.ok) setError(data.error ?? 'Erreur inconnue');
+            else {
+                setLastRun(
+                    `${(data.orgs ?? []).reduce((n: number, o: { linked: number }) => n + o.linked, 0)} li\u00e9s, ` +
+                    `${data.remaining ?? 0} restant`,
+                );
+                await fetchStatus();
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Erreur r\u00e9seau');
+        }
+        setRunning(false);
+    };
+
+    const pending = status?.customers_pending ?? 0;
+    const coverage = status && status.invoices_total > 0
+        ? Math.round((status.invoices_with_account / status.invoices_total) * 100)
+        : 0;
+
+    return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                        <Link2 className="w-4 h-4 text-brand-main" />
+                        Liaison Factures &rarr; Comptes CRM
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                        Associe chaque client Zoho Books \u00e0 son compte Zoho CRM, ce qui permet
+                        d&rsquo;afficher les factures sur la fiche d&rsquo;un lead ou d&rsquo;un contact.
+                        Chaque ex\u00e9cution traite une tranche&nbsp;: relancer jusqu&rsquo;\u00e0 ce
+                        qu&rsquo;il ne reste rien.
+                    </p>
+                    {lastRun && (
+                        <p className="text-xs text-slate-500 mt-2 font-medium">
+                            Dernier passage&nbsp;: <span className="text-slate-700">{lastRun}</span>
+                        </p>
+                    )}
+                </div>
+                <button
+                    onClick={runLink}
+                    disabled={running}
+                    className="flex shrink-0 items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl
+                               text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90
+                               transition-all disabled:opacity-60"
+                >
+                    {running
+                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Liaison...</>
+                        : <><RefreshCcw className="w-4 h-4" /> Lier</>}
+                </button>
+            </div>
+
+            {status && (
+                <div className="pt-4 border-t border-slate-100 space-y-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                            className="h-full rounded-full bg-brand-main transition-all"
+                            style={{ width: `${coverage}%` }}
+                        />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+                        <Stat label="Factures reli\u00e9es"
+                              value={`${status.invoices_with_account.toLocaleString('fr-CA')} / ${status.invoices_total.toLocaleString('fr-CA')} (${coverage}%)`} />
+                        <Stat label="Clients li\u00e9s" value={String(status.customers_linked)} />
+                        <Stat label="Sans compte CRM" value={String(status.customers_unlinked)} muted />
+                        <Stat label="Restant" value={String(pending)} highlight={pending > 0} />
+                        {status.customers_error > 0 && (
+                            <Stat label="Erreurs" value={String(status.customers_error)} danger />
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {error && (
+                <div className="flex items-center gap-2 text-sm text-rose-600">
+                    <AlertCircle className="w-4 h-4" />{error}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function Stat({ label, value, muted, highlight, danger }: {
+    label: string; value: string; muted?: boolean; highlight?: boolean; danger?: boolean;
+}) {
+    return (
+        <span className="flex items-baseline gap-1.5">
+            <span className="text-slate-400">{label}</span>
+            <span className={cn(
+                'font-bold tabular-nums',
+                danger ? 'text-rose-600'
+                    : highlight ? 'text-brand-main'
+                    : muted ? 'text-slate-400'
+                    : 'text-slate-700',
+            )}>{value}</span>
+        </span>
     );
 }
 
