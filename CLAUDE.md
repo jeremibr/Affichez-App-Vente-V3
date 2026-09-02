@@ -94,6 +94,42 @@ know about the other. `get_lead_invoice_totals` / `get_lead_invoices` back the
 Factures column and modal on the Leads page; `get_invoice_linkage_status` reports
 back-fill coverage in Settings.
 
+### Leads: which table is which
+
+There are two lead tables, and picking the wrong one is the easiest mistake to
+make here.
+
+- **`zoho_leads`** — the real data, ~29k rows synced from Zoho CRM. `stage` says
+  whether a row is a Lead or a Contact.
+- **`leads`** — a legacy hand-entered archive: 192 rows, every one dated
+  2026-01-01, untouched since May 2026. Nothing reads it any more. The
+  `get_leads_*` RPCs still point at it and are equally dead; use the
+  `get_zoho_lead*` ones.
+
+Three things about `zoho_leads` that are not obvious from the schema:
+
+- **`zoho_leads_unique` is for directories, not funnels.** It hides a converted
+  lead behind the contact it became, so counting conversions through it gives
+  ~99%. The dashboard reads the base table with `stage = 'lead'`.
+- **Contacts are not leads.** Most were created directly in Zoho as clients and
+  were never leads; including them inflates revenue several-fold.
+- **Conversion needs two numbers.** Zoho marks 97% of leads converted, which says
+  nothing. `leads_invoiced` — the lead's account actually being billed after the
+  lead arrived — is the figure that moves. The two are nested: every invoiced
+  lead is already flagged converted.
+
+Revenue comes in two flavours, both summed once per account so that several leads
+on one account do not double-count: `revenue_attributed` (invoices dated on or
+after the lead arrived) and `revenue_lifetime` (the account's whole history).
+
+**Filter values must come from `get_zoho_lead_filter_options`, never a hardcoded
+list.** Zoho's service picklist holds the same service under several spellings
+differing only in case or spacing ("Distribution publicitaire" /
+"Distribution Publicitaire", 2,209 leads between them). The RPC folds them via
+`zoho_service_key()` and returns `service_variants` so a query can match every
+spelling at once — the stored array keeps Zoho's original casing, and normalising
+the table would just be overwritten by the next sync.
+
 ### Pages and Routes
 
 | Route | Page | Purpose |

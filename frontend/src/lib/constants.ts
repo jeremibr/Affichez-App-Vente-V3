@@ -48,23 +48,11 @@ export const INTERNAL_REP_NAMES = [
     'Vincent Dagenais',
 ] as const;
 
-export const LEAD_SOURCES = [
-    { value: 'Meta Ads',                               label: 'Meta Ads' },
-    { value: 'Site Web / Recherche Google',            label: 'Site Web / Recherche Google' },
-    { value: 'Intérêt par un produit de la boutique', label: 'Boutique' },
-    { value: 'A reçu notre publicité imprimé',         label: 'Publicité imprimée' },
-    { value: 'Client déjà en CRM du passé',            label: 'Client CRM existant' },
-    { value: 'AUTRE (à déterminer dans les notes)',    label: 'Autre' },
-] as const;
-
-export const LEAD_SERVICES = [
-    { value: 'DISTRIBUTION PUB',          label: 'Distribution pub' },
-    { value: 'PROMO',                     label: 'Promo' },
-    { value: 'NUMERIQUE',                 label: 'Numérique' },
-    { value: 'ÉVÈNEMENT',                 label: 'Événement' },
-    { value: 'INTELLIGENCE ARTIFICIELLE', label: 'Intelligence artificielle' },
-    { value: 'NON MENTIONNÉ',             label: 'Non mentionné' },
-] as const;
+// LEAD_SOURCES / LEAD_SERVICES used to live here. They were the legacy `leads`
+// table's vocabulary, and only one of the six sources ("Meta Ads") exists in
+// Zoho CRM at all — the real top source, "Publicité/Recherche Google", was
+// never offered. Filter options now come from the data itself, via the
+// get_zoho_lead_filter_options RPC, which also folds Zoho's case variants.
 
 export const LEAD_STATUSES = [
     { value: 'active', label: 'Actif' },

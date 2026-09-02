@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
-import type { SommaireRow } from '../types/database';
+import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, Unlink } from 'lucide-react';
+import type { SommaireRow, InvoiceUnassignedSummary, UnassignedInvoiceRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
 import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { formatCurrencyCAD, cn } from '../lib/utils';
+import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
+import { InfoHint } from '../components/InfoHint';
 import { useAuth } from '../contexts/AuthContext';
 
 interface InvDashboardKPIs {
@@ -45,6 +46,9 @@ export default function FDashboard() {
     const [prevGrandTotalData, setPrevGrandTotalData] = useState<SommaireRow[]>([]);
     const [prevDeptData, setPrevDeptData] = useState<SommaireRow[]>([]);
     const [kpis, setKpis] = useState<InvDashboardKPIs | null>(null);
+    // Billing the app cannot tie to a CRM account, so it never reaches a lead.
+    const [unassigned, setUnassigned] = useState<InvoiceUnassignedSummary | null>(null);
+    const [showUnassigned, setShowUnassigned] = useState(false);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [allReps, setAllReps] = useState<string[]>([]);
@@ -71,7 +75,8 @@ export default function FDashboard() {
             { data: prevDData },
             { data: kpiData },
             { data: clientData },
-            { data: leaderData }
+            { data: leaderData },
+            { data: unassignedData }
         ] = await Promise.all([
             supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
             supabase.rpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
@@ -79,8 +84,12 @@ export default function FDashboard() {
             supabase.rpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
             supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
             supabase.rpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
-            supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam })
+            supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
+            // No status filter: an invoice is unattributed regardless of whether it is paid.
+            supabase.rpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam })
         ]);
+
+        setUnassigned((unassignedData as InvoiceUnassignedSummary[])?.[0] ?? null);
 
         // NFC-normalize both sides to handle é/è/etc. encoding differences between DB and JS strings
         const internalNamesNFC = new Set(
@@ -318,6 +327,23 @@ export default function FDashboard() {
                         <KPICard title="Objectif Annuel" value={formatCurrencyCAD(kpis?.annual_target || 0)} subText="Planifié pour l'année" icon={Target} />
                     </div>
 
+                    {/* Attribution quality. Shown whenever there is anything to report so a
+                        growing gap is noticed here rather than in a reconciliation later. */}
+                    {unassigned && (unassigned.unassigned_count > 0 || unassigned.internal_count > 0) && (
+                        <UnassignedCard data={unassigned} onOpen={() => setShowUnassigned(true)} />
+                    )}
+
+                    {showUnassigned && (
+                        <UnassignedModal
+                            year={year}
+                            office={selectedOffice === 'Toutes' ? null : selectedOffice}
+                            month={selectedMonth === 'Toutes' ? null : selectedMonth}
+                            dept={selectedDept === 'Toutes' ? null : selectedDept}
+                            rep={selectedRep === 'Tous' ? null : selectedRep}
+                            onClose={() => setShowUnassigned(false)}
+                        />
+                    )}
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                         {/* Leaderboard */}
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
@@ -472,6 +498,197 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
                     <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="overflow-y-auto">{children}</div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Invoicing with no CRM account behind it. Those invoices are real money that the
+ * Leads view cannot attribute to anyone, so the figure belongs next to the totals
+ * rather than in a report nobody opens.
+ *
+ * Internal billing is reported apart from the gap: the company invoices itself,
+ * and that will never have a CRM account, so folding it in would have made the
+ * number look four times worse than it is.
+ */
+function UnassignedCard({ data, onOpen }: {
+    data: InvoiceUnassignedSummary;
+    onOpen: () => void;
+}) {
+    return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                    <div className="p-2 bg-slate-50 rounded-xl text-slate-400">
+                        <Unlink className="w-4 h-4" />
+                    </div>
+                    <div>
+                        <div className="flex items-center gap-1.5">
+                            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                                Factures non attribuées
+                            </p>
+                            <InfoHint text={
+                                "Factures dont le client Zoho Books n'est reli\u00e9 \u00e0 aucun compte Zoho CRM. " +
+                                "Elles sont bien compt\u00e9es dans le total factur\u00e9, mais n'apparaissent sur " +
+                                "la fiche d'aucun lead ni d'aucun contact. La facturation interne (Affichez Inc. " +
+                                "\u00e0 elle-m\u00eame) est exclue de ce chiffre et affich\u00e9e s\u00e9par\u00e9ment, " +
+                                "car elle n'aura jamais de compte CRM. Cliquez pour voir les factures concern\u00e9es."
+                            } />
+                        </div>
+                        <p className="mt-1 text-base md:text-xl font-bold text-slate-900 tabular-nums">
+                            {formatCurrencyCAD(data.unassigned_amount)}
+                            <span className="ml-2 text-xs font-semibold text-slate-400">
+                                {data.unassigned_count.toLocaleString('fr-CA')}{' '}
+                                {data.unassigned_count === 1 ? 'facture' : 'factures'}
+                            </span>
+                        </p>
+                        <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 font-medium italic">
+                            {data.unassigned_share}&nbsp;% de la facturation externe
+                            {data.internal_count > 0 && (
+                                <>
+                                    {' \u00b7 '}interne exclue&nbsp;: {formatCurrencyCAD(data.internal_amount)}
+                                </>
+                            )}
+                        </p>
+                    </div>
+                </div>
+                {data.unassigned_count > 0 && (
+                    <button
+                        onClick={onOpen}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2
+                                   text-xs font-semibold text-slate-600 transition-colors
+                                   hover:border-brand-main hover:bg-amber-50 hover:text-brand-main"
+                    >
+                        Voir les factures
+                        <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/** The rows behind the figure, with the reason each one could not be linked. */
+function UnassignedModal({ year, office, month, dept, rep, onClose }: {
+    year: number;
+    office: string | null;
+    month: number | null;
+    dept: string | null;
+    rep: string | null;
+    onClose: () => void;
+}) {
+    const [rows, setRows] = useState<UnassignedInvoiceRow[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            setLoading(true);
+            const { data } = await supabase.rpc('get_unassigned_invoices', {
+                p_year: year, p_office: office, p_month: month,
+                p_dept: dept, p_rep: rep, p_limit: 500,
+            });
+            if (cancelled) return;
+            setRows((data as UnassignedInvoiceRow[]) ?? []);
+            setLoading(false);
+        })();
+        return () => { cancelled = true; };
+    }, [year, office, month, dept, rep]);
+
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
+    const total = rows.reduce((sum, r) => sum + Number(r.amount), 0);
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+            onClick={onClose}
+            role="presentation"
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Factures non attribuées"
+                onClick={e => e.stopPropagation()}
+                className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            >
+                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                    <div>
+                        <h2 className="text-lg font-semibold text-brand-dark">Factures non attribuées</h2>
+                        <p className="mt-0.5 text-sm text-slate-400">
+                            Aucun compte Zoho CRM derrière le client — ces montants n’apparaissent sur aucune fiche lead
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        aria-label="Fermer"
+                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                    >
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center py-20">
+                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                    </div>
+                ) : rows.length === 0 ? (
+                    <div className="px-6 py-16 text-center text-sm text-slate-400">
+                        Toutes les factures de cette période sont attribuées.
+                    </div>
+                ) : (
+                    <div className="overflow-auto">
+                        <table className="w-full">
+                            <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_theme(colors.slate.200)]">
+                                <tr>
+                                    <th className="th">Numéro</th>
+                                    <th className="th">Client</th>
+                                    <th className="th">Date</th>
+                                    <th className="th">Bureau</th>
+                                    <th className="th">Représentant</th>
+                                    <th className="th">Raison</th>
+                                    <th className="th text-right">Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map(inv => (
+                                    <tr key={inv.zoho_id} className={cn('transition-colors hover:bg-slate-50/70',
+                                                                        inv.is_avoir && 'bg-rose-50/30')}>
+                                        <td className="td font-medium text-brand-dark">{inv.invoice_number ?? '\u2014'}</td>
+                                        <td className="td text-slate-600">{inv.client_name}</td>
+                                        <td className="td whitespace-nowrap text-slate-500">
+                                            {inv.invoice_date ? formatShortDate(new Date(inv.invoice_date)) : '\u2014'}
+                                        </td>
+                                        <td className="td text-slate-500">{inv.office ?? '\u2014'}</td>
+                                        <td className="td text-slate-500">{inv.rep_name ?? '\u2014'}</td>
+                                        <td className="td">
+                                            <span className="badge bg-slate-100 text-slate-500">{inv.reason}</span>
+                                        </td>
+                                        <td className={cn('td text-right font-semibold tabular-nums',
+                                                          inv.is_avoir ? 'text-rose-600' : 'text-brand-dark')}>
+                                            {formatCurrencyCAD(inv.amount)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-3">
+                    <span className="text-sm text-slate-500" translate="no">
+                        {`${rows.length} facture${rows.length > 1 ? 's' : ''}`}
+                        {rows.length === 500 && ' (500 premi\u00e8res)'}
+                    </span>
+                    <span className="text-sm font-semibold text-brand-dark">
+                        Total <span className="tabular-nums text-base">{formatCurrencyCAD(total)}</span>
+                    </span>
+                </div>
             </div>
         </div>
     );

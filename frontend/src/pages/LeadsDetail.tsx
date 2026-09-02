@@ -108,6 +108,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const [allSources, setAllSources] = useState<string[]>([]);
     const [allServices, setAllServices] = useState<string[]>([]);
     const [allReps, setAllReps] = useState<string[]>([]);
+    // Every raw spelling behind each service label. Zoho stores the same service
+    // under variants that differ in case or spacing, so matching the label alone
+    // silently dropped rows — "Distribution Publicitaire" returned 166 of 2,209.
+    const [serviceVariants, setServiceVariants] = useState<Record<string, string[]>>({});
 
     const effectiveRepName = propRepName ?? null;
 
@@ -167,7 +171,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         else if (selectedRep !== 'Tous') query = query.eq('rep_name', selectedRep);
 
         if (selectedSource !== 'Toutes') query = query.eq('lead_source', selectedSource);
-        if (selectedService !== 'Tous') query = query.contains('service_interest', [selectedService]);
+        if (selectedService !== 'Tous') {
+            // overlaps, not contains: match any of the label's spellings.
+            query = query.overlaps('service_interest', serviceVariants[selectedService] ?? [selectedService]);
+        }
         if (selectedStage !== 'Tous') query = query.eq('stage', selectedStage);
 
         // Searching server-side, not over the loaded page: with 100 rows per page a
@@ -191,7 +198,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         // second round trip.
         fetchInvoiceTotals(pageRows);
     }, [yearBounds, selectedRep, selectedSource, selectedService, selectedStage,
-        effectiveRepName, page, debouncedSearch, fetchInvoiceTotals]);
+        effectiveRepName, page, debouncedSearch, fetchInvoiceTotals, serviceVariants]);
 
     /**
      * Options are scoped to the year only, so choosing one filter never empties
@@ -206,6 +213,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         setAllSources(data.sources ?? []);
         setAllServices(data.services ?? []);
         setAllReps(data.reps ?? []);
+        setServiceVariants(data.service_variants ?? {});
     }, [year]);
 
     const fetchDataRef = useRef(fetchData);

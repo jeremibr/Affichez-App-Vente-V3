@@ -127,11 +127,20 @@ export type ZohoLeadRow = {
     synced_at: string;
 };
 
-/** Return shape of the get_zoho_lead_filter_options RPC — distinct values for the filter bar. */
+/**
+ * Distinct values for the Leads filter bar (get_zoho_lead_filter_options).
+ *
+ * `services` is folded to one entry per service: Zoho's picklist holds the same
+ * service under several spellings that differ only in case or spacing, and
+ * offering both meant picking one silently excluded the other's rows.
+ * `service_variants` maps each label to every raw spelling behind it, so a query
+ * can match them all at once — the stored array keeps Zoho's original casing.
+ */
 export type ZohoLeadFilterOptions = {
     sources: string[];
     services: string[];
     reps: string[];
+    service_variants: Record<string, string[]>;
 };
 
 /** Legacy hand-entered leads table, superseded by ZohoLeadRow. Kept as an archive. */
@@ -270,4 +279,75 @@ export type InvoiceLinkageStatus = {
     customers_error: number;
     invoices_total: number;
     invoices_with_account: number;
+};
+
+/**
+ * Leads dashboard KPI row (get_zoho_lead_kpis), computed over Zoho's Leads module.
+ *
+ * Two conversion figures on purpose. `leads_converted` is Zoho's own flow, which
+ * marks ~97% of leads converted and so says little; `leads_invoiced` is the lead's
+ * account actually being billed after the lead arrived. The second is the one that
+ * moves. They are nested, not overlapping — every invoiced lead is also converted.
+ *
+ * `revenue_attributed` counts only invoices dated on or after the lead arrived;
+ * `revenue_lifetime` is the account's whole billing history. Both are summed once
+ * per account, so several leads on one account do not double-count.
+ */
+export type ZohoLeadKPIs = {
+    leads_received: number;
+    leads_converted: number;
+    leads_invoiced: number;
+    conversion_rate: number;
+    invoiced_rate: number;
+    revenue_attributed: number;
+    revenue_lifetime: number;
+};
+
+/** One row of any get_zoho_leads_by_* breakdown — same shape for rep, source and service. */
+export type ZohoLeadBreakdownRow = {
+    label: string;
+    nb_leads: number;
+    nb_converted: number;
+    nb_invoiced: number;
+    total_amount: number;
+};
+
+/** get_zoho_leads_monthly_summary — `month` is 1-12. */
+export type ZohoLeadsMonthlyRow = {
+    month: number;
+    nb_leads: number;
+    nb_converted: number;
+    nb_invoiced: number;
+    total_amount: number;
+};
+
+/**
+ * Invoicing the app cannot tie to a CRM account (get_invoice_unassigned_summary).
+ * Internal billing — the company invoicing itself — is reported separately rather
+ * than counted as a gap, since it will never have a CRM account.
+ */
+export type InvoiceUnassignedSummary = {
+    unassigned_count: number;
+    unassigned_amount: number;
+    internal_count: number;
+    internal_amount: number;
+    assigned_amount: number;
+    total_count: number;
+    total_amount: number;
+    unassigned_share: number;
+};
+
+/** One unattributed invoice, with why it could not be linked (get_unassigned_invoices). */
+export type UnassignedInvoiceRow = {
+    zoho_id: string;
+    invoice_number: string | null;
+    client_name: string;
+    amount: number;
+    invoice_date: string | null;
+    status: string;
+    is_avoir: boolean;
+    department: string | null;
+    office: 'QC' | 'MTL' | null;
+    rep_name: string | null;
+    reason: string;
 };
