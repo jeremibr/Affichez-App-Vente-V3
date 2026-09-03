@@ -122,8 +122,20 @@ Revenue comes in two flavours, both summed once per account so that several lead
 on one account do not double-count: `revenue_attributed` (invoices dated on or
 after the lead arrived) and `revenue_lifetime` (the account's whole history).
 
+**Dates are counted on Montreal's calendar, not the database's.** The session
+runs in UTC, so a bare `EXTRACT(MONTH FROM created_time)` or `created_time::date`
+puts a lead created 31 January at 21:00 EST into February. Everything funnel-side
+goes through `AT TIME ZONE 'America/Toronto'` (`zoho_leads_scoped`) or
+`zoho_lead_local_date()`. Use the helper rather than a fresh `::date`.
+
 **Filter values must come from `get_zoho_lead_filter_options`, never a hardcoded
-list.** Zoho's service picklist holds the same service under several spellings
+list — and pass `p_stage`.** The options are drawn from `zoho_leads_unique`,
+which is leads *and* contacts, while every dashboard figure counts leads only.
+The dashboard and rep portal therefore ask for `p_stage => 'lead'`; the detail
+page passes null because it genuinely lists both. Get this wrong and the dropdown
+offers a rep who owns only contacts, and picking them empties the page.
+
+Zoho's service picklist holds the same service under several spellings
 differing only in case or spacing ("Distribution publicitaire" /
 "Distribution Publicitaire", 2,209 leads between them). The RPC folds them via
 `zoho_service_key()` and returns `service_variants` so a query can match every

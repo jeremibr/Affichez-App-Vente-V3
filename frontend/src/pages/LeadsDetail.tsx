@@ -79,19 +79,22 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
 
     // Changing any filter must return to page 1 — otherwise a narrower result set
     // leaves you stranded on a page that no longer exists, showing nothing.
-    const setYear = (v: number | 'Toutes') => {
-        _setYearParam(v === 'Toutes' ? 'Toutes' : String(v));
-        setPage(1);
-    };
-    const setSelectedMonth = (v: number | 'Toutes') => {
-        _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-        setPage(1);
-    };
-    const setSelectedRep = (v: string) => { _setSelectedRep(v); setPage(1); };
-    const setSelectedSource = (v: string) => { _setSelectedSource(v); setPage(1); };
-    const setSelectedService = (v: string) => { _setSelectedService(v); setPage(1); };
-    const setSelectedStage = (v: string) => { _setSelectedStage(v); setPage(1); };
-    const setSelectedInvoiced = (v: string) => { _setSelectedInvoiced(v); setPage(1); };
+    //
+    // Both params move in ONE navigation. Calling the two setters in sequence
+    // looked equivalent but silently broke every filter on this page: react-router
+    // hands each setter the search params from the render it was created in, so
+    // the `page` reset started from a snapshot that predated the filter change and
+    // its navigate() overwrote it. See UrlStateCompanions in hooks/useUrlState.
+    const toPage1 = { page: null };
+    const setYear = (v: number | 'Toutes') =>
+        _setYearParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
+    const setSelectedMonth = (v: number | 'Toutes') =>
+        _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
+    const setSelectedRep = (v: string) => _setSelectedRep(v, toPage1);
+    const setSelectedSource = (v: string) => _setSelectedSource(v, toPage1);
+    const setSelectedService = (v: string) => _setSelectedService(v, toPage1);
+    const setSelectedStage = (v: string) => _setSelectedStage(v, toPage1);
+    const setSelectedInvoiced = (v: string) => _setSelectedInvoiced(v, toPage1);
 
     const [rows, setRows] = useState<ZohoLeadRow[]>([]);
     const [total, setTotal] = useState(0);
@@ -219,7 +222,9 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
      */
     const fetchOptions = useCallback(async () => {
         const { data, error } = await supabase
-            .rpc('get_zoho_lead_filter_options', { p_year: year === 'Toutes' ? null : year })
+            // p_stage stays null here, unlike the dashboard: this table really does
+            // list both modules, so its dropdowns should cover both.
+            .rpc('get_zoho_lead_filter_options', { p_year: year === 'Toutes' ? null : year, p_stage: null })
             .single<ZohoLeadFilterOptions>();
         if (error || !data) return;
         setAllSources(data.sources ?? []);

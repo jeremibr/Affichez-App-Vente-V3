@@ -58,7 +58,10 @@ export default function PortailLeads({ propRepName }: Props) {
 
     const fetchOptions = useCallback(async () => {
         const { data } = await supabase
-            .rpc('get_zoho_lead_filter_options', { p_year: year })
+            // Lead-only, to match get_zoho_lead_kpis and the monthly summary above —
+            // a source that only contacts carry would otherwise be offered here and
+            // empty the whole portal.
+            .rpc('get_zoho_lead_filter_options', { p_year: year, p_stage: 'lead' })
             .single<ZohoLeadFilterOptions>();
         if (data) setOptions(data);
     }, [year]);

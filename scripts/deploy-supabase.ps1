@@ -93,7 +93,14 @@ try {
         # Marking them applied records the history without executing the SQL.
         Write-Host ""
         Write-Host "-> Migration status" -ForegroundColor Cyan
-        $list = & npx --yes supabase@latest migration list 2>&1 | Out-String
+        # No 2>&1 here. Windows PowerShell 5.1 wraps a native command's stderr in
+        # ErrorRecords the moment it is redirected, and $ErrorActionPreference =
+        # 'Stop' above then kills the script on the CLI's first progress line
+        # ("Initialising login role...") even though the command succeeded - so the
+        # deploy aborted at the status step and never reached db push. Capturing
+        # stdout alone leaves stderr going straight to the console, where it is
+        # still visible but harmless.
+        $list = & npx --yes supabase@latest migration list | Out-String
         Write-Host $list
 
         $localOnly = [regex]::Matches($list, '(?m)^\s*(\d{14})\s*\|\s*\|') |

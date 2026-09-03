@@ -84,7 +84,11 @@ export default function LeadsDashboard() {
 
     const fetchOptions = useCallback(async () => {
         const { data } = await supabase
-            .rpc('get_zoho_lead_filter_options', { p_year: yearParamValue })
+            // p_stage: 'lead' because every figure on this page counts leads only.
+            // Without it the dropdowns were built from leads AND contacts, so a rep
+            // or source carried solely by contacts could be picked and returned an
+            // all-zero dashboard — which reads as broken data, not an empty filter.
+            .rpc('get_zoho_lead_filter_options', { p_year: yearParamValue, p_stage: 'lead' })
             .single<ZohoLeadFilterOptions>();
         if (data) setOptions(data);
     }, [yearParamValue]);
