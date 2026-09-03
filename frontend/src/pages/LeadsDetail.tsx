@@ -68,6 +68,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const [selectedSource, _setSelectedSource] = useUrlState('source', 'Toutes');
     const [selectedService, _setSelectedService] = useUrlState('service', 'Tous');
     const [selectedStage, _setSelectedStage] = useUrlState('stage', 'Tous');
+    // Composes with the Type filter above rather than replacing it: "leads with
+    // invoices", "contacts with invoices" and "both" are Type x Factures, so the
+    // two stay separate dropdowns instead of one combined list of six.
+    const [selectedInvoiced, _setSelectedInvoiced] = useUrlState('factures', 'Tous');
     const [page, setPage] = useUrlStateNumber('page', 1);
 
     const [search, setSearch] = useState('');
@@ -87,6 +91,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const setSelectedSource = (v: string) => { _setSelectedSource(v); setPage(1); };
     const setSelectedService = (v: string) => { _setSelectedService(v); setPage(1); };
     const setSelectedStage = (v: string) => { _setSelectedStage(v); setPage(1); };
+    const setSelectedInvoiced = (v: string) => { _setSelectedInvoiced(v); setPage(1); };
 
     const [rows, setRows] = useState<ZohoLeadRow[]>([]);
     const [total, setTotal] = useState(0);
@@ -176,6 +181,12 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
             query = query.overlaps('service_interest', serviceVariants[selectedService] ?? [selectedService]);
         }
         if (selectedStage !== 'Tous') query = query.eq('stage', selectedStage);
+        // Server-side, on the view's computed flag: the page is cut by
+        // LIMIT/OFFSET in Postgres, so filtering on the invoice rollup here would
+        // search 100 rows out of ~29k and leave the count and pager wrong.
+        if (selectedInvoiced !== 'Tous') {
+            query = query.eq('has_invoices', selectedInvoiced === 'avec');
+        }
 
         // Searching server-side, not over the loaded page: with 100 rows per page a
         // client-side filter would quietly search 100 of several thousand records.
@@ -198,7 +209,8 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         // second round trip.
         fetchInvoiceTotals(pageRows);
     }, [yearBounds, selectedRep, selectedSource, selectedService, selectedStage,
-        effectiveRepName, page, debouncedSearch, fetchInvoiceTotals, serviceVariants]);
+        selectedInvoiced, effectiveRepName, page, debouncedSearch, fetchInvoiceTotals,
+        serviceVariants]);
 
     /**
      * Options are scoped to the year only, so choosing one filter never empties
@@ -306,6 +318,14 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         { value: 'lead', label: 'Leads seulement' },
         { value: 'contact', label: 'Contacts seulement' },
     ];
+    // "Sans factures" also catches records with no CRM account at all — from the
+    // table's side those are indistinguishable from an account that was never
+    // billed, and both show an em dash in the Factures column.
+    const invoicedOptions = [
+        { value: 'Tous', label: 'Avec et sans factures' },
+        { value: 'avec', label: 'Avec factures' },
+        { value: 'sans', label: 'Sans factures' },
+    ];
 
     const pageBtn = 'min-w-[2rem] rounded-lg px-2 py-1.5 text-sm font-medium transition-colors';
 
@@ -409,6 +429,9 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                 </FilterGroup>
                 <FilterGroup label="Type">
                     <Select value={selectedStage} onChange={setSelectedStage} options={stageOptions} />
+                </FilterGroup>
+                <FilterGroup label="Factures">
+                    <Select value={selectedInvoiced} onChange={setSelectedInvoiced} options={invoicedOptions} />
                 </FilterGroup>
             </FilterBar>
 
@@ -539,11 +562,15 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
 }
 
 /**
- * The Factures cell. Three states worth telling apart, because "no invoices" and
+ * The Factures cell. Four states worth telling apart, because "no invoices" and
  * "we cannot know yet" would otherwise look identical:
  *   no account      - nothing to look up (an unconverted lead, or a contact with
  *                     no company in the CRM)
- *   account, no row - the account is known and simply has no invoices
+ *   account, none   - the account is known and simply has no invoices
+ *   rollup pending  - the row says there are invoices, the amounts are still in
+ *                     flight. Shown as a placeholder rather than an em dash, so
+ *                     the column cannot briefly contradict the Factures filter
+ *                     or a failed rollup call.
  *   account + row   - count and net total, click for the lines
  */
 function InvoiceCell({ row, totals, onOpen }: {
@@ -554,8 +581,17 @@ function InvoiceCell({ row, totals, onOpen }: {
     if (!row.account_id) {
         return <span className="text-slate-300" title="Aucun compte Zoho associe">&mdash;</span>;
     }
-    if (!totals || (totals.invoice_count === 0 && totals.credit_count === 0)) {
+    // `=== false`, not `!`: the flag comes from the view, so a frontend shipped
+    // ahead of its migration would otherwise read undefined and blank the whole
+    // column. Missing falls through to the rollup, which is the previous behaviour.
+    if (row.has_invoices === false) {
         return <span className="text-slate-300" title="Aucune facture pour ce compte">&mdash;</span>;
+    }
+    if (row.has_invoices === undefined && !totals) {
+        return <span className="text-slate-300" title="Aucune facture pour ce compte">&mdash;</span>;
+    }
+    if (!totals || (totals.invoice_count === 0 && totals.credit_count === 0)) {
+        return <span className="text-slate-300" title="Chargement des montants">&hellip;</span>;
     }
     const count = totals.invoice_count + totals.credit_count;
     return (

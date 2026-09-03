@@ -117,6 +117,17 @@ export type ZohoLeadRow = {
      */
     account_id: string | null;
 
+    /**
+     * The account has at least one invoice or avoir, ever. Computed in
+     * zoho_leads_unique rather than derived from the per-page rollup, so the
+     * Factures filter can run in Postgres over the whole table instead of over
+     * the 100 rows currently on screen.
+     *
+     * Optional only so a build can precede its migration; the view always
+     * supplies it once 20260903020000 is applied.
+     */
+    has_invoices?: boolean;
+
     is_converted: boolean;
     converted_contact_id: string | null;
     converted_account_id: string | null;
