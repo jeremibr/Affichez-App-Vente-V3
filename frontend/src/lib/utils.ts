@@ -130,24 +130,29 @@ export function phoneSearchPattern(term: string): string {
 // department, so this column is the one that breaks the table's rhythm if left
 // to run. Only the first is shown; the rest live in the hover title.
 //
-// The cap applies to that single name too — "Imprimés, articles et vêtements
-// promo" is 37 characters on its own and would widen the column just as badly as
-// a list would.
-export const SERVICE_MAX_CHARS = 30;
+// 32, not 30: "Développement d'application Web" is 31 characters, and it is a
+// real picklist value, not an outlier. At 30 the commonest long service was
+// being cut for the sake of two columns of width. The two genuinely long ones
+// ("Imprimés, articles et vêtements promo", "Solutions d'intelligence
+// artificielle", both 37) still truncate, which is why `truncated` is reported.
+export const SERVICE_MAX_CHARS = 32;
 
 /**
- * The first service, plus how many were left out for the caller to signal.
+ * The first service, whether it had to be cut, and how many were left out.
  *
- * Truncated only when one name exceeds the whole budget, which is the single
- * case where cutting mid-word is unavoidable. The full list always reaches the
- * reader through the tooltip, so nothing here is the only copy of a value.
+ * `truncated` matters as much as `hiddenCount`: a single name too long for the
+ * column is elided just as surely as a second service is, and the caller has to
+ * put BOTH cases in the tooltip or the value becomes unrecoverable — the reader
+ * sees "Développement d'application W…" and has nowhere to find the rest.
  */
 export function clipServices(
     services: string[], maxChars: number = SERVICE_MAX_CHARS,
-): { text: string; hiddenCount: number } {
+): { text: string; hiddenCount: number; truncated: boolean } {
     const first = services[0] ?? '';
-    const text = first.length > maxChars
-        ? first.slice(0, maxChars - 1).trimEnd() + '…'
-        : first;
-    return { text, hiddenCount: Math.max(0, services.length - 1) };
+    const truncated = first.length > maxChars;
+    return {
+        text: truncated ? first.slice(0, maxChars - 1).trimEnd() + '…' : first,
+        hiddenCount: Math.max(0, services.length - 1),
+        truncated,
+    };
 }

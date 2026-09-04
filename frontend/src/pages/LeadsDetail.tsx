@@ -650,24 +650,29 @@ function ServiceCell({ row }: { row: ZohoLeadRow }) {
 
     const origin = row.service_origin
         ?? (row.attribution_inherited ? 'lead' : 'own') as AttributionOrigin;
-    const { text, hiddenCount } = clipServices(services);
+    const { text, hiddenCount, truncated } = clipServices(services);
 
-    // Only the first service is on screen, so the tooltip is the only place the
-    // rest exist — it carries the whole list, and the count, since an ellipsis
-    // alone does not say whether one more is hidden or six.
-    const title = [
-        hiddenCount > 0 ? `${services.length} services : ${services.join(', ')}` : null,
-        ORIGIN_HINTS[origin],
-    ].filter(Boolean).join(' — ');
+    // Anything the cell cannot show has to be in the tooltip, and there are two
+    // ways to lose a value here, not one: a second service, or a single name too
+    // long for the column. Keying this off hiddenCount alone left
+    // "Développement d'application W…" with no way to read the rest.
+    const elided = hiddenCount > 0 || truncated;
+    const full = hiddenCount > 0
+        ? `${services.length} services : ${services.join(', ')}`
+        : services[0];
+    const title = [elided ? full : null, ORIGIN_HINTS[origin]]
+        .filter(Boolean).join(' — ');
 
     return (
         <span
-            className={cn('inline-flex items-baseline gap-1', hiddenCount > 0 && 'cursor-help')}
+            className={cn('inline-flex items-baseline gap-1', elided && 'cursor-help')}
             title={title}
         >
             <span className="whitespace-nowrap">
                 {text}
-                {hiddenCount > 0 && <span className="text-slate-400">&hellip;</span>}
+                {/* One ellipsis, never two: `text` already ends in one when the
+                    name itself was cut. */}
+                {hiddenCount > 0 && !truncated && <span className="text-slate-400">&hellip;</span>}
             </span>
             {isBorrowed(origin) && <span className="text-slate-400">*</span>}
         </span>
