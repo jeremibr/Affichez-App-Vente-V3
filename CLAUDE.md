@@ -56,8 +56,17 @@ involved and they do not share ids or credentials:
 
 - **Zoho Books** (`zoho-sync`, `zoho-invoice-sync`) — two organisations, QC and
   MTL, feeding `quotes` and `invoices`.
-- **Zoho CRM** (`zoho-lead-sync`, `zoho-task-sync`) — one org, feeding
-  `zoho_leads` and `zoho_tasks`.
+- **Zoho CRM** (`zoho-lead-sync`, `zoho-task-sync`, `zoho-account-sync`) — one
+  org, feeding `zoho_leads`, `zoho_tasks` and `zoho_accounts`.
+
+`zoho-account-sync` needs `ZohoCRM.modules.accounts.READ`, which the shared CRM
+refresh token was **not** originally issued with — it covers leads, contacts and
+users. Without the extra scope every page 401s and the walk upserts nothing
+while still reporting success. Check before trusting it:
+
+```
+curl.exe -H "x-check-scope: true" https://auyfucbskylougsmmrks.supabase.co/functions/v1/zoho-account-sync
+```
 
 Two Zoho API quirks are worth knowing before touching `zoho-invoice-sync`:
 
@@ -117,6 +126,36 @@ Three things about `zoho_leads` that are not obvious from the schema:
   nothing. `leads_invoiced` — the lead's account actually being billed after the
   lead arrived — is the figure that moves. The two are nested: every invoiced
   lead is already flagged converted.
+
+### Where a contact's source and service come from
+
+Zoho's Contacts module has **no** `Lead_Source` and no service multiselect —
+those fields exist only on Leads. So for a contact both are resolved elsewhere,
+in `zoho_leads_unique`, and the answer differs per field:
+
+| | billed (`has_invoices`) | not billed |
+|---|---|---|
+| **source** | the account's `Origine_du_client` | the lead's own source, else the account's |
+| **service** | the distinct `invoices.department` values | the lead's own service, else the account's |
+
+`source_origin` / `service_origin` say which branch won (`own`, `lead`,
+`account`, `invoice`) and drive the `*` marker in the table.
+
+**Use `source_resolved` / `service_resolved` for anything user-facing, and for
+filtering.** The raw `lead_source` / `service_interest` columns stay exactly what
+Zoho's Leads module said, which for most contacts is nothing — filter on those
+and the dropdown offers values that match zero rows.
+
+Invoice departments keep Zoho Books' own wording (`DIST. PUBLICITAIRE SOLO`,
+`NUMERIQUE`), deliberately **not** translated into the CRM's eight-value service
+picklist: six department values against eight services, with no honest mapping
+for `MULTI-ANNONCEURS` or `APPLICATION`. The cost is that the detail page's
+Service filter offers both vocabularies. `zoho_service_labels` therefore spans
+leads, accounts and invoices — but its label is pinned to the *leads* spelling
+wherever the service appears there, so widening it cannot rename a dashboard bar.
+
+None of this touches the funnel: the dashboard reads `zoho_leads` with
+`stage = 'lead'`, and every rule above applies only to contacts.
 
 Revenue comes in two flavours, both summed once per account so that several leads
 on one account do not double-count: `revenue_attributed` (invoices dated on or

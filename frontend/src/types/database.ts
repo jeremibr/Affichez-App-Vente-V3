@@ -79,6 +79,16 @@ export type InvDetailRow = {
 };
 
 /**
+ * Where a contact's source or service came from, once resolved.
+ *
+ * 'own'     the record states it itself (always the case for a lead)
+ * 'lead'    inherited from the lead this contact converted from
+ * 'account' taken from the CRM account the contact belongs to
+ * 'invoice' the departments the account has actually been billed under
+ */
+export type AttributionOrigin = 'own' | 'lead' | 'account' | 'invoice';
+
+/**
  * A row of `zoho_leads` — one Zoho CRM record, Lead or Contact, told apart by
  * `stage`. Synced by the zoho-lead-sync edge function; read-only in the app.
  *
@@ -109,6 +119,26 @@ export type ZohoLeadRow = {
     service_interest: string[];
     lead_status: string | null;
     attribution_inherited: boolean;
+
+    /**
+     * Attribution as it should be shown. For a lead these are just its own
+     * values; for a contact they are resolved in zoho_leads_unique from the
+     * account and the invoices billed to it, because Zoho's Contacts module
+     * carries neither field.
+     *
+     * Use these for display and filtering. `lead_source` and `service_interest`
+     * above stay exactly what Zoho's Leads module said, which for most contacts
+     * is nothing at all.
+     *
+     * Optional only so a frontend build can ship ahead of its migration; both are
+     * always present once 20260903060000 is applied.
+     */
+    source_resolved?: string | null;
+    service_resolved?: string[];
+
+    /** Where each resolved value came from, for the inherited-value marker. */
+    source_origin?: AttributionOrigin | null;
+    service_origin?: AttributionOrigin | null;
 
     /**
      * CRM account this record belongs to — the join key to invoices. A contact

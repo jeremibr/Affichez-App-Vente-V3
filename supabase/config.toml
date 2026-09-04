@@ -387,6 +387,11 @@ verify_jwt = false
 [functions.zoho-books-customer-link]
 verify_jwt = false
 
+# Both cron-driven and webhook-driven, so no JWT on either path. The webhook
+# path authenticates itself with x-webhook-secret, same as zoho-lead-sync.
+[functions.zoho-account-sync]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

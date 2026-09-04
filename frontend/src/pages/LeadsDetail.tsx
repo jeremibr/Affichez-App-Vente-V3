@@ -4,11 +4,14 @@ import { supabase } from '../lib/supabase';
 import { Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight, FileText, X } from 'lucide-react';
 import type {
     ZohoLeadRow, ZohoLeadFilterOptions, LeadInvoiceRow, LeadInvoiceTotals,
+    AttributionOrigin,
 } from '../types/database';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { formatShortDate, formatCurrencyCAD, cn } from '../lib/utils';
+import {
+    formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, clipServices, cn,
+} from '../lib/utils';
 
 const STAGE_LABELS: Record<string, string> = {
     lead: 'Lead',
@@ -178,10 +181,13 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         if (effectiveRepName) query = query.eq('rep_name', effectiveRepName);
         else if (selectedRep !== 'Tous') query = query.eq('rep_name', selectedRep);
 
-        if (selectedSource !== 'Toutes') query = query.eq('lead_source', selectedSource);
+        // source_resolved / service_resolved, not the raw Zoho columns: those are
+        // empty for most contacts, so filtering on them would return nothing for
+        // exactly the rows the dropdown was populated from.
+        if (selectedSource !== 'Toutes') query = query.eq('source_resolved', selectedSource);
         if (selectedService !== 'Tous') {
             // overlaps, not contains: match any of the label's spellings.
-            query = query.overlaps('service_interest', serviceVariants[selectedService] ?? [selectedService]);
+            query = query.overlaps('service_resolved', serviceVariants[selectedService] ?? [selectedService]);
         }
         if (selectedStage !== 'Tous') query = query.eq('stage', selectedStage);
         // Server-side, on the view's computed flag: the page is cut by
@@ -198,7 +204,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
             const like = `%${term}%`;
             query = query.or(
                 `full_name.ilike.${like},company.ilike.${like},` +
-                `email.ilike.${like},phone.ilike.${like}`,
+                `email.ilike.${like},phone.ilike.${phoneSearchPattern(term)}`,
             );
         }
 
@@ -500,28 +506,15 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                                     <tr key={r.zoho_record_id} className="transition-colors hover:bg-slate-50/70">
                                         <td className="td font-medium text-brand-dark">{r.full_name ?? '—'}</td>
                                         <td className="td">{r.company ?? '—'}</td>
-                                        <td className="td whitespace-nowrap tabular-nums">{r.phone ?? '—'}</td>
+                                        <td className="td whitespace-nowrap tabular-nums">{formatPhone(r.phone) ?? '—'}</td>
                                         <td className="td">
                                             {r.email
                                                 ? <a href={`mailto:${r.email}`} className="text-brand-main hover:underline">{r.email}</a>
                                                 : '—'}
                                         </td>
                                         <td className="td">{r.rep_name ?? r.owner_name ?? '—'}</td>
-                                        <td className="td">
-                                            {isBlankPick(r.lead_source) ? (
-                                                <span className="text-slate-300">—</span>
-                                            ) : (
-                                                <span title={r.attribution_inherited ? 'Hérité du lead d’origine' : undefined}>
-                                                    {r.lead_source}
-                                                    {r.attribution_inherited && <span className="ml-1 text-slate-400">*</span>}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="td">
-                                            {r.service_interest?.length
-                                                ? r.service_interest.join(', ')
-                                                : <span className="text-slate-300">—</span>}
-                                        </td>
+                                        <td className="td"><SourceCell row={r} /></td>
+                                        <td className="td"><ServiceCell row={r} /></td>
                                         <td className="td">
                                             <InvoiceCell
                                                 row={r}
@@ -618,6 +611,69 @@ function InvoiceCell({ row, totals, onOpen }: {
 }
 
 /** Every invoice on the lead's account, fetched on open. */
+/**
+ * Why a value is showing when the record itself does not carry it. Zoho's
+ * Contacts module has no source and no service field at all, so for a contact
+ * every one of these except 'own' is the normal case rather than an exception.
+ */
+const ORIGIN_HINTS: Record<AttributionOrigin, string> = {
+    own:     'Renseigné sur la fiche',
+    lead:    'Hérité du lead d’origine',
+    account: 'Provenant du compte client',
+    invoice: 'Départements réellement facturés',
+};
+
+/** Borrowed from somewhere else, so the cell earns the asterisk. */
+function isBorrowed(origin: AttributionOrigin | null | undefined): boolean {
+    return origin === 'lead' || origin === 'account' || origin === 'invoice';
+}
+
+function SourceCell({ row }: { row: ZohoLeadRow }) {
+    // ?? the raw column, not ||: a frontend shipped ahead of its migration reads
+    // undefined here and would otherwise blank a source it already knows.
+    const source = row.source_resolved ?? row.lead_source;
+    const origin = row.source_origin
+        ?? (row.attribution_inherited ? 'lead' : 'own') as AttributionOrigin;
+
+    if (isBlankPick(source)) return <span className="text-slate-300">&mdash;</span>;
+    return (
+        <span title={ORIGIN_HINTS[origin]}>
+            {source}
+            {isBorrowed(origin) && <span className="ml-1 text-slate-400">*</span>}
+        </span>
+    );
+}
+
+function ServiceCell({ row }: { row: ZohoLeadRow }) {
+    const services = row.service_resolved ?? row.service_interest;
+    if (!services?.length) return <span className="text-slate-300">&mdash;</span>;
+
+    const origin = row.service_origin
+        ?? (row.attribution_inherited ? 'lead' : 'own') as AttributionOrigin;
+    const { text, hiddenCount } = clipServices(services);
+
+    // Only the first service is on screen, so the tooltip is the only place the
+    // rest exist — it carries the whole list, and the count, since an ellipsis
+    // alone does not say whether one more is hidden or six.
+    const title = [
+        hiddenCount > 0 ? `${services.length} services : ${services.join(', ')}` : null,
+        ORIGIN_HINTS[origin],
+    ].filter(Boolean).join(' — ');
+
+    return (
+        <span
+            className={cn('inline-flex items-baseline gap-1', hiddenCount > 0 && 'cursor-help')}
+            title={title}
+        >
+            <span className="whitespace-nowrap">
+                {text}
+                {hiddenCount > 0 && <span className="text-slate-400">&hellip;</span>}
+            </span>
+            {isBorrowed(origin) && <span className="text-slate-400">*</span>}
+        </span>
+    );
+}
+
 function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => void }) {
     const [rows, setRows] = useState<LeadInvoiceRow[]>([]);
     const [loading, setLoading] = useState(true);
