@@ -59,10 +59,11 @@ involved and they do not share ids or credentials:
 - **Zoho CRM** (`zoho-lead-sync`, `zoho-task-sync`, `zoho-account-sync`) — one
   org, feeding `zoho_leads`, `zoho_tasks` and `zoho_accounts`.
 
-`zoho-account-sync` needs `ZohoCRM.modules.accounts.READ`, which the shared CRM
-refresh token was **not** originally issued with — it covers leads, contacts and
-users. Without the extra scope every page 401s and the walk upserts nothing
-while still reporting success. Check before trusting it:
+`zoho-account-sync` needs `ZohoCRM.modules.accounts.READ` on top of the leads,
+contacts and users scopes the shared CRM refresh token was issued with. It was
+missing at first; **verified present on 2026-09-07**. Without it every page 401s
+and the walk upserts nothing while still reporting success, so re-check before
+blaming anything else:
 
 ```
 curl.exe -H "x-check-scope: true" https://auyfucbskylougsmmrks.supabase.co/functions/v1/zoho-account-sync
@@ -102,6 +103,47 @@ slice at a time under Zoho's 100-calls/minute/org limit by the
 know about the other. `get_lead_invoice_totals` / `get_lead_invoices` back the
 Factures column and modal on the Leads page; `get_invoice_linkage_status` reports
 back-fill coverage in Settings.
+
+### Comptes: the account is the record
+
+The **Comptes** module (`/comptes`, `/comptes/detail`) is the primary funnel view
+and replaced the Leads pages on 2026-09-07. Its grain is the Zoho CRM **account**,
+because that is the grain the business is run in: a company with three contacts
+is one account, so its revenue is counted once with no dedupe layer.
+
+The Leads pages and every `get_zoho_lead*` RPC are still there and still work —
+only the routes and nav entries in `App.tsx` / `Layout.tsx` are commented out.
+Uncomment them to compare a number against the old grain.
+
+Three things about the Comptes module that are not obvious:
+
+- **Revenue is windowed.** `p_window_months` (default 12) caps attributed revenue
+  at N months from the account's creation. Without it a 2021 account beats a 2026
+  one purely by having had five more years to buy, and no month-over-month or
+  source-over-source comparison means anything. `NULL` lifts the cap.
+- **`revenue_per_account` divides by accounts *created*, not accounts invoiced.**
+  The accounts that bought nothing are what makes a bad source bad.
+- **1,937 accounts are rated "Compte interne : Ne pas reprendre"** and 3
+  "Fournisseur" — Affichez's own entities. Every RPC excludes them by default via
+  `p_exclude_ratings`; the pages carry a "Statut" filter to switch them back on.
+  The detail table filters `zoho_accounts_enriched.is_internal` instead, because
+  PostgREST's `rating=not.in.(…)` is NULL — not TRUE — for the 977 unrated rows
+  and would silently hide them.
+
+**Royer & Fils / VotreLogo.ca is a different company's revenue.** Measured
+2026-09-07: `SUM(Ventes_totales_2022_2026)` is $5,530,878.34 across all 20,645
+accounts and $5,530,878.34 across just the 2,028 whose origin is "Client Royer &
+Fils / VotreLogo.ca" — to the cent. That promo business is invoiced outside the
+QC and MTL Books orgs, so it never appears in `invoices` (LUMEN: $1.5M in CRM,
+zero invoice rows). It is synced into `zoho_accounts.ventes_*` and reported
+*beside* the invoice figures, never added into `revenue_attributed` or
+`revenue_lifetime`.
+
+**Account sources must come from the data, never a picklist.** Accounts hold 26
+distinct `origine_du_client` values against 21 live picklist entries. The orphans
+include **"Publicité/Recherche Google" (108 accounts)** — the exact segment asked
+about in the 2026-09-04 meeting. `get_zoho_account_filter_options` reads stored
+values for this reason.
 
 ### Leads: which table is which
 
@@ -185,6 +227,8 @@ the table would just be overwritten by the next sync.
 
 | Route | Page | Purpose |
 |---|---|---|
+| `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, with the revenue attribution window |
+| `/comptes/detail` | `AccountsDetail` | Searchable client directory; a row opens its billing history by department and year |
 | `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |
 | `/quarterly` | `QuarterlyAverages` | YoY quarterly average deal size per rep |
@@ -195,6 +239,7 @@ All routes are children of `Layout`, which provides the sidebar navigation.
 ### Key Shared Abstractions
 
 - **`src/lib/utils.ts`**: `cn()` (Tailwind class merger), `formatCurrencyCAD()`, `formatShortDate()`, `formatLongDate()`, `formatPercentage()`
+- **`src/lib/csv.ts`** + **`src/components/ExportButton.tsx`**: CSV export for any table. Semicolon-delimited with a UTF-8 BOM because these files are opened in a French-locale Excel; numbers use a decimal comma and stay unquoted so they arrive as numbers. On a paginated table, pass `rows` as an async function that refetches without the page limit — exporting the visible 100 rows would answer a different question from the one on screen.
 - **`src/lib/constants.ts`**: `DEPARTMENTS`, `MONTHS`, `OFFICES`, `SALE_STATUSES` — used as filter option sources across all pages
 - **`src/types/database.ts`**: TypeScript types mirroring Supabase view/RPC return shapes (`SommaireRow`, `ZoneA_SummaryRow`, `ZoneB_DetailRow`, `YoYRow`, etc.)
 - **`src/components/FilterBar.tsx`**: `<FilterBar>` / `<FilterGroup>` composable filter bar used on every page

@@ -1,0 +1,430 @@
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useUrlState } from '../hooks/useUrlState';
+import { supabase } from '../lib/supabase';
+import { Loader2, Building2, Percent, DollarSign, Timer, Info } from 'lucide-react';
+import type {
+    ZohoAccountKPIs, ZohoAccountBreakdownRow, ZohoAccountFilterOptions,
+} from '../types/database';
+import { MONTHS } from '../lib/constants';
+import { FilterBar, FilterGroup } from '../components/FilterBar';
+import { Select } from '../components/Select';
+import { InfoHint } from '../components/InfoHint';
+import { ExportButton } from '../components/ExportButton';
+import { formatCurrencyCAD, cn } from '../lib/utils';
+import type { CsvColumn } from '../lib/csv';
+
+/**
+ * Comptes — tableau de bord.
+ *
+ * Reads Zoho CRM's Accounts module, which is the grain Dominic actually works
+ * in: "c'est des comptes, les contacts je m'en fous, tout est basé sur le
+ * compte" (2026-09-04). A company with three contacts is ONE account, so its
+ * revenue is counted once with no dedupe layer — that was the hardest part of
+ * the leads dashboard and it simply does not arise here.
+ *
+ * Two things on this page do not exist on the leads one, and both come straight
+ * out of that meeting:
+ *
+ *   1. THE ATTRIBUTION WINDOW. "Les leads qu'on a eus en juillet, ils ont acheté
+ *      combien dans les 12 mois après?" Revenue is capped at N months from the
+ *      account's creation. Without the cap a 2021 account outperforms a 2026 one
+ *      purely by having had five more years to buy, and every month-over-month
+ *      source comparison is a lie.
+ *
+ *   2. REVENUE PER ACCOUNT. The quality measure. Divided by accounts created,
+ *      not by accounts invoiced, because the accounts that bought nothing are
+ *      exactly what makes a bad source bad.
+ */
+
+/** Excluded by default. Both are Affichez's own entities, not clients: LUMEN
+ *  (Hydro-Québec) alone carries six figures on an internal rating and would
+ *  otherwise sit at the top of every list. The Statut filter switches them back
+ *  on — the data layer keeps every account. */
+const DEFAULT_EXCLUDED_RATINGS = ['Compte interne : Ne pas reprendre', 'Fournisseur'];
+
+const WINDOW_OPTIONS = [
+    { value: '3',      label: '3 mois après' },
+    { value: '6',      label: '6 mois après' },
+    { value: '12',     label: '12 mois après' },
+    { value: '24',     label: '24 mois après' },
+    { value: 'Toute',  label: 'Tout l’historique' },
+];
+
+export default function AccountsDashboard() {
+    const [yearParam, _setYearParam] = useUrlState('year', '2026');
+    const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
+    const setYear = (v: number | 'Toutes') => _setYearParam(v === 'Toutes' ? 'Toutes' : String(v));
+
+    const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
+    const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
+    const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
+
+    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
+    const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
+    const [selectedDomaine, setSelectedDomaine] = useUrlState('domaine', 'Tous');
+    const [selectedRegion, setSelectedRegion] = useUrlState('region', 'Toutes');
+    const [windowParam, setWindowParam] = useUrlState('fenetre', '12');
+    // 'Tous' means show the internal and supplier accounts too.
+    const [ratingScope, setRatingScope] = useUrlState('statut', 'Clients');
+
+    const [loading, setLoading] = useState(true);
+    const [kpis, setKpis] = useState<ZohoAccountKPIs | null>(null);
+    const [byRep, setByRep] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [bySource, setBySource] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [byService, setByService] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [byDomaine, setByDomaine] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
+
+    const yearParamValue = year === 'Toutes' ? null : year;
+    // null is the RPC's "no cap", not a missing argument.
+    const windowMonths = windowParam === 'Toute' ? null : Number(windowParam);
+    const excludeRatings = ratingScope === 'Tous' ? null : DEFAULT_EXCLUDED_RATINGS;
+
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        const shared = {
+            p_year: yearParamValue,
+            p_month: selectedMonth === 'Toutes' ? null : selectedMonth,
+            p_window_months: windowMonths,
+            p_exclude_ratings: excludeRatings,
+            p_domaine: selectedDomaine === 'Tous' ? null : selectedDomaine,
+            p_region: selectedRegion === 'Toutes' ? null : selectedRegion,
+        };
+        const rep = selectedRep === 'Tous' ? null : selectedRep;
+        const source = selectedSource === 'Toutes' ? null : selectedSource;
+        const service = selectedService === 'Tous' ? null : selectedService;
+
+        // Each breakdown drops its own dimension from the filter set, so choosing
+        // "Meta Ads" does not reduce the source chart to a single bar.
+        const [
+            { data: kpiData },
+            { data: repData },
+            { data: srcData },
+            { data: svcData },
+            { data: domData },
+        ] = await Promise.all([
+            supabase.rpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_source: source, p_service: service }),
+            supabase.rpc('get_zoho_accounts_by_rep',    { ...shared,             p_source: source, p_service: service }),
+            supabase.rpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep,                   p_service: service }),
+            supabase.rpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_source: source }),
+            supabase.rpc('get_zoho_accounts_by_domaine',{
+                p_year: shared.p_year, p_month: shared.p_month,
+                p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
+                p_region: shared.p_region,
+                p_rep: rep, p_source: source, p_service: service,
+            }),
+        ]);
+
+        setKpis((kpiData as ZohoAccountKPIs[])?.[0] ?? null);
+        setByRep((repData as ZohoAccountBreakdownRow[]) ?? []);
+        setBySource((srcData as ZohoAccountBreakdownRow[]) ?? []);
+        setByService((svcData as ZohoAccountBreakdownRow[]) ?? []);
+        setByDomaine((domData as ZohoAccountBreakdownRow[]) ?? []);
+        setLoading(false);
+    }, [yearParamValue, selectedMonth, selectedRep, selectedSource, selectedService,
+        selectedDomaine, selectedRegion, windowMonths, excludeRatings]);
+
+    const fetchOptions = useCallback(async () => {
+        const { data } = await supabase
+            .rpc('get_zoho_account_filter_options', {
+                p_year: yearParamValue,
+                p_exclude_ratings: excludeRatings,
+            })
+            .single<ZohoAccountFilterOptions>();
+        if (data) setOptions(data);
+    }, [yearParamValue, excludeRatings]);
+
+    const fetchDataRef = useRef(fetchData);
+    useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+    // Both effects set state: fetchData flips `loading` before awaiting, and
+    // fetchOptions writes in the awaited continuation. Neither cascades — the
+    // write happens after a round trip, not during the render pass — and this is
+    // the same shape every other dashboard in the app uses.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { fetchData(); }, [fetchData]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { fetchOptions(); }, [fetchOptions]);
+
+    // Coalesced: a full account sync rewrites all 20,645 rows, and one refetch
+    // per change event would fire thousands of queries at the browser.
+    useEffect(() => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const sub = supabase
+            .channel('accounts-dashboard-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_accounts' }, () => {
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(() => fetchDataRef.current(), 1500);
+            })
+            .subscribe();
+        return () => {
+            if (timer) clearTimeout(timer);
+            supabase.removeChannel(sub);
+        };
+    }, []);
+
+    const yearOptions = useMemo(() => [
+        { value: 'Toutes', label: 'Toutes les années' },
+        ...(options?.years ?? []).map(y => ({ value: String(y), label: String(y) })),
+    ], [options]);
+    const monthOptions = useMemo(
+        () => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))],
+        [],
+    );
+    const optionList = (all: string, values: string[] | undefined, allLabel: string) => [
+        { value: all, label: allLabel },
+        ...(values ?? []).map(v => ({ value: v, label: v })),
+    ];
+
+    const windowLabel = windowParam === 'Toute'
+        ? 'tout l’historique'
+        : `${windowParam} mois suivant la création du compte`;
+
+    return (
+        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
+            <div>
+                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Comptes — Tableau de bord</h1>
+                <p className="text-xs md:text-sm text-slate-400 mt-0.5">
+                    Comptes clients du CRM, et ce qu&rsquo;ils ont facturé après leur arrivée
+                </p>
+            </div>
+
+            <FilterBar>
+                <FilterGroup label="Année">
+                    <Select
+                        value={year === 'Toutes' ? 'Toutes' : String(year)}
+                        onChange={v => setYear(v === 'Toutes' ? 'Toutes' : Number(v))}
+                        options={yearOptions} variant="accent" className="w-40"
+                    />
+                </FilterGroup>
+                <FilterGroup label="Mois">
+                    <Select
+                        value={String(selectedMonth)}
+                        onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))}
+                        options={monthOptions} className="w-40"
+                    />
+                </FilterGroup>
+                <FilterGroup label="Fenêtre de revenus">
+                    <Select value={windowParam} onChange={setWindowParam} options={WINDOW_OPTIONS} variant="accent" className="w-44" />
+                </FilterGroup>
+                <FilterGroup label="Représentant">
+                    <Select value={selectedRep} onChange={setSelectedRep} options={optionList('Tous', options?.reps, 'Tous les reps')} className="w-44" />
+                </FilterGroup>
+                <FilterGroup label="Source">
+                    <Select value={selectedSource} onChange={setSelectedSource} options={optionList('Toutes', options?.sources, 'Toutes les sources')} className="w-52" />
+                </FilterGroup>
+                <FilterGroup label="Service">
+                    <Select value={selectedService} onChange={setSelectedService} options={optionList('Tous', options?.services, 'Tous les services')} className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Domaine">
+                    <Select value={selectedDomaine} onChange={setSelectedDomaine} options={optionList('Tous', options?.domaines, 'Tous les domaines')} className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Région">
+                    <Select value={selectedRegion} onChange={setSelectedRegion} options={optionList('Toutes', options?.regions, 'Toutes les régions')} className="w-44" />
+                </FilterGroup>
+                <FilterGroup label="Statut">
+                    <Select
+                        value={ratingScope} onChange={setRatingScope} className="w-52"
+                        options={[
+                            { value: 'Clients', label: 'Clients seulement' },
+                            { value: 'Tous',    label: 'Inclure comptes internes' },
+                        ]}
+                    />
+                </FilterGroup>
+            </FilterBar>
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
+                    <p className="text-sm text-slate-400 font-medium">Chargement des comptes...</p>
+                </div>
+            ) : (
+                <>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                        <KPICard
+                            title="Comptes créés"
+                            value={(kpis?.accounts_created ?? 0).toLocaleString('fr-CA')}
+                            subText="Nouveaux comptes sur la période"
+                            icon={Building2}
+                            hint="Comptes créés dans Zoho CRM sur la période choisie, comptés sur le calendrier de Montréal. Un compte = une entreprise, peu importe le nombre de contacts qu'il porte. Par défaut les comptes internes d'Affichez et les fournisseurs sont exclus — changez « Statut » pour les inclure."
+                        />
+                        <KPICard
+                            title="Comptes facturés"
+                            value={(kpis?.accounts_invoiced ?? 0).toLocaleString('fr-CA')}
+                            subText={`${(kpis?.invoiced_rate ?? 0).toFixed(1)} % des comptes créés`}
+                            icon={Percent}
+                            highlight={(kpis?.invoiced_rate ?? 0) >= 20}
+                            hint={`Comptes ayant reçu au moins une facture dans les ${windowLabel}. C'est la seule conversion qui mesure de l'argent plutôt qu'une case cochée dans Zoho.`}
+                        />
+                        <KPICard
+                            title="Revenus attribués"
+                            value={formatCurrencyCAD(kpis?.revenue_attributed ?? 0)}
+                            subText={`Historique complet ${formatCurrencyCAD(kpis?.revenue_lifetime ?? 0)}`}
+                            icon={DollarSign}
+                            hint={`Factures datées entre la création du compte et ${windowLabel}. La fenêtre est ce qui rend deux mois comparables : sans elle, un compte de 2021 bat toujours un compte de 2026 simplement parce qu'il a eu cinq ans de plus pour acheter. « Historique complet » ignore la fenêtre.`}
+                        />
+                        <KPICard
+                            title="Revenu par compte"
+                            value={formatCurrencyCAD(kpis?.revenue_per_account ?? 0)}
+                            subText={kpis?.avg_days_to_first_invoice != null
+                                ? `1re facture après ${Math.round(kpis.avg_days_to_first_invoice)} jours en moyenne`
+                                : 'Aucune facture sur la période'}
+                            icon={Timer}
+                            hint="Revenus attribués ÷ comptes créés. Divisé par tous les comptes, pas seulement les comptes facturés : les comptes qui n'ont rien acheté sont précisément ce qui rend une source mauvaise, les retirer du calcul cacherait le problème. C'est le chiffre à comparer d'un mois à l'autre et d'une source à l'autre."
+                        />
+                    </div>
+
+                    {(kpis?.ventes_royer ?? 0) > 0 && (
+                        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100">
+                            <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                                <span className="font-semibold text-slate-600">
+                                    {formatCurrencyCAD(kpis?.ventes_royer ?? 0)}
+                                </span>{' '}
+                                de ventes Royer &amp; Fils / VotreLogo.ca sur ces comptes, en plus des montants
+                                ci-dessus. Cette facturation se fait en dehors des deux organisations Zoho Books
+                                (QC et MTL) que l&rsquo;application lit, donc elle n&rsquo;apparaît dans aucune
+                                facture ici — elle vient d&rsquo;un champ de total du CRM. Les deux ne se
+                                chevauchent pas, mais ce sont deux entreprises différentes : elles sont affichées
+                                côte à côte plutôt qu&rsquo;additionnées.
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+                        <BreakdownTable
+                            title="Par source" rows={bySource} filename="comptes_par_source"
+                            note="Les sources marquées d'un point sont des listes de clients rachetées (Royer & Fils, PLOGG/BUCCO), pas des campagnes : leur volume ne se compare pas à celui de Meta Ads ou de Google."
+                        />
+                        <BreakdownTable
+                            title="Par représentant" rows={byRep} filename="comptes_par_rep"
+                        />
+                        <BreakdownTable
+                            title="Par domaine d'activité" rows={byDomaine} filename="comptes_par_domaine"
+                            note="Le secteur du client selon le CRM. Renseigné sur environ deux comptes sur trois."
+                        />
+                        <BreakdownTable
+                            title="Par service" rows={byService} filename="comptes_par_service"
+                            note="Un compte peut cocher plusieurs services : le total des lignes dépasse le nombre de comptes."
+                        />
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+const BREAKDOWN_CSV: CsvColumn<ZohoAccountBreakdownRow>[] = [
+    { header: 'Nom',                value: r => r.label },
+    { header: 'Comptes',            value: r => r.nb_accounts },
+    { header: 'Comptes facturés',   value: r => r.nb_invoiced },
+    { header: 'Taux facturé (%)',   value: r => r.nb_accounts > 0 ? Math.round((r.nb_invoiced / r.nb_accounts) * 1000) / 10 : 0 },
+    { header: 'Revenus',            value: r => r.total_amount },
+    { header: 'Revenu par compte',  value: r => r.revenue_per_account },
+    { header: 'Liste rachetée',     value: r => r.is_bulk_import },
+];
+
+function BreakdownTable({ title, rows, note, filename }: {
+    title: string;
+    rows: ZohoAccountBreakdownRow[];
+    note?: string;
+    filename: string;
+}) {
+    const totalAccounts = rows.reduce((s, r) => s + r.nb_accounts, 0);
+    return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+                {note && <InfoHint text={note} />}
+                <div className="ml-auto">
+                    <ExportButton rows={rows} columns={BREAKDOWN_CSV} filename={filename} disabled={rows.length === 0} />
+                </div>
+            </div>
+            {rows.length === 0 ? (
+                <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucun compte</p>
+            ) : (
+                <div className="max-h-[420px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-slate-50/95 backdrop-blur">
+                            <tr className="border-b border-slate-50">
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nom</th>
+                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Comptes</th>
+                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturés</th>
+                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revenus</th>
+                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">/ compte</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {rows.map(r => {
+                                const pct = totalAccounts > 0 ? Math.round((r.nb_accounts / totalAccounts) * 100) : 0;
+                                const rate = r.nb_accounts > 0 ? ((r.nb_invoiced / r.nb_accounts) * 100).toFixed(0) : '0';
+                                return (
+                                    <tr key={r.label} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="px-4 py-2.5">
+                                            <p className="font-semibold text-slate-700 text-xs truncate max-w-[170px] flex items-center gap-1.5" title={r.label}>
+                                                {r.is_bulk_import && (
+                                                    <span
+                                                        className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0"
+                                                        title="Liste de clients rachetée, pas une campagne"
+                                                    />
+                                                )}
+                                                {r.label}
+                                            </p>
+                                            <div className="mt-1 h-1 rounded-full bg-slate-100 w-full max-w-[100px]">
+                                                <div className="h-1 rounded-full bg-brand-main" style={{ width: `${pct}%` }} />
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-slate-700 tabular-nums">{r.nb_accounts}</td>
+                                        <td className="px-4 py-2.5 text-right tabular-nums">
+                                            <span className="font-bold text-slate-700">{r.nb_invoiced}</span>
+                                            <span className={cn('ml-1 text-[10px] font-bold',
+                                                Number(rate) >= 20 ? 'text-emerald-500' : 'text-slate-400')}>
+                                                ({rate}%)
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums text-xs">
+                                            {formatCurrencyCAD(r.total_amount)}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500 tabular-nums text-xs">
+                                            {formatCurrencyCAD(r.revenue_per_account)}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function KPICard({ title, value, subText, icon: Icon, highlight, hint }: {
+    title: string;
+    value: string;
+    subText: string;
+    icon: React.ElementType;
+    highlight?: boolean;
+    hint?: string;
+}) {
+    return (
+        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+            <div className="flex items-start justify-between mb-2 md:mb-4">
+                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                    <Icon className="w-4 h-4 md:w-5 md:h-5" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                    {highlight && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Bon</span>
+                    )}
+                    {hint && <InfoHint text={hint} />}
+                </div>
+            </div>
+            <div>
+                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
+                <p className="mt-1 text-base md:text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
+                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
+            </div>
+        </div>
+    );
+}

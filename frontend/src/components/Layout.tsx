@@ -35,7 +35,7 @@ interface Section {
 
 function getSectionKey(pathname: string): string {
     if (pathname.startsWith('/portail')) return 'portail';
-    if (pathname.startsWith('/leads')) return 'ensemble';
+    if (pathname.startsWith('/leads') || pathname.startsWith('/comptes')) return 'ensemble';
     if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
     if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches')) return 'admin';
     return 'ensemble';
@@ -163,9 +163,14 @@ export default function Layout() {
                     { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
                     { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
                 ] : []),
-                { name: 'Leads',           href: '',                    icon: UserPlus,        isLabel: true },
-                { name: 'Tableau de bord', href: '/leads',              icon: LayoutDashboard, end: true },
-                { name: 'Détail leads',    href: '/leads/detail',       icon: List },
+                // Leads — hidden while the Comptes module replaces it. Routes are
+                // commented out in App.tsx; leaving these visible would 404.
+                // { name: 'Leads',           href: '',                    icon: UserPlus,        isLabel: true },
+                // { name: 'Tableau de bord', href: '/leads',              icon: LayoutDashboard, end: true },
+                // { name: 'Détail leads',    href: '/leads/detail',       icon: List },
+                { name: 'Comptes',         href: '',                    icon: Building2,       isLabel: true },
+                { name: 'Tableau de bord', href: '/comptes',            icon: LayoutDashboard, end: true },
+                { name: 'Détail comptes',  href: '/comptes/detail',     icon: List },
             ],
         },
         {

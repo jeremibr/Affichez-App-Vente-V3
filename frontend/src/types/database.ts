@@ -392,3 +392,162 @@ export type UnassignedInvoiceRow = {
     rep_name: string | null;
     reason: string;
 };
+
+// ─── Comptes (Zoho CRM Accounts) ──────────────────────────────────────────────
+//
+// The Comptes module reads the ACCOUNT as the record, not the lead or the
+// contact. An account is unique where a contact is not: a company with three
+// contacts is one account, so revenue is counted once without any dedupe layer.
+// That is the whole reason this module exists — see docs/COMPTES.md.
+
+/**
+ * One row of zoho_accounts_enriched — a Zoho account with its lifetime invoice
+ * rollup attached. Revenue here is lifetime, not windowed: a row is an account,
+ * and the 12-month attribution window is a property of a cohort comparison,
+ * which lives on the dashboard RPCs instead.
+ */
+export type ZohoAccountRow = {
+    zoho_account_id: string;
+    account_name: string | null;
+
+    phone: string | null;
+    website: string | null;
+    description: string | null;
+    billing_street: string | null;
+    billing_city: string | null;
+    billing_state: string | null;
+    billing_code: string | null;
+    billing_country: string | null;
+
+    owner_name: string | null;
+    owner_email: string | null;
+    rep_name: string | null;
+    charge_de_projets: string | null;
+
+    created_time: string | null;
+    created_date: string | null;
+    modified_time: string | null;
+    last_activity_time: string | null;
+
+    origine_du_client: string | null;
+    service_interest: string[];
+    domaine_activite: string | null;
+    region_administrative: string | null;
+    region_cible: string[];
+    type_marche: string[];
+    periode_publicitaire: string[];
+    nombre_employes: string | null;
+    budget_publicitaire_annuel: number | null;
+    potentiel_multi_annonceurs: string | null;
+    potentiel_services_ia: boolean | null;
+    revendeur: boolean | null;
+    rating: string | null;
+    tags: string[];
+
+    parent_account_id: string | null;
+    parent_account_name: string | null;
+
+    nombre_taches: number | null;
+    derniere_tache_fermee: string | null;
+
+    /**
+     * Royer & Fils / VotreLogo.ca promo revenue, from a Zoho CRM rollup field.
+     * That business is invoiced outside the QC and MTL Books orgs, so it never
+     * appears in `invoices` and must never be added to revenue_lifetime — the
+     * two measure different companies.
+     */
+    ventes_totales: number | null;
+    ventes_2026: number | null;
+    ventes_2025: number | null;
+
+    zoho_crm_url: string | null;
+
+    invoice_count: number;
+    credit_count: number;
+    revenue_lifetime: number;
+    first_invoice_date: string | null;
+    last_invoice_date: string | null;
+    has_invoices: boolean;
+
+    /** "Client Royer & Fils / VotreLogo.ca" or "Client PLOGG/BUCCO" — an acquired
+     *  customer list, not a campaign. Flagged so a 2,028-account import is never
+     *  read against a Meta Ads bar as though they measured the same thing. */
+    is_bulk_import: boolean;
+
+    /**
+     * Rating is one of Affichez's own entities ("Compte interne : Ne pas
+     * reprendre", "Fournisseur") rather than a client. Precomputed in the view
+     * because PostgREST's `rating=not.in.(...)` becomes NOT (rating IN ...),
+     * which is NULL — not TRUE — for the 977 accounts with no rating, and would
+     * hide them from the table while the dashboard still counted them.
+     */
+    is_internal: boolean;
+};
+
+/**
+ * get_zoho_account_kpis.
+ *
+ * `revenue_per_account` is the figure the module exists for: what a cohort
+ * actually billed, per account acquired. Divided by accounts_created, not by
+ * accounts_invoiced — the accounts that bought nothing are exactly what makes a
+ * bad source bad.
+ *
+ * `ventes_royer` sits beside the invoice figures and never inside them.
+ */
+export type ZohoAccountKPIs = {
+    accounts_created: number;
+    accounts_invoiced: number;
+    invoiced_rate: number;
+    revenue_attributed: number;
+    revenue_lifetime: number;
+    revenue_per_account: number;
+    avg_days_to_first_invoice: number | null;
+    ventes_royer: number;
+};
+
+/** One row of any get_zoho_accounts_by_* breakdown — rep, source, service, domaine. */
+export type ZohoAccountBreakdownRow = {
+    label: string;
+    nb_accounts: number;
+    nb_invoiced: number;
+    total_amount: number;
+    revenue_per_account: number;
+    is_bulk_import: boolean;
+};
+
+/** get_zoho_accounts_monthly_summary — `month` is 1-12, every month present. */
+export type ZohoAccountMonthlyRow = {
+    month: number;
+    nb_accounts: number;
+    nb_invoiced: number;
+    total_amount: number;
+    revenue_per_account: number;
+};
+
+/**
+ * get_zoho_account_filter_options.
+ *
+ * Drawn from the stored data, never from Zoho's picklist definition. Accounts
+ * hold 26 distinct sources against 21 live picklist entries, and the orphans
+ * include "Publicité/Recherche Google" (108 accounts) — the segment Dominic
+ * asked to report on. A hardcoded list offers every source except that one.
+ */
+export type ZohoAccountFilterOptions = {
+    years: number[];
+    sources: string[];
+    services: string[];
+    service_variants: Record<string, string[]>;
+    reps: string[];
+    domaines: string[];
+    regions: string[];
+    ratings: string[];
+};
+
+/** get_account_revenue_by_department — one row per (year, department) for one account. */
+export type AccountDeptRevenueRow = {
+    year: number;
+    department: string;
+    invoice_count: number;
+    credit_count: number;
+    total_amount: number;
+};

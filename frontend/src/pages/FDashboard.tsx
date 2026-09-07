@@ -9,6 +9,8 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
 import { InfoHint } from '../components/InfoHint';
+import { ExportButton } from '../components/ExportButton';
+import type { CsvColumn } from '../lib/csv';
 import { useAuth } from '../contexts/AuthContext';
 
 interface InvDashboardKPIs {
@@ -23,7 +25,26 @@ interface InvDashboardKPIs {
 }
 
 interface TopClient { client_name: string; total_amount: number; deal_count: number; office: string; }
+
+// Asked for directly in the 2026-09-04 meeting: "je veux tout le temps qu'on
+// puisse telecharger les rapports partout". The export always carries the FULL
+// list behind each card, not the five rows the card shows.
+const CLIENT_CSV: CsvColumn<TopClient>[] = [
+    { header: 'Client',   value: c => c.client_name },
+    { header: 'Bureau',   value: c => c.office },
+    { header: 'Factures', value: c => c.deal_count },
+    { header: 'Montant',  value: c => c.total_amount },
+];
 interface LeaderboardEntry { rep_name: string; office: string; total_amount: number; deal_count: number; avg_deal: number; rank: number; }
+
+const LEADERBOARD_CSV: CsvColumn<LeaderboardEntry>[] = [
+    { header: 'Rang',              value: r => r.rank },
+    { header: 'Representant',      value: r => r.rep_name },
+    { header: 'Bureau',            value: r => r.office },
+    { header: 'Factures',          value: r => r.deal_count },
+    { header: 'Montant',           value: r => r.total_amount },
+    { header: 'Facture moyenne',   value: r => r.avg_deal },
+];
 
 export default function FDashboard() {
     const { isAdmin, repName: authRepName } = useAuth();
@@ -351,11 +372,15 @@ export default function FDashboard() {
                                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <Trophy className="w-4 h-4 text-amber-500" /> Leaderboard Reps
                                 </h3>
-                                {leaderboard.length > 5 && (
-                                    <button onClick={() => setShowLeaderboard(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
-                                        Voir tout ({leaderboard.length}) <ChevronRight className="w-3 h-3" />
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <ExportButton rows={leaderboard} columns={LEADERBOARD_CSV}
+                                                  filename="leaderboard_reps_factures" disabled={leaderboard.length === 0} label="CSV" />
+                                    {leaderboard.length > 5 && (
+                                        <button onClick={() => setShowLeaderboard(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                            Voir tout ({leaderboard.length}) <ChevronRight className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="divide-y divide-slate-50">
                                 {(() => {
@@ -392,11 +417,15 @@ export default function FDashboard() {
                                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                                     <User className="w-4 h-4 text-blue-500" /> Top 5 Clients
                                 </h3>
-                                {topClients.length > 5 && (
-                                    <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
-                                        Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    <ExportButton rows={topClients} columns={CLIENT_CSV}
+                                                  filename="top_clients_factures" disabled={topClients.length === 0} label="CSV" />
+                                    {topClients.length > 5 && (
+                                        <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                            Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="divide-y divide-slate-50">
                                 {topClients.slice(0, 5).map((c) => (

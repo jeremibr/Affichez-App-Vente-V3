@@ -1,9 +1,11 @@
 // supabase/functions/zoho-account-sync/index.ts
 // Syncs Zoho CRM Accounts → the Supabase zoho_accounts table.
 //
-// Only two fields matter here, and only because a Contact does not carry them:
-// "Origine du client" and the service multiselect. Everything else about an
-// account already reaches the app through invoices.
+// This started as a two-field lookup — "Origine du client" and the service
+// multiselect, the two things a Contact does not carry itself. It now backs the
+// Comptes module, where the account IS the record, so it carries the full
+// profile: owner, creation date, reach, segment and Zoho's Royer-only revenue
+// rollups. See ACCOUNT_FIELDS for what is deliberately left behind.
 //
 // Three ways in, matching zoho-lead-sync:
 //   1. Webhook   — Zoho workflow rule POSTs {id} to this function.
@@ -18,12 +20,12 @@
 // through mapRecord, upsertBatch, deleteBatch and reconcileStaleRows for no
 // shared behaviour. Same shape, separate blast radius.
 //
-// SCOPE WARNING: the shared CRM refresh token is scoped to
-// ZohoCRM.modules.leads.READ + ZohoCRM.modules.contacts.READ + ZohoCRM.users.READ.
-// Reading Accounts additionally needs ZohoCRM.modules.accounts.READ. Check it
-// with `x-check-scope: true` BEFORE scheduling this — a token without the scope
-// returns 401 OAUTH_SCOPE_MISMATCH on every page and the walk silently does
-// nothing.
+// SCOPE: reading Accounts needs ZohoCRM.modules.accounts.READ on top of the
+// leads + contacts + users scopes the shared CRM refresh token was issued with.
+// It was missing at first; verified present on 2026-09-07 (`x-check-scope: true`
+// → 200, readable). Re-check with that header before blaming anything else — a
+// token without the scope returns 401 OAUTH_SCOPE_MISMATCH on every page and the
+// walk silently upserts nothing while still reporting success.
 //
 // Unlike zoho-lead-sync this never deletes. An account removed in Zoho leaves a
 // row nothing points at any more: zoho_leads_unique reaches it by
@@ -49,8 +51,33 @@ const SB_HEADERS = {
 // the two can share a column without translation.
 const SERVICE_FIELD = 'Int_r_t_pour_quel_service_initialement';
 
+// 38 fields of the 70 Accounts exposes. Zoho caps `fields` at 50 per request, so
+// this has room but not unlimited room — anything added here should be something
+// the Comptes module actually reads.
+//
+// Left out on purpose: Shipping_* (duplicates Billing_* for a company that ships
+// nothing), the five zthrive* loyalty fields, Currency/Exchange_Rate (one
+// currency), Enrich_Status/Record_Status/Locked (Zoho housekeeping), and
+// NUM/WEB/PROM/DIST/AUTRE — the per-department currency fields are abandoned in
+// Zoho (LUMEN: $1.5M of Ventes_totales against NUM = 47.78, the rest null), and
+// department revenue comes from invoices.department, which is maintained.
 const ACCOUNT_FIELDS = [
-  'id', 'Account_Name', 'Origine_du_client', SERVICE_FIELD, 'Modified_Time',
+  'id', 'Account_Name', 'Phone', 'Website', 'Description',
+  'Billing_Street', 'Billing_City', 'Billing_State', 'Billing_Code', 'Billing_Country',
+  'Owner', 'Created_Time', 'Modified_Time', 'Last_Activity_Time',
+  'Origine_du_client', SERVICE_FIELD, 'Domaine_d_activit',
+  'R_gion_administrative_du_client', 'R_gion_cible', 'Type_de_march',
+  'P_riode_publicitaire', 'Nombre_d_employ_s', 'Budget_publicitaire_annuel',
+  'Potentiel_Multi_Annonceurs', 'Potentiel_Services_IA', 'Revendeur_de_nos_services',
+  'Rating', 'Tag', 'Parent_Account',
+  'Nombre_de_t_ches', 'Derni_re_T_che_Ferm_e', 'Charg_e_de_projets',
+  // Royer & Fils / VotreLogo.ca revenue. Verified 2026-09-07:
+  // SUM(Ventes_totales_2022_2026) is $5,530,878.34 over all 20,645 accounts and
+  // $5,530,878.34 over the 2,028 Royer-origin ones — every account carrying a
+  // value belongs to that cohort. Its invoices are billed outside the QC and MTL
+  // Books orgs, so these fields are the only way that revenue reaches the app.
+  'Ventes_2022', 'Ventes_2023', 'Ventes_2024', 'Ventes_2025', 'Ventes_2026',
+  'Ventes_totales_2022_2026',
 ].join(',');
 
 // ~20.6k accounts at 200 a page is ~104 requests, comfortably inside one
@@ -203,7 +230,24 @@ async function writeCursorToken(key: string, token: string | null): Promise<void
 
 // ─── Field mapping ────────────────────────────────────────────────────────────
 
-interface ZohoLookup { name?: string; id?: string }
+interface ZohoLookup { name?: string; id?: string; email?: string }
+
+/** email (lowercased) → app rep_name, so a Comptes figure and a Factures figure
+ *  for the same person carry the same name. Same source as zoho-lead-sync. */
+async function loadRepMap(): Promise<Record<string, string>> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/allowed_users?select=email,rep_name&rep_name=not.is.null`,
+    { headers: SB_HEADERS },
+  );
+  const map: Record<string, string> = {};
+  if (res.ok) {
+    const rows = await res.json() as Array<{ email: string; rep_name: string }>;
+    for (const r of rows) {
+      if (r.email && r.rep_name) map[r.email.toLowerCase()] = r.rep_name;
+    }
+  }
+  return map;
+}
 
 /** Zoho returns multiselects as string[], but a single value can arrive as a string. */
 function toStringArray(v: unknown): string[] {
@@ -223,18 +267,107 @@ function pickOrNull(v: unknown): string | null {
   return s;
 }
 
-function mapAccount(rec: Record<string, unknown>): object {
+/**
+ * Zoho returns Tag as [{name, id}], not as the plain string[] every other
+ * multiselect uses. Handles both so a shape change does not silently empty the
+ * column.
+ */
+function toTagArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return toStringArray(v);
+  return v
+    .map((t) => (typeof t === 'string' ? t : (t as ZohoLookup)?.name ?? ''))
+    .filter(Boolean);
+}
+
+/** Zoho sends currency fields as a number, but an empty one arrives as null or ''. */
+function toNumberOrNull(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** A Zoho date field is 'YYYY-MM-DD'; an unset one is null or ''. */
+function toDateOrNull(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null;
+}
+
+function mapAccount(rec: Record<string, unknown>, repMap: Record<string, string>): object {
   // Account_Name is plain text on Accounts, unlike on Contacts where it is the
   // lookup pointing here.
   const name = rec.Account_Name;
+  const owner = (rec.Owner ?? {}) as ZohoLookup;
+  const parent = (rec.Parent_Account ?? null) as ZohoLookup | null;
+  const ownerEmail = owner.email?.toLowerCase() ?? null;
+  const id = String(rec.id);
+
   return {
-    zoho_account_id: String(rec.id),
+    zoho_account_id: id,
     account_name: typeof name === 'string'
       ? name
       : ((name as ZohoLookup | null)?.name ?? null),
+
+    // Reach
+    phone: pickOrNull(rec.Phone),
+    website: pickOrNull(rec.Website),
+    description: pickOrNull(rec.Description),
+    billing_street: pickOrNull(rec.Billing_Street),
+    billing_city: pickOrNull(rec.Billing_City),
+    billing_state: pickOrNull(rec.Billing_State),
+    billing_code: pickOrNull(rec.Billing_Code),
+    billing_country: pickOrNull(rec.Billing_Country),
+
+    // Ownership. rep_name falls back to Zoho's own owner name when the address is
+    // not in allowed_users — an ex-rep's accounts should keep showing a name
+    // rather than collapsing into a null bucket.
+    owner_id: owner.id ?? null,
+    owner_name: owner.name ?? null,
+    owner_email: ownerEmail,
+    rep_name: (ownerEmail && repMap[ownerEmail]) ? repMap[ownerEmail] : (owner.name ?? null),
+    charge_de_projets: pickOrNull(rec.Charg_e_de_projets),
+
+    // Dates. Zoho stamps these with the org's own offset (-04:00/-05:00), so they
+    // are already Montreal wall-clock; Postgres stores the instant and the
+    // scoped view reads them back AT TIME ZONE 'America/Toronto'.
+    created_time: (rec.Created_Time as string) || null,
+    modified_time: (rec.Modified_Time as string) || null,
+    last_activity_time: (rec.Last_Activity_Time as string) || null,
+
+    // Attribution and segmentation
     origine_du_client: pickOrNull(rec.Origine_du_client),
     service_interest: toStringArray(rec[SERVICE_FIELD]),
-    modified_time: (rec.Modified_Time as string) || null,
+    domaine_activite: pickOrNull(rec.Domaine_d_activit),
+    region_administrative: pickOrNull(rec.R_gion_administrative_du_client),
+    region_cible: toStringArray(rec.R_gion_cible),
+    type_marche: toStringArray(rec.Type_de_march),
+    periode_publicitaire: toStringArray(rec.P_riode_publicitaire),
+    nombre_employes: pickOrNull(rec.Nombre_d_employ_s),
+    budget_publicitaire_annuel: toNumberOrNull(rec.Budget_publicitaire_annuel),
+    potentiel_multi_annonceurs: pickOrNull(rec.Potentiel_Multi_Annonceurs),
+    potentiel_services_ia: (rec.Potentiel_Services_IA as boolean) ?? null,
+    revendeur: (rec.Revendeur_de_nos_services as boolean) ?? null,
+    rating: pickOrNull(rec.Rating),
+    tags: toTagArray(rec.Tag),
+
+    // Hierarchy — recorded, not rolled up. A child keeps its own invoices.
+    parent_account_id: parent?.id ?? null,
+    parent_account_name: parent?.name ?? null,
+
+    // Activity
+    nombre_taches: rec.Nombre_de_t_ches === null || rec.Nombre_de_t_ches === undefined
+      ? null
+      : Number(rec.Nombre_de_t_ches),
+    derniere_tache_fermee: toDateOrNull(rec.Derni_re_T_che_Ferm_e),
+
+    // Royer & Fils / VotreLogo.ca only — see ACCOUNT_FIELDS. Never summed into
+    // revenue_attributed or revenue_lifetime.
+    ventes_2022: toNumberOrNull(rec.Ventes_2022),
+    ventes_2023: toNumberOrNull(rec.Ventes_2023),
+    ventes_2024: toNumberOrNull(rec.Ventes_2024),
+    ventes_2025: toNumberOrNull(rec.Ventes_2025),
+    ventes_2026: toNumberOrNull(rec.Ventes_2026),
+    ventes_totales: toNumberOrNull(rec.Ventes_totales_2022_2026),
+
+    zoho_crm_url: `https://crm.zoho.com/crm/org${CRM_ORG_ID}/tab/Accounts/${id}`,
     synced_at: new Date().toISOString(),
   };
 }
@@ -264,6 +397,7 @@ async function fetchOne(id: string, token: string): Promise<Record<string, unkno
  */
 async function syncAccounts(
   token: string,
+  repMap: Record<string, string>,
   since: Date | null,
   errors: string[],
   opts: { deadline?: number; cursorKey?: string } = {},
@@ -312,7 +446,7 @@ async function syncAccounts(
     const records: Record<string, unknown>[] = data.data ?? [];
     if (records.length === 0) { complete = true; break; }
 
-    await upsertBatch(records.map(mapAccount));
+    await upsertBatch(records.map((r) => mapAccount(r, repMap)));
     upserted += records.length;
 
     const info = (data.info ?? {}) as Record<string, unknown>;
@@ -393,7 +527,7 @@ Deno.serve(async (req: Request) => {
         await logSync('webhook_accounts', 200, recordId, 'not found in Zoho; left as is');
         return json({ id: recordId, action: 'absent' });
       }
-      await upsertBatch([mapAccount(rec)]);
+      await upsertBatch([mapAccount(rec, await loadRepMap())]);
       await logSync('webhook_accounts', 200, recordId);
       return json({ id: recordId, action: 'upserted' });
     } catch (e) {
@@ -410,6 +544,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const token = await getAccessToken();
+    // One read for the whole walk: allowed_users holds 16 rows and does not
+    // change mid-sync, so fetching it per page would be ~104 pointless requests.
+    const repMap = await loadRepMap();
 
     if (isFull) {
       const done = await readCursorToken(FULL_CURSOR_KEY);
@@ -421,7 +558,7 @@ Deno.serve(async (req: Request) => {
       }
 
       // No If-Modified-Since: a full pass walks the entire module.
-      const r = await syncAccounts(token, null, errors, { deadline, cursorKey: FULL_CURSOR_KEY });
+      const r = await syncAccounts(token, repMap, null, errors, { deadline, cursorKey: FULL_CURSOR_KEY });
       if (r.complete) {
         await writeCursorToken(FULL_CURSOR_KEY, DONE_MARKER);
         await writeSyncState(INCREMENTAL_KEY, new Date());
@@ -434,7 +571,7 @@ Deno.serve(async (req: Request) => {
     // ── Incremental ──
     const since = await readSyncState(INCREMENTAL_KEY);
     const startedAt = new Date();
-    const r = await syncAccounts(token, since, errors, { deadline });
+    const r = await syncAccounts(token, repMap, since, errors, { deadline });
     // Only advance the cursor on a clean pass; otherwise the next run re-covers
     // the same window rather than stepping over whatever failed.
     if (errors.length === 0) await writeSyncState(INCREMENTAL_KEY, startedAt);

@@ -20,8 +20,14 @@ import PortailPaye from './pages/PortailPaye';
 import PortailObjectifs from './pages/PortailObjectifs';
 import PortailParametres from './pages/PortailParametres';
 import ObjectifsEquipe from './pages/ObjectifsEquipe';
-import LeadsDashboard from './pages/LeadsDashboard';
-import LeadsDetail from './pages/LeadsDetail';
+// Leads module — hidden from the UI while the Comptes module replaces it.
+// The pages and every get_zoho_lead* RPC behind them are left intact: the
+// account view is the same data at a different grain, and until it is trusted
+// this is the only way back to a number someone has already quoted.
+// import LeadsDashboard from './pages/LeadsDashboard';
+// import LeadsDetail from './pages/LeadsDetail';
+import AccountsDashboard from './pages/AccountsDashboard';
+import AccountsDetail from './pages/AccountsDetail';
 import PortailLeads from './pages/PortailLeads';
 import TasksDashboard from './pages/TasksDashboard';
 
@@ -58,9 +64,13 @@ function AppRoutes() {
                     </>
                 )}
 
-                {/* ─── Leads module ─── */}
-                <Route path="leads" element={<LeadsDashboard />} />
-                <Route path="leads/detail" element={<LeadsDetail />} />
+                {/* ─── Leads module — superseded by Comptes, routes disabled ─── */}
+                {/* <Route path="leads" element={<LeadsDashboard />} /> */}
+                {/* <Route path="leads/detail" element={<LeadsDetail />} /> */}
+
+                {/* ─── Comptes module — Zoho CRM Accounts, the grain that replaced leads ─── */}
+                <Route path="comptes" element={<AccountsDashboard />} />
+                <Route path="comptes/detail" element={<AccountsDetail />} />
 
                 {/* ─── Mon Portail — personal view for every rep ─── */}
                 <Route path="portail" element={<PortailObjectifs />} />
