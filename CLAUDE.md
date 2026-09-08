@@ -54,8 +54,11 @@ There is no service layer abstraction; Supabase calls are made directly inside p
 app only ever reads what they have written. Two different Zoho products are
 involved and they do not share ids or credentials:
 
-- **Zoho Books** (`zoho-sync`, `zoho-invoice-sync`) — two organisations, QC and
-  MTL, feeding `quotes` and `invoices`.
+- **Zoho Books** (`zoho-sync`, `zoho-invoice-sync`, `zoho-quote-creator-sync`) —
+  two organisations, QC and MTL, feeding `quotes` and `invoices`. Verified
+  2026-09-07 against `GET /books/v3/organizations`: those two are **the only**
+  orgs the token can see, so the Royer & Fils revenue below is not reachable
+  through these credentials at all.
 - **Zoho CRM** (`zoho-lead-sync`, `zoho-task-sync`, `zoho-account-sync`) — one
   org, feeding `zoho_leads`, `zoho_tasks` and `zoho_accounts`.
 
@@ -68,6 +71,51 @@ blaming anything else:
 ```
 curl.exe -H "x-check-scope: true" https://auyfucbskylougsmmrks.supabase.co/functions/v1/zoho-account-sync
 ```
+
+### Who created a document, vs who sold it
+
+Zoho Books stores two different people on a quote or invoice: the **salesperson**
+(who owns the sale) and the **creator** (who typed it in). Everything in the app
+reads the salesperson except `/createurs`, which reads the creator — asked for so
+Morgane Owczarzak's and Guillaume Montambeault's admin work is visible even when
+the sale is credited elsewhere.
+
+The two modules give it away very differently (verified 2026-09-07):
+
+- **Invoices** — `created_by` is a NAME on the list payload. Free.
+- **Estimates** — no creator on the list at all; the detail endpoint has only
+  `created_by_id`. One API call per quote, resolved through `zoho_books_users`
+  (150 users). That is what `zoho-quote-creator-sync` is for: a paced, resumable
+  back-fill over 7,961 quotes, cron every 3 min until `pending` hits zero.
+
+`zoho-sync` deliberately omits `created_by_name` from its upsert. PostgREST's
+merge-duplicates only touches columns present in the payload, so a routine quote
+re-sync cannot wipe a name the back-fill paid an API call for.
+
+**These figures never reconcile with the rep numbers, by design.** A quote created
+by Morgane and sold by Dominic counts once under each. `/createurs` is admin-only
+and says so on screen; never add its totals to a leaderboard.
+
+### The syncs no longer discard records silently
+
+`zoho-invoice-sync` and `zoho-sync` used to `continue` past any record whose
+department wasn't in `DEPT_MAP` — no error, no log, nothing on screen. On
+2026-09-07 that was changed to land the row with a NULL `department`, keeping
+Zoho's raw label, surfaced by `get_unmapped_department_summary` in Settings.
+
+It found sixteen months of missing money on the first run:
+
+- **`ÉVÈNEMENT`** — a real seventh department Zoho Books had been billing under
+  since 2025-05-29. 160 invoices, $142,918, none of which had ever reached the
+  app. Now `EVENEMENT` in `department_enum`, `DEPT_MAP` and `DEPARTMENTS`.
+  `objectives_factures` has no target rows for it yet.
+- **92 credit notes, -$117,764** across 2025-26 whose department could not be
+  resolved from `reference_number`. Dominic's diagnosis in the 2026-09-04
+  meeting — *"on n'inclut pas les crédits, les avoirs"* — was correct.
+
+A full sync with `x-date-start: 2021-01-01` also pulled in ~4,000 invoices from
+2021-22 that the old window had never covered. They are kept; they carry no
+department because Zoho has none on them.
 
 Two Zoho API quirks are worth knowing before touching `zoho-invoice-sync`:
 
@@ -227,7 +275,8 @@ the table would just be overwritten by the next sync.
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, with the revenue attribution window |
+| `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
+| `/createurs` | `Createurs` | Admin-only. Who *created* each quote/invoice, vs who sold it. Never reconciles with rep figures — by design |
 | `/comptes/detail` | `AccountsDetail` | Searchable client directory; a row opens its billing history by department and year |
 | `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |

@@ -20,6 +20,15 @@ const DEPT_MAP: Record<string, string> = {
   'AGENCE WEB': 'APPLICATION',
   'APPLICATION': 'APPLICATION',
   'SERVICES IA': 'SERVICES IA',
+  // Added 2026-09-07. Zoho Books has billed under this since May 2025 and the
+  // app never saw a cent of it: 160 invoices, $142,918, discarded silently by
+  // the `if (!dept) continue` that used to sit below. Every accent spelling is
+  // listed because extractDept upper-cases but does not strip accents, and
+  // Zoho's own wording is inconsistent across its two modules.
+  'ÉVÈNEMENT': 'EVENEMENT',
+  'ÉVÉNEMENT': 'EVENEMENT',
+  'EVENEMENT': 'EVENEMENT',
+  'ÉVENEMENT': 'EVENEMENT',
 };
 
 const STATUS_MAP: Record<string, string> = {
@@ -184,6 +193,25 @@ async function writeSyncState(key: string, ts: Date): Promise<void> {
 
 // ─── Field Extraction ─────────────────────────────────────────────────────────
 
+/**
+ * Zoho's own wording for the department, mapped or not. Stored alongside a null
+ * `department` so get_unmapped_department_summary can name the label somebody
+ * has to add to DEPT_MAP, rather than just reporting a count of mystery rows.
+ */
+function rawDeptLabel(record: Record<string, unknown>): string | null {
+  let raw = (record.cf_d_partement ?? record.department ?? '') as string;
+  if (!raw) {
+    const fields = record.custom_fields as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(fields)) {
+      const f = fields.find(
+        (x) => x.api_name === 'cf_d_partement' || x.api_name === 'cf_departement' || x.label === 'Département',
+      );
+      raw = ((f?.value ?? f?.string_value ?? '') as string);
+    }
+  }
+  return raw?.trim() || null;
+}
+
 function extractDept(record: Record<string, unknown>): { label: string; mapped: string } | null {
   // Try flat field first (invoices list returns cf_xxx inline)
   let raw = (record.cf_d_partement ?? record.department ?? '') as string;
@@ -295,8 +323,14 @@ async function syncInvoices(
         const rawStatus = ((inv.status as string) ?? '').toLowerCase().replace(/_/g, '');
         const mappedStatus = STATUS_MAP[rawStatus];
         if (!mappedStatus) continue;
+        // An unrecognised department no longer throws the record away. Before
+        // this, `continue` meant an invoice whose department Zoho reported under
+        // a name DEPT_MAP does not know vanished with no error and no log -
+        // harmless while the six live labels are all mapped, and a silent hole
+        // in the revenue the day somebody adds a seventh. The row now lands with
+        // a null department, keeps Zoho's raw label, and shows up in
+        // get_unmapped_department_summary so the mapping can be fixed.
         const dept = extractDept(inv);
-        if (!dept) continue;
         touched.add(String(inv.invoice_number));
         toUpsert.push({
           zoho_id: String(inv.invoice_id),
@@ -308,8 +342,14 @@ async function syncInvoices(
           books_customer_id: String(inv.customer_id ?? '') || null,
           amount: Math.round((Number(inv.total) / 1.14975) * 100) / 100,
           rep_name: (inv.salesperson_name as string)?.trim() || null,
-          zoho_department_label: dept.label,
-          department: dept.mapped,
+          // Who keyed the invoice in, which is routinely NOT the salesperson:
+          // the first record sampled on 2026-09-07 was created_by "Morgane
+          // Owczarzak" with salesperson "Dominic Letendre". Free - Zoho puts it
+          // on the list payload, unlike estimates, which need a detail call
+          // each (see zoho-quote-creator-sync).
+          created_by_name: (inv.created_by as string)?.trim() || null,
+          zoho_department_label: dept?.label ?? rawDeptLabel(inv),
+          department: dept?.mapped ?? null,
           office: org.office,
           invoice_date: inv.date,
           status: mappedStatus,
@@ -384,7 +424,9 @@ async function syncCreditNotes(
 
     const toUpsert: object[] = [];
     for (const { note, dept } of pending) {
-      if (!dept) continue;
+      // Same rule as invoices above: land it with a null department rather than
+      // losing it. A credit note is money leaving; dropping one silently
+      // overstates revenue.
       touched.add(String(note.creditnote_number));
       toUpsert.push({
         zoho_id: String(note.creditnote_id),
@@ -393,8 +435,9 @@ async function syncCreditNotes(
         books_customer_id: String(note.customer_id ?? '') || null,
         amount: Math.round((Number(note.total) / 1.14975) * 100) / 100 * -1,
         rep_name: (note.salesperson_name as string)?.trim() || null,
-        zoho_department_label: dept.label,
-        department: dept.mapped,
+        created_by_name: (note.created_by as string)?.trim() || null,
+        zoho_department_label: dept?.label ?? rawDeptLabel(note),
+        department: dept?.mapped ?? null,
         office: org.office,
         invoice_date: note.date,
         status: 'avoir',
@@ -552,10 +595,104 @@ Deno.serve(async (req: Request) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers':
-      'authorization, x-sync-source, x-full-sync, x-org, x-status, x-date-start, ' +
+      'authorization, x-sync-source, x-full-sync, x-org, x-status, x-date-start, x-probe, ' +
       'x-date-end, x-prune, x-prune-only, x-dry-run, content-type',
   };
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+
+  // ── x-probe: read-only reconnaissance, writes nothing ──
+  //
+  // Answers two questions that cannot be answered from the database, and that
+  // both block work asked for in the 2026-09-04 meeting:
+  //
+  //   1. How many Zoho Books organisations can this token see? ORGS below is
+  //      hardcoded to QC + MTL, but the Royer & Fils / VotreLogo.ca business is
+  //      billed in neither, and $5.5M of CRM revenue has no invoice behind it
+  //      here. If a third org is visible, that money is reachable.
+  //
+  //   2. Does an estimate or an invoice carry the person who CREATED it, as
+  //      opposed to salesperson_name (who owns the sale)? Dominic asked to count
+  //      "les devis creees par" Morgane and Guillaume even when someone else is
+  //      the salesperson, which needs a different field from the one we store.
+  //
+  // Returns the org list plus every key present on one estimate and one invoice,
+  // so the answer is what Zoho actually sends rather than what the docs claim.
+  if (req.headers.get('x-probe') === 'true') {
+    try {
+      const token = await getAccessToken();
+      const zh = { Authorization: `Zoho-oauthtoken ${token}` };
+
+      const orgRes = await fetch('https://www.zohoapis.com/books/v3/organizations', { headers: zh });
+      const orgBody = await orgRes.json().catch(() => ({}));
+      const orgs = (orgBody.organizations ?? []).map((o: Record<string, unknown>) => ({
+        organization_id: o.organization_id,
+        name: o.name,
+        is_default_org: o.is_default_org,
+        currency_code: o.currency_code,
+      }));
+
+      // One record from each module, at detail level: Zoho's LIST payload is a
+      // subset of the DETAIL payload, so both are sampled - a field that exists
+      // only on detail still means one extra call per record to sync it.
+      const sample = async (module: string, listKey: string, idKey: string) => {
+        const qc = ORGS[0].id;
+        const listRes = await fetch(
+          `https://www.zohoapis.com/books/v3/${module}?organization_id=${qc}&per_page=1`,
+          { headers: zh },
+        );
+        const listBody = await listRes.json().catch(() => ({}));
+        const first = (listBody[listKey] ?? [])[0];
+        if (!first) return { module, error: `no ${listKey} returned`, status: listRes.status };
+        const id = first[idKey];
+        const detRes = await fetch(
+          `https://www.zohoapis.com/books/v3/${module}/${id}?organization_id=${qc}`,
+          { headers: zh },
+        );
+        const detBody = await detRes.json().catch(() => ({}));
+        const detail = detBody[listKey.replace(/s$/, '')] ?? {};
+        const creatorish = (obj: Record<string, unknown>) =>
+          Object.fromEntries(Object.entries(obj).filter(([k]) =>
+            /creat|author|user|owner|salesperson|last_modified/i.test(k)));
+        return {
+          module,
+          list_keys: Object.keys(first).sort(),
+          detail_keys: Object.keys(detail).sort(),
+          list_creator_fields: creatorish(first),
+          detail_creator_fields: creatorish(detail),
+        };
+      };
+
+      // Estimates carry only created_by_id, so a name needs the org's user list.
+      // Confirm it is readable and how many rows it holds before planning a sync
+      // that depends on it.
+      const usersOut: Record<string, unknown> = {};
+      for (const org of ORGS) {
+        const uRes = await fetch(
+          `https://www.zohoapis.com/books/v3/users?organization_id=${org.id}&per_page=200`,
+          { headers: zh },
+        );
+        const uBody = await uRes.json().catch(() => ({}));
+        const users = (uBody.users ?? []) as Record<string, unknown>[];
+        usersOut[org.office] = {
+          status: uRes.status,
+          count: users.length,
+          sample: users.slice(0, 3).map((u) => ({ user_id: u.user_id, name: u.name, email: u.email, status: u.status })),
+        };
+      }
+
+      return new Response(JSON.stringify({
+        orgs_visible: orgs,
+        orgs_configured: ORGS,
+        estimates: await sample('estimates', 'estimates', 'estimate_id'),
+        invoices: await sample('invoices', 'invoices', 'invoice_id'),
+        users: usersOut,
+      }, null, 2), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: String(e) }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+  }
 
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';

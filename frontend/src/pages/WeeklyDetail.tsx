@@ -10,6 +10,23 @@ import { cn } from '../lib/utils';
 import { Select } from '../components/Select';
 import { useRepList } from '../hooks/useRepList';
 import { INTERNAL_REP_NAMES } from '../lib/constants';
+import { ExportButton } from '../components/ExportButton';
+import type { CsvColumn } from '../lib/csv';
+
+// "Je veux tout le temps qu'on puisse telecharger les rapports partout"
+// (2026-09-04). Exports the filtered line items for the selected week - the same
+// rows the table below shows, not the whole year.
+const WEEK_CSV: CsvColumn<ZoneB_DetailRow>[] = [
+    { header: 'Date',          value: r => r.sale_date },
+    { header: 'Numero',        value: r => r.quote_number },
+    { header: 'Client',        value: r => r.client_name },
+    { header: 'Representant',  value: r => r.rep_name },
+    { header: 'Departement',   value: r => r.department },
+    { header: 'Etiquette Zoho', value: r => r.zoho_department_label },
+    { header: 'Bureau',        value: r => r.office },
+    { header: 'Statut',        value: r => r.status },
+    { header: 'Montant',       value: r => r.amount },
+];
 
 // ─── Week label helpers ───────────────────────────────────────────────────────
 
@@ -226,6 +243,13 @@ export default function WeeklyDetail() {
                         </div>
                     </div>
 
+                    <div className="flex justify-end">
+                        <ExportButton
+                            rows={filteredLineItems} columns={WEEK_CSV}
+                            filename="devis_semaine" disabled={filteredLineItems.length === 0}
+                            label={`Exporter ${filteredLineItems.length} devis`}
+                        />
+                    </div>
                     <ZoneAPivotTable repPivotRows={repPivotRows} grandTotal={grandTotal} deptTotals={deptTotals} />
                     <ZoneBTable lineItems={filteredLineItems} />
                 </div>

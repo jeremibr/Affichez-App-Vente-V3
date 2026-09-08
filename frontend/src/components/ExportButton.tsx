@@ -54,7 +54,12 @@ export function ExportButton<T>({ rows, columns, filename, label = 'Exporter CSV
             {busy
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <Download className="w-3.5 h-3.5" />}
-            {busy ? 'Préparation…' : label}
+            {/* translate="no": the label usually carries a live row count, and
+                Chrome's translator replaces a text node once and then leaves the
+                stale copy in place when React updates it. That produced a button
+                reading "Exporter CSV" (the count-is-zero label from first paint)
+                next to a table showing 18,705 rows. */}
+            <span translate="no">{busy ? 'Préparation…' : label}</span>
         </button>
     );
 }

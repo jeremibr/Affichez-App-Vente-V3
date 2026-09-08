@@ -5,7 +5,7 @@ import {
     Menu, LogOut, FileText, ClipboardList, Wallet,
     DollarSign, ChevronDown, UserCircle,
     Target, Eye, Building2, BarChart2, Users, UserPlus, List,
-    CheckSquare,
+    CheckSquare, FileSignature,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,7 +37,7 @@ function getSectionKey(pathname: string): string {
     if (pathname.startsWith('/portail')) return 'portail';
     if (pathname.startsWith('/leads') || pathname.startsWith('/comptes')) return 'ensemble';
     if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
-    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches')) return 'admin';
+    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches') || pathname.startsWith('/createurs')) return 'admin';
     return 'ensemble';
 }
 
@@ -195,6 +195,8 @@ export default function Layout() {
         { name: 'Objectifs',        href: '',                     icon: Target,       isLabel: true },
         { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Target,       end: true },
         { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
+        { name: 'Créé par',         href: '',                    icon: FileSignature, isLabel: true },
+        { name: 'Devis et factures', href: '/createurs',         icon: FileSignature, end: true },
         { name: 'Tâches CRM',       href: '',                    icon: CheckSquare,  isLabel: true },
         { name: 'Tableau de bord', href: '/taches',             icon: LayoutDashboard, end: true },
         { name: 'Système',         href: '',                    icon: Settings,     isLabel: true },

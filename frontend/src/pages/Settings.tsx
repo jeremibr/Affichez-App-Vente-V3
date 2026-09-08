@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { cn, formatShortDate } from '../lib/utils';
 import type { InvoiceLinkageStatus } from '../types/database';
+import { UnmappedDepartmentsCard, QuoteCreatorCard } from '../components/settings/DataHealthCards';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
@@ -233,10 +234,15 @@ function SyncManager() {
                 actionLabel="sync_tasks_manual"
             />
             <LinkageCard />
+            <QuoteCreatorCard />
+            {/* Placed last and deliberately loud when it has anything to say: this
+                card is the alarm that did not exist when ÉVÈNEMENT went missing
+                for sixteen months. */}
+            <UnmappedDepartmentsCard />
             <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
                 <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                 <span>
-                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>, <strong className="text-slate-700">Liaison factures aux 30 min</strong>.
+                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>, <strong className="text-slate-700">Liaison factures aux 30 min</strong>, <strong className="text-slate-700">Créateurs des devis aux 3 min</strong>.
                 </span>
             </div>
         </div>

@@ -4,12 +4,15 @@ import { supabase } from '../lib/supabase';
 import { Loader2, Building2, Percent, DollarSign, Timer, Info } from 'lucide-react';
 import type {
     ZohoAccountKPIs, ZohoAccountBreakdownRow, ZohoAccountFilterOptions,
+    ZohoAccountMonthlyRow,
 } from '../types/database';
+import { MonthlyEvolution } from '../components/accounts/MonthlyEvolution';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { InfoHint } from '../components/InfoHint';
 import { ExportButton } from '../components/ExportButton';
+import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import type { CsvColumn } from '../lib/csv';
 
@@ -74,12 +77,43 @@ export default function AccountsDashboard() {
     const [bySource, setBySource] = useState<ZohoAccountBreakdownRow[]>([]);
     const [byService, setByService] = useState<ZohoAccountBreakdownRow[]>([]);
     const [byDomaine, setByDomaine] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [monthly, setMonthly] = useState<ZohoAccountMonthlyRow[]>([]);
+    const [monthlyPrev, setMonthlyPrev] = useState<ZohoAccountMonthlyRow[]>([]);
     const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
 
     const yearParamValue = year === 'Toutes' ? null : year;
     // null is the RPC's "no cap", not a missing argument.
     const windowMonths = windowParam === 'Toute' ? null : Number(windowParam);
     const excludeRatings = ratingScope === 'Tous' ? null : DEFAULT_EXCLUDED_RATINGS;
+
+    /**
+     * Back to the default view in one navigation: 2026, twelve-month window,
+     * clients only, no other filter. Setting `year` to its default drops the
+     * param and the rest ride along as companions — nine separate calls would
+     * leave eight params behind.
+     *
+     * The year and the window are reset too, deliberately: they are part of what
+     * the page shows by default, and a "réinitialiser" that left the window on 3
+     * months would be the more surprising behaviour.
+     */
+    const clearFilters = () => {
+        _setYearParam('2026', {
+            month: null, rep: null, source: null, service: null,
+            domaine: null, region: null, fenetre: null, statut: null,
+        });
+    };
+
+    const activeFilterCount = [
+        yearParam !== '2026',
+        selectedMonth !== 'Toutes',
+        selectedRep !== 'Tous',
+        selectedSource !== 'Toutes',
+        selectedService !== 'Tous',
+        selectedDomaine !== 'Tous',
+        selectedRegion !== 'Toutes',
+        windowParam !== '12',
+        ratingScope !== 'Clients',
+    ].filter(Boolean).length;
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -97,12 +131,25 @@ export default function AccountsDashboard() {
 
         // Each breakdown drops its own dimension from the filter set, so choosing
         // "Meta Ads" does not reduce the source chart to a single bar.
+        // The monthly series ignores the month filter on purpose - it IS the
+        // month axis, and scoping it to one month would collapse it to a single
+        // point. The previous year is fetched alongside so a month can be read
+        // against the same month last year rather than only against its
+        // neighbours.
+        const monthlyArgs = {
+            p_rep: rep, p_source: source, p_service: service,
+            p_domaine: shared.p_domaine, p_region: shared.p_region,
+            p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
+        };
+
         const [
             { data: kpiData },
             { data: repData },
             { data: srcData },
             { data: svcData },
             { data: domData },
+            { data: monData },
+            { data: monPrevData },
         ] = await Promise.all([
             supabase.rpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_source: source, p_service: service }),
             supabase.rpc('get_zoho_accounts_by_rep',    { ...shared,             p_source: source, p_service: service }),
@@ -114,6 +161,11 @@ export default function AccountsDashboard() {
                 p_region: shared.p_region,
                 p_rep: rep, p_source: source, p_service: service,
             }),
+            supabase.rpc('get_zoho_accounts_monthly_summary', { ...monthlyArgs, p_year: yearParamValue }),
+            supabase.rpc('get_zoho_accounts_monthly_summary', {
+                ...monthlyArgs,
+                p_year: yearParamValue === null ? null : yearParamValue - 1,
+            }),
         ]);
 
         setKpis((kpiData as ZohoAccountKPIs[])?.[0] ?? null);
@@ -121,6 +173,8 @@ export default function AccountsDashboard() {
         setBySource((srcData as ZohoAccountBreakdownRow[]) ?? []);
         setByService((svcData as ZohoAccountBreakdownRow[]) ?? []);
         setByDomaine((domData as ZohoAccountBreakdownRow[]) ?? []);
+        setMonthly((monData as ZohoAccountMonthlyRow[]) ?? []);
+        setMonthlyPrev((monPrevData as ZohoAccountMonthlyRow[]) ?? []);
         setLoading(false);
     }, [yearParamValue, selectedMonth, selectedRep, selectedSource, selectedService,
         selectedDomaine, selectedRegion, windowMonths, excludeRatings]);
@@ -231,6 +285,7 @@ export default function AccountsDashboard() {
                         ]}
                     />
                 </FilterGroup>
+                <ClearFiltersButton activeCount={activeFilterCount} onClear={clearFilters} />
             </FilterBar>
 
             {loading ? (
@@ -240,7 +295,10 @@ export default function AccountsDashboard() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                    {/* translate="no": these are live figures; a translated text
+                        node is replaced once and then keeps its stale value when
+                        React re-renders. Labels stay translatable, values do not. */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4" translate="no">
                         <KPICard
                             title="Comptes créés"
                             value={(kpis?.accounts_created ?? 0).toLocaleString('fr-CA')}
@@ -291,10 +349,17 @@ export default function AccountsDashboard() {
                         </div>
                     )}
 
+                    <MonthlyEvolution
+                        current={monthly} previous={monthlyPrev}
+                        year={year}
+                        previousYear={yearParamValue === null ? null : yearParamValue - 1}
+                        windowLabel={windowLabel}
+                    />
+
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
                         <BreakdownTable
                             title="Par source" rows={bySource} filename="comptes_par_source"
-                            note="Les sources marquées d'un point sont des listes de clients rachetées (Royer & Fils, PLOGG/BUCCO), pas des campagnes : leur volume ne se compare pas à celui de Meta Ads ou de Google."
+                            note="Les sources marquées d'un point sont des listes de clients rachetées (Royer & Fils, PLOGG/BUCCO), pas des campagnes : leur volume ne se compare pas à celui de Meta Ads ou de Google. Attention en particulier à Royer & Fils / VotreLogo.ca : cette entreprise est facturée en dehors des deux organisations Zoho Books que l'application lit, donc ses revenus n'apparaissent presque pas ici — un taux de facturation très bas sur cette ligne ne veut PAS dire que ces clients n'achètent rien."
                         />
                         <BreakdownTable
                             title="Par représentant" rows={byRep} filename="comptes_par_rep"
@@ -344,7 +409,7 @@ function BreakdownTable({ title, rows, note, filename }: {
                 <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucun compte</p>
             ) : (
                 <div className="max-h-[420px] overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm" translate="no">
                         <thead className="sticky top-0 bg-slate-50/95 backdrop-blur">
                             <tr className="border-b border-slate-50">
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nom</th>
@@ -364,8 +429,11 @@ function BreakdownTable({ title, rows, note, filename }: {
                                             <p className="font-semibold text-slate-700 text-xs truncate max-w-[170px] flex items-center gap-1.5" title={r.label}>
                                                 {r.is_bulk_import && (
                                                     <span
-                                                        className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0"
-                                                        title="Liste de clients rachetée, pas une campagne"
+                                                        className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                                                        title={"Liste de clients rachetée, pas une campagne — le volume ne se compare pas à celui d'une campagne publicitaire."
+                                                            + (r.label.includes('Royer')
+                                                                ? " Cette entreprise est aussi facturée hors des organisations Zoho Books lues par l'application : ses revenus réels n'apparaissent pas dans cette ligne."
+                                                                : '')}
                                                     />
                                                 )}
                                                 {r.label}

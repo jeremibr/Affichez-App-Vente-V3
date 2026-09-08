@@ -28,6 +28,7 @@ import ObjectifsEquipe from './pages/ObjectifsEquipe';
 // import LeadsDetail from './pages/LeadsDetail';
 import AccountsDashboard from './pages/AccountsDashboard';
 import AccountsDetail from './pages/AccountsDetail';
+import Createurs from './pages/Createurs';
 import PortailLeads from './pages/PortailLeads';
 import TasksDashboard from './pages/TasksDashboard';
 
@@ -87,6 +88,12 @@ function AppRoutes() {
                         <Route path="paye" element={<Paye />} />
                         <Route path="paye/settings" element={<PayeRepSettings />} />
                         <Route path="objectifs/equipe" element={<ObjectifsEquipe />} />
+
+                        {/* "Créé par" — admin-only on purpose. These numbers overlap
+                            the rep figures by design and would be misread as a second
+                            leaderboard. Dominic, who asked for it: "c'est vraiment
+                            juste pour moi, c'est même pas pour personne." */}
+                        <Route path="createurs" element={<Createurs />} />
 
                         {/* ─── Tâches CRM module (owner-only) — dashboard + weekly tabs ─── */}
                         <Route path="taches" element={<TasksDashboard />} />

@@ -2,16 +2,18 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
-    Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight, FileText, X,
+    Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight,
+    ChevronsLeft, ChevronsRight, FileText, X,
 } from 'lucide-react';
 import type {
     ZohoAccountRow, ZohoAccountFilterOptions, LeadInvoiceRow, LeadInvoiceTotals,
-    AccountDeptRevenueRow,
+    AccountDeptRevenueRow, AccountContactRow,
 } from '../types/database';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { ExportButton } from '../components/ExportButton';
+import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import type { CsvColumn } from '../lib/csv';
 import {
     formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, clipServices, cn,
@@ -86,22 +88,78 @@ export default function AccountsDetail() {
     const [detailAccount, setDetailAccount] = useState<ZohoAccountRow | null>(null);
     const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
 
-    // Any filter change invalidates the current page number — page 7 of a
-    // 3-page result is an empty table, which reads as "no data" rather than
-    // "wrong page".
-    const resetPage = <T,>(setter: (v: T) => void) => (v: T) => { setter(v); setPage(1); };
-    const setYear = resetPage((v: number | 'Toutes') => _setYearParam(v === 'Toutes' ? 'Toutes' : String(v)));
-    const setSelectedMonth = resetPage((v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v)));
-    const setSelectedRep = resetPage(_setSelectedRep);
-    const setSelectedSource = resetPage(_setSelectedSource);
-    const setSelectedService = resetPage(_setSelectedService);
-    const setSelectedDomaine = resetPage(_setSelectedDomaine);
-    const setSelectedRegion = resetPage(_setSelectedRegion);
-    const setSelectedInvoiced = resetPage(_setSelectedInvoiced);
-    const setRatingScope = resetPage(_setRatingScope);
+    // A filter change invalidates the page number — page 7 of a 3-page result is
+    // an empty table, which reads as "no data" rather than "wrong page".
+    //
+    // Both params MUST move in one navigation. Calling the filter setter and then
+    // setPage(1) looks equivalent and is not: react-router hands each setter the
+    // search params from the render that created it, so the page reset starts
+    // from a snapshot taken before the filter change and its navigate()
+    // overwrites it. The filter then appears to do nothing at all — the dropdown
+    // snaps back and the table never changes. LeadsDetail hit this exact bug and
+    // UrlStateCompanions in hooks/useUrlState exists to solve it.
+    const toPage1 = { page: null };
+    const setYear = (v: number | 'Toutes') =>
+        _setYearParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
+    const setSelectedMonth = (v: number | 'Toutes') =>
+        _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
+    const setSelectedRep = (v: string) => _setSelectedRep(v, toPage1);
+    const setSelectedSource = (v: string) => _setSelectedSource(v, toPage1);
+    const setSelectedService = (v: string) => _setSelectedService(v, toPage1);
+    const setSelectedDomaine = (v: string) => _setSelectedDomaine(v, toPage1);
+    const setSelectedRegion = (v: string) => _setSelectedRegion(v, toPage1);
+    const setSelectedInvoiced = (v: string) => _setSelectedInvoiced(v, toPage1);
+    const setRatingScope = (v: string) => _setRatingScope(v, toPage1);
+
+    /**
+     * Debounced search, with the page reset skipped on the first run.
+     *
+     * The effect fires once on mount, and resetting the page there silently threw
+     * away `?page=3` from a shared link, a bookmark or a browser Back — the table
+     * jumped to page 1 about a third of a second after loading, with no
+     * indication why.
+     */
+    const searchSettled = useRef(false);
+    /**
+     * Every filter back to its default in ONE navigation.
+     *
+     * `year` is set to its own default value, which makes useUrlState drop the
+     * param; the other eight ride along as companions. Nine separate setter calls
+     * would leave eight of the params behind, for the same reason a filter change
+     * cannot reset the page on its own — see toPage1 above.
+     *
+     * `search` is component state rather than a URL param, so it is cleared
+     * separately and costs no navigation.
+     */
+    const clearFilters = () => {
+        setSearch('');
+        _setYearParam('Toutes', {
+            month: null, rep: null, source: null, service: null,
+            domaine: null, region: null, factures: null, statut: null, page: null,
+        });
+    };
+
+    // Counted from `search`, not `debouncedSearch`, so the badge reacts as you
+    // type rather than a third of a second later.
+    const activeFilterCount = [
+        search.trim() !== '',
+        year !== 'Toutes',
+        selectedMonth !== 'Toutes',
+        selectedRep !== 'Tous',
+        selectedSource !== 'Toutes',
+        selectedService !== 'Tous',
+        selectedDomaine !== 'Tous',
+        selectedRegion !== 'Toutes',
+        selectedInvoiced !== 'Tous',
+        ratingScope !== 'Clients',
+    ].filter(Boolean).length;
 
     useEffect(() => {
-        const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300);
+        const t = setTimeout(() => {
+            setDebouncedSearch(search);
+            if (searchSettled.current) setPage(1);
+            searchSettled.current = true;
+        }, 300);
         return () => clearTimeout(t);
         // setPage is stable; search is the only real trigger.
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,29 +221,58 @@ export default function AccountsDetail() {
     }, [dateBounds, selectedRep, selectedSource, selectedService, selectedDomaine,
         selectedRegion, selectedInvoiced, ratingScope, debouncedSearch, serviceVariants]);
 
-    const fetchInvoiceTotals = useCallback(async (pageRows: ZohoAccountRow[]) => {
+    /**
+     * Monotonic request id. Nine filters over 20,645 rows means a broad query and
+     * a narrow one are regularly in flight together, and they do not come back in
+     * the order they were sent — so without this guard an older, wider response
+     * lands last and overwrites the filtered result. On screen that looks exactly
+     * like the filter having been ignored: the dropdown says "Meta Ads" and the
+     * table shows every account.
+     */
+    const requestId = useRef(0);
+
+    /** `id` is the request that asked for these rows; if a newer page has since
+     *  loaded, its invoice totals must not be replaced by this one's. */
+    const fetchInvoiceTotals = useCallback(async (pageRows: ZohoAccountRow[], id: number) => {
         const ids = pageRows.map(r => r.zoho_account_id).filter(Boolean);
         if (ids.length === 0) { setInvoiceTotals({}); return; }
         const { data } = await supabase.rpc('get_account_invoice_totals', { p_account_ids: ids });
-        if (!data) return;
+        if (!data || id !== requestId.current) return;
         const byAccount: Record<string, LeadInvoiceTotals> = {};
         for (const row of data as LeadInvoiceTotals[]) byAccount[row.account_id] = row;
         setInvoiceTotals(byAccount);
     }, []);
 
     const fetchData = useCallback(async () => {
+        const id = ++requestId.current;
         setLoading(true);
         const from = (page - 1) * PAGE_SIZE;
         const { data, count } = await buildQuery(false).range(from, from + PAGE_SIZE - 1);
+        if (id !== requestId.current) return; // a newer query has already answered
         const pageRows = (data as ZohoAccountRow[]) ?? [];
         setRows(pageRows);
         setTotal(count ?? 0);
         setLoading(false);
-        // After setLoading on purpose: the table is useful without the Factures
-        // column, so it renders on the first result rather than waiting on a
-        // second round trip.
-        fetchInvoiceTotals(pageRows);
-    }, [buildQuery, page, fetchInvoiceTotals]);
+
+        // A page number can outlive the result it belonged to: a shared
+        // ?page=7 link, a filter carried in from the URL, or the Back button
+        // after narrowing the list. The table then renders empty and says
+        // "aucun compte ne correspond à ces filtres", which is a lie - the
+        // filters match plenty, you are simply past the end.
+        //
+        // Clamping cannot loop: the value written always satisfies
+        // page <= lastPage, so the refetch it triggers takes the else branch.
+        const lastPage = Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE));
+        if (page > lastPage) {
+            setPage(lastPage);
+            return;
+        }
+
+        // Deliberately after setLoading: the table is useful without the
+        // Factures column, so it renders on the first result rather than
+        // waiting on a second round trip.
+        fetchInvoiceTotals(pageRows, id);
+    }, [buildQuery, page, fetchInvoiceTotals, setPage]);
 
     const fetchOptions = useCallback(async () => {
         const { data } = await supabase
@@ -319,35 +406,15 @@ export default function AccountsDetail() {
                         ]}
                     />
                 </FilterGroup>
+                <ClearFiltersButton activeCount={activeFilterCount} onClear={clearFilters} />
             </FilterBar>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-                    <p className="text-xs font-medium text-slate-400" translate="no">
-                        {total === 0 ? 'Aucun compte' : `${rangeStart}–${rangeEnd} sur ${total.toLocaleString('fr-CA')} comptes`}
-                    </p>
-                    <div className="flex items-center gap-1">
-                        <button
-                            onClick={() => setPage(Math.max(1, page - 1))}
-                            disabled={page <= 1}
-                            aria-label="Page précédente"
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
-                        >
-                            <ChevronLeft className="w-4 h-4" />
-                        </button>
-                        <span className="text-xs font-semibold text-slate-500 px-2 tabular-nums">
-                            {page} / {totalPages}
-                        </span>
-                        <button
-                            onClick={() => setPage(Math.min(totalPages, page + 1))}
-                            disabled={page >= totalPages}
-                            aria-label="Page suivante"
-                            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent"
-                        >
-                            <ChevronRight className="w-4 h-4" />
-                        </button>
-                    </div>
-                </div>
+                <Pager
+                    page={page} totalPages={totalPages} total={total}
+                    rangeStart={rangeStart} rangeEnd={rangeEnd}
+                    onChange={setPage} position="top"
+                />
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
@@ -357,7 +424,12 @@ export default function AccountsDetail() {
                     <p className="py-20 text-center text-sm text-slate-400">Aucun compte ne correspond à ces filtres.</p>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full">
+                        {/* translate="no" on the whole table: none of this is prose -
+                            it is company names, phone numbers, amounts and dates.
+                            Translating it is never wanted, and Chrome freezing a
+                            translated cell makes the table silently show stale data
+                            after a filter change. */}
+                        <table className="w-full" translate="no">
                             <thead className="sticky top-0 z-10 bg-white shadow-[0_1px_0_0_theme(colors.slate.200)]">
                                 <tr>
                                     <th className="th">Compte</th>
@@ -447,11 +519,71 @@ export default function AccountsDetail() {
                         </table>
                     </div>
                 )}
+
+                {/* Repeated at the foot of the table: with 100 rows on screen the
+                    top control has scrolled well out of view by the time somebody
+                    has finished reading and wants the next page. */}
+                {!loading && rows.length > 0 && (
+                    <Pager
+                        page={page} totalPages={totalPages} total={total}
+                        rangeStart={rangeStart} rangeEnd={rangeEnd}
+                        onChange={setPage} position="bottom"
+                    />
+                )}
             </div>
 
             {detailAccount && (
                 <AccountDetailModal account={detailAccount} onClose={() => setDetailAccount(null)} />
             )}
+        </div>
+    );
+}
+
+/**
+ * The pager, rendered above and below the table.
+ *
+ * First and last buttons matter here in a way they do not on a short list: 20,645
+ * accounts is 188 pages, and stepping to the end one arrow at a time is not a
+ * navigation option.
+ */
+function Pager({ page, totalPages, total, rangeStart, rangeEnd, onChange, position }: {
+    page: number;
+    totalPages: number;
+    total: number;
+    rangeStart: number;
+    rangeEnd: number;
+    onChange: (p: number) => void;
+    position: 'top' | 'bottom';
+}) {
+    const go = (p: number) => onChange(Math.min(totalPages, Math.max(1, p)));
+    const btn = 'p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent';
+    return (
+        <div className={cn(
+            'flex flex-wrap items-center justify-between gap-3 px-5 py-3',
+            position === 'top' ? 'border-b border-slate-100' : 'border-t border-slate-100 bg-slate-50/40',
+        )}>
+            <p className="text-xs font-medium text-slate-400" translate="no">
+                {total === 0
+                    ? 'Aucun compte'
+                    : rangeStart + '–' + rangeEnd + ' sur ' + total.toLocaleString('fr-CA') + ' comptes'}
+            </p>
+            <div className="flex items-center gap-1">
+                <button onClick={() => go(1)} disabled={page <= 1} aria-label="Première page" className={btn}>
+                    <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button onClick={() => go(page - 1)} disabled={page <= 1} aria-label="Page précédente" className={btn}>
+                    <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-xs font-semibold text-slate-500 px-2 tabular-nums" translate="no">
+                    {page} / {totalPages}
+                </span>
+                <button onClick={() => go(page + 1)} disabled={page >= totalPages} aria-label="Page suivante" className={btn}>
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+                <button onClick={() => go(totalPages)} disabled={page >= totalPages} aria-label="Dernière page" className={btn}>
+                    <ChevronsRight className="w-4 h-4" />
+                </button>
+            </div>
         </div>
     );
 }
@@ -505,19 +637,22 @@ const INVOICE_CSV: CsvColumn<LeadInvoiceRow>[] = [
 function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onClose: () => void }) {
     const [invoices, setInvoices] = useState<LeadInvoiceRow[]>([]);
     const [deptRows, setDeptRows] = useState<AccountDeptRevenueRow[]>([]);
+    const [contacts, setContacts] = useState<AccountContactRow[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const [{ data: inv }, { data: dept }] = await Promise.all([
+            const [{ data: inv }, { data: dept }, { data: cts }] = await Promise.all([
                 supabase.rpc('get_account_invoices', { p_account_id: account.zoho_account_id }),
                 supabase.rpc('get_account_revenue_by_department', { p_account_id: account.zoho_account_id }),
+                supabase.rpc('get_account_contacts', { p_account_id: account.zoho_account_id }),
             ]);
             if (cancelled) return;
             setInvoices((inv as LeadInvoiceRow[]) ?? []);
             setDeptRows((dept as AccountDeptRevenueRow[]) ?? []);
+            setContacts((cts as AccountContactRow[]) ?? []);
             setLoading(false);
         })();
         return () => { cancelled = true; };
@@ -591,6 +726,29 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                         </button>
                     </div>
                 </div>
+
+                {!loading && contacts.length > 0 && (
+                    <div className="px-6 py-3 border-b border-slate-100 flex flex-wrap gap-x-5 gap-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest self-center">
+                            Contacts
+                        </span>
+                        {contacts.slice(0, 8).map(c => (
+                            <span key={c.zoho_record_id} className="text-xs text-slate-500">
+                                <span className="font-semibold text-slate-700">{c.full_name ?? '—'}</span>
+                                {c.phone && <span className="text-slate-400"> · {formatPhone(c.phone)}</span>}
+                                {c.email && <span className="text-slate-300"> · {c.email}</span>}
+                                {c.stage === 'lead' && (
+                                    <span className="ml-1 badge bg-blue-50 text-blue-600">Lead</span>
+                                )}
+                            </span>
+                        ))}
+                        {contacts.length > 8 && (
+                            <span className="text-xs text-slate-300 self-center">
+                                +{contacts.length - 8} autres
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">

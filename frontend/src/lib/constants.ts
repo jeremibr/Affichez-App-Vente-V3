@@ -4,7 +4,14 @@ export const DEPARTMENTS = [
     'DIST. PUBLICITAIRE SOLO',
     'NUMERIQUE',
     'APPLICATION',
-    'SERVICES IA'
+    'SERVICES IA',
+    // Added 2026-09-07. Zoho Books had been billing under "ÉVÈNEMENT" since May
+    // 2025 — 160 invoices, $142,918 — and the sync discarded every one of them
+    // because its department mapping had no entry for the label. Spelled without
+    // accents to match NUMERIQUE, which Zoho writes as "NUMÉRIQUE".
+    // NOTE: objectives_factures has no target rows for this department yet, so
+    // it shows actuals against a zero objective until somebody sets them.
+    'EVENEMENT',
 ] as const;
 
 export const MONTHS = [

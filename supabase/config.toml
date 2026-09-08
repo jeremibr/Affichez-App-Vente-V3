@@ -392,6 +392,9 @@ verify_jwt = false
 [functions.zoho-account-sync]
 verify_jwt = false
 
+[functions.zoho-quote-creator-sync]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

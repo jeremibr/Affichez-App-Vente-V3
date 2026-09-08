@@ -4,6 +4,18 @@ import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow, QuarterTotalsRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
+import { ExportButton } from '../components/ExportButton';
+import type { CsvColumn } from '../lib/csv';
+
+const YOY_CSV: CsvColumn<YoYRow>[] = [
+    { header: 'Trimestre',        value: r => r.quarter },
+    { header: 'Representant',     value: r => r.rep_name },
+    { header: 'Bureau',           value: r => r.office },
+    { header: 'Devis',            value: r => r.deal_count },
+    { header: 'Moyenne courante', value: r => r.current_avg },
+    { header: 'Moyenne an dernier', value: r => r.previous_avg },
+    { header: 'Ecart (%)',        value: r => r.resultat },
+];
 import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
@@ -84,8 +96,18 @@ export default function QuarterlyAverages() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             {/* Header */}
             <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
+                        <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
+                    </div>
+                    {/* Exports every quarter at once, filters applied - the four
+                        blocks on screen are one dataset split for reading. */}
+                    <ExportButton
+                        rows={groupedYoyData} columns={YOY_CSV}
+                        filename="moyennes_trimestrielles" disabled={groupedYoyData.length === 0}
+                    />
+                </div>
             </div>
 
             {/* Filters */}

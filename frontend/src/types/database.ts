@@ -551,3 +551,96 @@ export type AccountDeptRevenueRow = {
     credit_count: number;
     total_amount: number;
 };
+
+// ─── Créé par (who keyed a quote or invoice in, not who sold it) ──────────────
+//
+// Zoho Books stores two different people on a document: the salesperson, who
+// owns the sale, and the creator, who typed it in. Everything else in this app
+// reads the salesperson. This module reads the creator.
+//
+// These numbers deliberately do NOT reconcile with the rep figures elsewhere. A
+// quote created by Morgane and sold by Dominic is counted here under Morgane and
+// on the Factures dashboard under Dominic. That is what Jérémi warned about in
+// the 2026-09-04 meeting — "faut pas que ça fausse les chiffres" — and the
+// agreed answer was a separate page, never a column on an existing table.
+
+/** get_creator_summary — one row per person who has created a quote or invoice. */
+export type CreatorSummaryRow = {
+    creator: string;
+    quotes_created: number;
+    quotes_won: number;
+    quotes_amount: number;
+    quotes_won_amount: number;
+    invoices_created: number;
+    invoices_amount: number;
+    win_rate: number;
+};
+
+/** get_creator_detail — quotes and invoices in one list. `sold_by` is the point:
+ *  it is routinely somebody other than the creator. */
+export type CreatorDetailRow = {
+    module: 'devis' | 'factures';
+    doc_number: string | null;
+    doc_date: string | null;
+    client_name: string | null;
+    department: string;
+    office: 'QC' | 'MTL' | null;
+    sold_by: string | null;
+    status: string;
+    amount: number;
+    is_avoir: boolean;
+};
+
+/**
+ * get_quote_creator_link_status — progress of the quote back-fill.
+ *
+ * Quotes only. Invoices need no back-fill: Zoho puts `created_by` on the invoice
+ * list payload, while an estimate's creator exists only on the detail endpoint
+ * and only as an id, which is one API call per quote.
+ */
+export type QuoteCreatorLinkStatus = {
+    quotes_total: number;
+    quotes_linked: number;
+    quotes_pending: number;
+    quotes_error: number;
+    invoices_total: number;
+    invoices_linked: number;
+    distinct_creators: number;
+};
+
+/**
+ * get_unmapped_department_summary — records Zoho sent under a department name
+ * the sync does not recognise.
+ *
+ * Expected to be empty. A row means the money is safely stored but missing from
+ * every per-department figure until the label is added to DEPT_MAP in both
+ * zoho-invoice-sync and zoho-sync. This alert is how EVENEMENT was found: 160
+ * invoices and $142,918 that the sync had been discarding since May 2025.
+ */
+export type UnmappedDepartmentRow = {
+    module: 'devis' | 'factures';
+    zoho_label: string;
+    record_count: number;
+    total_amount: number;
+    first_seen: string | null;
+    last_seen: string | null;
+};
+
+/**
+ * get_account_contacts — the people at one company.
+ *
+ * Shown only on the Comptes detail modal, and counted nowhere. The Comptes
+ * module measures companies on purpose; this exists because once someone has
+ * found the company, "who do I call" is the next question.
+ */
+export type AccountContactRow = {
+    zoho_record_id: string;
+    stage: 'lead' | 'contact';
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    rep_name: string | null;
+    lead_status: string | null;
+    created_time: string | null;
+    zoho_crm_url: string | null;
+};

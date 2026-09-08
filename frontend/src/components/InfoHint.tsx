@@ -67,8 +67,15 @@ export function InfoHint({ text, className }: Props) {
                     role="tooltip"
                     // right-0 so a card at the right edge of the grid does not push
                     // the panel off screen.
+                    //
+                    // whitespace-normal / normal-case / tracking-normal undo what
+                    // the panel inherits when the hint sits in a table heading:
+                    // `.th` is uppercase, wide-tracked and nowrap, and nowrap in
+                    // particular stopped the text wrapping inside w-64, so it ran
+                    // off the right of the screen as one clipped line.
                     className="absolute right-0 top-6 z-30 w-64 rounded-xl border border-slate-100
                                bg-white p-3 text-left text-[11px] font-medium not-italic leading-relaxed
+                               normal-case tracking-normal whitespace-normal
                                text-slate-500 shadow-card-hover"
                 >
                     {text}

@@ -19,6 +19,13 @@ const DEPT_MAP: Record<string, string> = {
   'AGENCE WEB': 'APPLICATION',
   'APPLICATION': 'APPLICATION',
   'SERVICES IA': 'SERVICES IA',
+  // Added 2026-09-07, mirroring zoho-invoice-sync. Found only because the
+  // syncs stopped discarding records whose department they did not know:
+  // Zoho Books has been billing under EVENEMENT since May 2025.
+  'ÉVÈNEMENT': 'EVENEMENT',
+  'ÉVÉNEMENT': 'EVENEMENT',
+  'EVENEMENT': 'EVENEMENT',
+  'ÉVENEMENT': 'EVENEMENT',
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -307,22 +314,32 @@ Deno.serve(async (req: Request) => {
             seenZohoIds.add(zohoId);
 
             if (rawStatus === 'accepted' || rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
+              // An unrecognised department no longer throws the quote away.
+              // The old `if (department)` meant an estimate whose department
+              // Zoho reports under a name DEPT_MAP does not know vanished with
+              // no error and no log. It now lands with a null department,
+              // keeping Zoho's raw label, and is reported by
+              // get_unmapped_department_summary so the mapping can be fixed.
               const deptLabel = (est.cf_d_partement ?? est.department) as string;
-              const department = DEPT_MAP[deptLabel];
-              if (department) {
-                toUpsert.push({
-                  zoho_id: zohoId,
-                  sale_date: (est.cf_date_acceptation_unformatted as string) || (est.accepted_date as string) || (est.date as string),
-                  client_name: est.customer_name,
-                  amount: Math.round((Number(est.total) / 1.14975) * 100) / 100,
-                  quote_number: est.estimate_number,
-                  rep_name: (est.salesperson_name as string)?.trim() || null,
-                  zoho_department_label: String(deptLabel),
-                  department,
-                  office: org.office,
-                  status: rawStatus === 'accepted' ? 'accepted' : 'invoiced',
-                });
-              }
+              const department = DEPT_MAP[deptLabel] ?? null;
+              toUpsert.push({
+                zoho_id: zohoId,
+                sale_date: (est.cf_date_acceptation_unformatted as string) || (est.accepted_date as string) || (est.date as string),
+                client_name: est.customer_name,
+                amount: Math.round((Number(est.total) / 1.14975) * 100) / 100,
+                quote_number: est.estimate_number,
+                rep_name: (est.salesperson_name as string)?.trim() || null,
+                zoho_department_label: deptLabel ? String(deptLabel) : null,
+                department,
+                office: org.office,
+                status: rawStatus === 'accepted' ? 'accepted' : 'invoiced',
+                // Deliberately NOT set here. The estimates list carries no
+                // creator at all - only the detail endpoint does, and only as an
+                // id - so filling it costs one API call per quote. That runs in
+                // zoho-quote-creator-sync at its own pace; leaving the column
+                // out of this upsert is what stops a re-sync wiping a name the
+                // back-fill already paid for.
+              });
             } else if (rawStatus === 'declined' || rawStatus === 'void') {
               toDecline.push(zohoId);
             }
