@@ -242,21 +242,35 @@ function normalizeInvoiceRef(ref: string): string {
   return prefix + num.padStart(6, '0');
 }
 
-/** Batch-lookup dept from invoices table using credit note reference_number → invoice_number */
+/**
+ * Batch-lookup from a credit note's reference_number to the invoice it corrects.
+ *
+ * Returns the department AND the creator. Zoho gives a credit note neither: its
+ * list payload carries no `created_by` at all — verified 2026-09-07, all 881
+ * came back without one. So the only honest attribution is the person who
+ * created the invoice being refunded, which is exactly who should carry the
+ * reduction on the "Créé par" page.
+ */
 async function lookupDeptByInvoiceNumber(
   invoiceNumbers: string[],
   office: string,
-): Promise<Map<string, { label: string; mapped: string }>> {
+): Promise<Map<string, { label: string; mapped: string; createdBy: string | null }>> {
   if (invoiceNumbers.length === 0) return new Map();
   const normalized = invoiceNumbers.map(normalizeInvoiceRef);
   const nums = normalized.map((n) => encodeURIComponent(n)).join(',');
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/invoices?select=invoice_number,department,zoho_department_label&office=eq.${office}&invoice_number=in.(${nums})`,
+    `${SUPABASE_URL}/rest/v1/invoices?select=invoice_number,department,zoho_department_label,created_by_name&office=eq.${office}&invoice_number=in.(${nums})`,
     { headers: SB_HEADERS },
   );
   if (!res.ok) return new Map();
-  const rows = await res.json() as Array<{ invoice_number: string; department: string; zoho_department_label: string }>;
-  return new Map(rows.map((r) => [r.invoice_number, { label: r.zoho_department_label, mapped: r.department }]));
+  const rows = await res.json() as Array<{
+    invoice_number: string; department: string; zoho_department_label: string;
+    created_by_name: string | null;
+  }>;
+  return new Map(rows.map((r) => [
+    r.invoice_number,
+    { label: r.zoho_department_label, mapped: r.department, createdBy: r.created_by_name },
+  ]));
 }
 
 // ─── Sync Invoices ────────────────────────────────────────────────────────────
@@ -400,12 +414,16 @@ async function syncCreditNotes(
     const notes: Record<string, unknown>[] = data.creditnotes ?? [];
     if (notes.length === 0) break;
 
-    type Pending = { note: Record<string, unknown>; dept: { label: string; mapped: string } | null };
+    type Pending = {
+      note: Record<string, unknown>;
+      dept: { label: string; mapped: string } | null;
+      createdBy: string | null;
+    };
     const pending: Pending[] = [];
     for (const note of notes) {
       const rawStatus = ((note.status as string) ?? '').toLowerCase();
       if (rawStatus === 'void') continue;
-      pending.push({ note, dept: extractDept(note) });
+      pending.push({ note, dept: extractDept(note), createdBy: null });
     }
 
     // Batch-lookup dept for notes that had no inline dept field
@@ -418,12 +436,16 @@ async function syncCreditNotes(
       for (const p of needsLookup) {
         const ref = (p.note.reference_number as string)?.trim();
         const normalizedRef = ref ? normalizeInvoiceRef(ref) : null;
-        if (normalizedRef && deptByInv.has(normalizedRef)) p.dept = deptByInv.get(normalizedRef)!;
+        const hit = normalizedRef ? deptByInv.get(normalizedRef) : undefined;
+        if (hit) {
+          p.dept = { label: hit.label, mapped: hit.mapped };
+          p.createdBy = hit.createdBy;
+        }
       }
     }
 
     const toUpsert: object[] = [];
-    for (const { note, dept } of pending) {
+    for (const { note, dept, createdBy } of pending) {
       // Same rule as invoices above: land it with a null department rather than
       // losing it. A credit note is money leaving; dropping one silently
       // overstates revenue.
@@ -435,7 +457,11 @@ async function syncCreditNotes(
         books_customer_id: String(note.customer_id ?? '') || null,
         amount: Math.round((Number(note.total) / 1.14975) * 100) / 100 * -1,
         rep_name: (note.salesperson_name as string)?.trim() || null,
-        created_by_name: (note.created_by as string)?.trim() || null,
+        // Zoho sends no creator on a credit note, so this falls back to the
+        // creator of the invoice being refunded, inherited above. Without it the
+        // "Créé par" page shows billing with none of the matching refunds, and
+        // its totals can never agree with the account detail page.
+        created_by_name: (note.created_by as string)?.trim() || createdBy,
         zoho_department_label: dept?.label ?? rawDeptLabel(note),
         department: dept?.mapped ?? null,
         office: org.office,

@@ -56,6 +56,25 @@ function escapeCell(v: CsvValue): string {
     return /[";\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+/**
+ * Columns derived from the first row's keys.
+ *
+ * For tables whose shape is defined by an RPC and mirrored straight onto the
+ * screen — the header is then the column name, which is not pretty but is
+ * honest, and it means a new field added to the query is exported without
+ * anybody having to remember to add it here.
+ *
+ * Prefer an explicit CsvColumn[] where the headings are read by people.
+ */
+export function autoColumns<T extends object>(rows: T[]): CsvColumn<T>[] {
+    const first = rows[0];
+    if (!first) return [];
+    return (Object.keys(first) as (keyof T & string)[]).map(k => ({
+        header: k,
+        value: (row: T) => row[k] as CsvValue,
+    }));
+}
+
 /** Rows → a CSV string, headers included. Exported for tests and for callers
  *  that want the text without triggering a download. */
 export function toCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {

@@ -3,6 +3,18 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { YoYRow } from '../../types/database';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
+import { ExportButton } from '../ExportButton';
+import type { CsvColumn } from '../../lib/csv';
+
+const QUARTER_CSV: CsvColumn<YoYRow>[] = [
+    { header: 'Trimestre',          value: r => r.quarter },
+    { header: 'Representant',       value: r => r.rep_name },
+    { header: 'Bureau',             value: r => r.office },
+    { header: 'Documents',          value: r => r.deal_count },
+    { header: 'Moyenne courante',   value: r => r.current_avg },
+    { header: 'Moyenne precedente', value: r => r.previous_avg },
+    { header: 'Ecart (%)',          value: r => r.resultat },
+];
 
 export function QuarterBlock({
     quarter,
@@ -44,9 +56,17 @@ export function QuarterBlock({
         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden flex flex-col">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Trimestre {quarter}</h2>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-brand-main">
-                    Q{quarter} · {currentYear}
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-brand-main"
+                          translate="no">
+                        Q{quarter} · {currentYear}
+                    </span>
+                    <ExportButton
+                        rows={sortedData} columns={QUARTER_CSV}
+                        filename={`trimestre_${quarter}_${currentYear}`} label="CSV"
+                        disabled={sortedData.length === 0}
+                    />
+                </div>
             </div>
 
             <div className="flex-1 overflow-x-auto">

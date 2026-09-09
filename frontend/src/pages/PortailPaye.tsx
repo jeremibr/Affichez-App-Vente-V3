@@ -8,6 +8,8 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { fetchCommRate } from '../utils/commRates';
+import { ExportButton } from '../components/ExportButton';
+import { autoColumns } from '../lib/csv';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -315,6 +317,12 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                 <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
+                        <ExportButton
+                            rows={entries}
+                            columns={autoColumns(entries)}
+                            filename={`mes_paies_${year}`} label="CSV"
+                            disabled={entries.length === 0}
+                        />
                         <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-400">Taux commission :</span>
                             {canEdit && editingRate ? (

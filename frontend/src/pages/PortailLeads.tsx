@@ -11,6 +11,8 @@ import { InfoHint } from '../components/InfoHint';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
 import LeadsDetail from './LeadsDetail';
+import { ExportButton } from '../components/ExportButton';
+import type { CsvColumn } from '../lib/csv';
 
 interface Props { propRepName?: string; }
 
@@ -188,6 +190,18 @@ export default function PortailLeads({ propRepName }: Props) {
                             <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                                 <div className="px-5 py-4 border-b border-slate-100">
                                     <h3 className="text-sm font-bold text-slate-800">Résumé mensuel</h3>
+                                    <ExportButton
+                                        rows={monthly}
+                                        columns={[
+                                            { header: 'Mois',      value: r => r.month },
+                                            { header: 'Leads',     value: r => r.nb_leads },
+                                            { header: 'Convertis', value: r => r.nb_converted },
+                                            { header: 'Factures',  value: r => r.nb_invoiced },
+                                            { header: 'Montant',   value: r => r.total_amount },
+                                        ] as CsvColumn<typeof monthly[number]>[]}
+                                        filename="mes_leads_par_mois" label="CSV"
+                                        disabled={monthly.length === 0}
+                                    />
                                 </div>
                                 {monthly.length === 0 ? (
                                     <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucune donnée</p>

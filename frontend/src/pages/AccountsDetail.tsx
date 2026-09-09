@@ -3,7 +3,7 @@ import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import {
     Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight,
-    ChevronsLeft, ChevronsRight, FileText, X,
+    ChevronsLeft, ChevronsRight, X,
 } from 'lucide-react';
 import type {
     ZohoAccountRow, ZohoAccountFilterOptions, LeadInvoiceRow, LeadInvoiceTotals,
@@ -14,9 +14,11 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { ExportButton } from '../components/ExportButton';
 import { ClearFiltersButton } from '../components/ClearFiltersButton';
+import { TagCell } from '../components/TagCell';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import type { CsvColumn } from '../lib/csv';
 import {
-    formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, clipServices, cn,
+    formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, cn,
 } from '../lib/utils';
 
 /**
@@ -69,7 +71,7 @@ export default function AccountsDetail() {
     const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const [selectedRep, _setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedRep, _setSelectedRep] = useUrlState('rep', REP_DEFAULT);
     const [selectedSource, _setSelectedSource] = useUrlState('source', 'Toutes');
     const [selectedService, _setSelectedService] = useUrlState('service', 'Tous');
     const [selectedDomaine, _setSelectedDomaine] = useUrlState('domaine', 'Tous');
@@ -80,13 +82,16 @@ export default function AccountsDetail() {
 
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
 
     const [rows, setRows] = useState<ZohoAccountRow[]>([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [invoiceTotals, setInvoiceTotals] = useState<Record<string, LeadInvoiceTotals>>({});
     const [detailAccount, setDetailAccount] = useState<ZohoAccountRow | null>(null);
-    const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
+
+    // Équipe entière / Interne / one rep. See hooks/useRepFilter.
+    const repFilter = useRepFilter(selectedRep, options?.reps ?? []);
 
     // A filter change invalidates the page number — page 7 of a 3-page result is
     // an empty table, which reads as "no data" rather than "wrong page".
@@ -145,7 +150,7 @@ export default function AccountsDetail() {
         search.trim() !== '',
         year !== 'Toutes',
         selectedMonth !== 'Toutes',
-        selectedRep !== 'Tous',
+        selectedRep !== REP_DEFAULT,
         selectedSource !== 'Toutes',
         selectedService !== 'Tous',
         selectedDomaine !== 'Tous',
@@ -195,7 +200,10 @@ export default function AccountsDetail() {
             .order('created_time', { ascending: false, nullsFirst: false });
 
         if (dateBounds) query = query.gte('created_time', dateBounds.from).lt('created_time', dateBounds.to);
-        if (selectedRep !== 'Tous') query = query.eq('rep_name', selectedRep);
+        // A group becomes an `in` list; a single rep stays an equality. Both go
+        // through repFilter so the dropdown and the query can never disagree.
+        if (repFilter.rep) query = query.eq('rep_name', repFilter.rep);
+        else if (repFilter.reps) query = query.in('rep_name', repFilter.reps);
         if (selectedSource !== 'Toutes') query = query.eq('origine_du_client', selectedSource);
         if (selectedDomaine !== 'Tous') query = query.eq('domaine_activite', selectedDomaine);
         if (selectedRegion !== 'Toutes') query = query.eq('region_administrative', selectedRegion);
@@ -218,7 +226,7 @@ export default function AccountsDetail() {
             );
         }
         return query;
-    }, [dateBounds, selectedRep, selectedSource, selectedService, selectedDomaine,
+    }, [dateBounds, repFilter, selectedSource, selectedService, selectedDomaine,
         selectedRegion, selectedInvoiced, ratingScope, debouncedSearch, serviceVariants]);
 
     /**
@@ -373,7 +381,7 @@ export default function AccountsDetail() {
                     />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={optionList('Tous', options?.reps, 'Tous les reps')} className="w-44" />
+                    <Select value={selectedRep} onChange={setSelectedRep} options={repFilter.options} className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Source">
                     <Select value={selectedSource} onChange={setSelectedSource} options={optionList('Toutes', options?.sources, 'Toutes les sources')} className="w-52" />
@@ -447,17 +455,31 @@ export default function AccountsDetail() {
                             <tbody className="divide-y divide-slate-50">
                                 {rows.map(a => {
                                     const totals = invoiceTotals[a.zoho_account_id];
-                                    const svc = clipServices(a.service_interest ?? []);
                                     return (
-                                        <tr key={a.zoho_account_id} className="hover:bg-slate-50/70 transition-colors">
+                                        // The whole row opens the account, not just
+                                        // the name: the name is a small target in a
+                                        // ten-column table, and every other cell
+                                        // looked clickable but was not.
+                                        <tr
+                                            key={a.zoho_account_id}
+                                            onClick={() => setDetailAccount(a)}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    setDetailAccount(a);
+                                                }
+                                            }}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`Voir la facturation de ${a.account_name ?? 'ce compte'}`}
+                                            className="cursor-pointer transition-colors hover:bg-slate-50/70
+                                                       focus:bg-slate-50 focus:outline-none
+                                                       focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-main/40"
+                                        >
                                             <td className="td">
-                                                <button
-                                                    onClick={() => setDetailAccount(a)}
-                                                    className="text-left font-semibold text-brand-dark hover:text-brand-main transition-colors"
-                                                    title="Voir la facturation de ce compte"
-                                                >
+                                                <span className="font-semibold text-brand-dark">
                                                     {a.account_name ?? '—'}
-                                                </button>
+                                                </span>
                                                 {a.parent_account_name && (
                                                     <p className="text-[10px] text-slate-400 mt-0.5">
                                                         Sous-compte de {a.parent_account_name}
@@ -467,33 +489,64 @@ export default function AccountsDetail() {
                                             <td className="td whitespace-nowrap text-slate-500">{formatPhone(a.phone) ?? '—'}</td>
                                             <td className="td text-slate-500">{a.billing_city ?? '—'}</td>
                                             <td className="td text-slate-500">{a.rep_name ?? '—'}</td>
-                                            <td className="td text-slate-500">
+                                            <td className="td">
                                                 <span className="inline-flex items-center gap-1.5">
                                                     {a.is_bulk_import && (
                                                         <span
-                                                            className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0"
+                                                            className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
                                                             title="Liste de clients rachetée, pas une campagne"
                                                         />
                                                     )}
-                                                    {isBlankPick(a.origine_du_client) ? '—' : a.origine_du_client}
+                                                    <TagCell values={isBlankPick(a.origine_du_client) ? [] : [a.origine_du_client!]} />
                                                 </span>
                                             </td>
                                             <td className="td text-slate-500">{isBlankPick(a.domaine_activite) ? '—' : a.domaine_activite}</td>
-                                            <td className="td text-slate-500" title={(a.service_interest ?? []).join(', ')}>
-                                                {svc.text || '—'}
-                                                {svc.hiddenCount > 0 && !svc.truncated && <span className="text-slate-400">&hellip;</span>}
+                                            {/* service_resolved, not service_interest:
+                                                59% of accounts never had the CRM field
+                                                filled in, and Shop Santé showed an empty
+                                                Service column while its invoices clearly
+                                                named two departments. Borrowed values are
+                                                greyed and marked, so an invoice department
+                                                is never passed off as a CRM answer. */}
+                                            <td className="td">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <TagCell
+                                                        values={a.service_resolved ?? []}
+                                                        muted={a.service_origin === 'invoice'}
+                                                    />
+                                                    {a.service_origin === 'invoice' && (
+                                                        <span
+                                                            className="text-slate-300"
+                                                            title="Service déduit des départements facturés — le CRM n'en indique aucun"
+                                                        >*</span>
+                                                    )}
+                                                </span>
                                             </td>
                                             <td className="td text-right">
                                                 {totals ? (
-                                                    <button
-                                                        onClick={() => setDetailAccount(a)}
-                                                        className="inline-flex items-center gap-1.5 font-semibold text-brand-dark
-                                                                   hover:text-brand-main transition-colors tabular-nums"
-                                                        title={`${totals.invoice_count} facture(s)`}
+                                                    // Amount on top, the document count under it: the
+                                                    // amount is what the column is for, and "$3,400"
+                                                    // over one invoice is a different client from
+                                                    // "$3,400" over forty.
+                                                    <span
+                                                        className="inline-flex flex-col items-end leading-tight"
+                                                        title={`${totals.invoice_count} facture${totals.invoice_count > 1 ? 's' : ''}`
+                                                            + (totals.credit_count > 0
+                                                                ? `, ${totals.credit_count} avoir${totals.credit_count > 1 ? 's' : ''}`
+                                                                : '')}
                                                     >
-                                                        <FileText className="w-3.5 h-3.5 text-slate-300" />
-                                                        {formatCurrencyCAD(totals.total_amount)}
-                                                    </button>
+                                                        <span className="font-semibold text-brand-dark tabular-nums">
+                                                            {formatCurrencyCAD(totals.total_amount)}
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 tabular-nums" translate="no">
+                                                            {totals.invoice_count} facture{totals.invoice_count > 1 ? 's' : ''}
+                                                            {totals.credit_count > 0 && (
+                                                                <span className="text-rose-400">
+                                                                    {' '}· {totals.credit_count} avoir{totals.credit_count > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </span>
                                                 ) : (
                                                     <span className="text-slate-300">—</span>
                                                 )}
@@ -505,6 +558,7 @@ export default function AccountsDetail() {
                                                 {a.zoho_crm_url && (
                                                     <a
                                                         href={a.zoho_crm_url} target="_blank" rel="noopener noreferrer"
+                                                        onClick={e => e.stopPropagation()}
                                                         aria-label={`Ouvrir ${a.account_name ?? 'le compte'} dans Zoho CRM`}
                                                         className="text-slate-300 hover:text-brand-main transition-colors inline-block"
                                                     >

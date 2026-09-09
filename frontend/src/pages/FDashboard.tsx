@@ -9,6 +9,7 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
 import { InfoHint } from '../components/InfoHint';
+import { useRepFilter, REP_DEFAULT, REP_ALL } from '../hooks/useRepFilter';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useAuth } from '../contexts/AuthContext';
@@ -57,7 +58,7 @@ export default function FDashboard() {
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     // Admin can switch reps; members are locked to their own rep
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_ALL));
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -72,12 +73,59 @@ export default function FDashboard() {
     const [showUnassigned, setShowUnassigned] = useState(false);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    /**
+     * Every rep who billed anything this year, fetched WITHOUT a rep filter.
+     *
+     * It used to be scraped out of the leaderboard the page had just loaded,
+     * which fed the filter its own output: choosing "Équipe entière" narrowed the
+     * leaderboard to the team, allReps then held only the team, "Interne"
+     * computed allReps-minus-team = nothing, and an empty group falls back to no
+     * filter — so Interne silently showed EVERYONE, with a higher total than the
+     * team it was supposed to be a subset of.
+     *
+     * One unfiltered read per year breaks the loop.
+     */
     const [allReps, setAllReps] = useState<string[]>([]);
 
-    // "Vente Interne" is handled by the supplementary query when repParam is null
-    const repParam = isAdmin
-        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
-        : (authRepName ?? null);
+    /**
+     * The rep filter, rebuilt 2026-09-08.
+     *
+     * THE BUG being fixed: 'Tous' and 'Vente Interne' BOTH resolved to
+     * repParam = null, so they sent an identical query — switching between them
+     * changed nothing on screen. repParam was also the effect dependency, so
+     * nothing even refetched.
+     *
+     * The dropdown now offers groups: Équipe entière (the reps in the View
+     * dropdown, and the default) and Interne (everybody else). p_rep cannot
+     * express a group — it holds one name — so p_reps carries the list.
+     *
+     * Both are sent because they do different jobs on these functions: p_rep
+     * filters rows AND selects that rep's own objective from rep_objectives,
+     * while p_reps filters rows only and leaves the team objective in place. A
+     * group has no single target, so a group sends p_rep = null.
+     */
+    const repFilter = useRepFilter(selectedRep, allReps);
+    const repParam = isAdmin ? repFilter.rep : (authRepName ?? null);
+    // Only an admin gets the group options; a rep is pinned to their own name,
+    // where p_rep already does the right thing and a list would add nothing.
+    const repsParam = isAdmin ? repFilter.reps : null;
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        let cancelled = false;
+        (async () => {
+            const { data } = await supabase.rpc('get_inv_rep_leaderboard', { p_year: year });
+            if (cancelled || !data) return;
+            const names = (data as LeaderboardEntry[])
+                .map(r => r.rep_name).filter(Boolean);
+            // 'Vente interne' is dropped from the RPC by excluded_reps, so it
+            // would never appear here — but it is a real biller and belongs in
+            // the Interne group, so it is added back by name.
+            const withInternal = [...new Set([...names, 'Vente interne'])].sort();
+            setAllReps(withInternal);
+        })();
+        return () => { cancelled = true; };
+    }, [year, isAdmin]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -99,15 +147,15 @@ export default function FDashboard() {
             { data: leaderData },
             { data: unassignedData }
         ] = await Promise.all([
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
-            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
-            supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
+            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
             // No status filter: an invoice is unattributed regardless of whether it is paid.
-            supabase.rpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam })
+            supabase.rpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setUnassigned((unassignedData as InvoiceUnassignedSummary[])?.[0] ?? null);
@@ -129,7 +177,10 @@ export default function FDashboard() {
 
         setTopClients(clientData || []);
 
-        if (repParam === null) {
+        // Kept for the unfiltered view only. With a group or a single rep the
+        // RPCs now reach every name themselves — p_reps stands the excluded_reps
+        // guard down — so running this as well would double-count Vente interne.
+        if (repParam === null && repsParam === null) {
             // Supplementary query ONLY for 'Vente interne' — the one rep actually excluded from RPC results
             // (Simon, Magasin, Charles, Pier-Alexandre are already in the RPC numbers; fetching them again would double-count)
             const buildIntQuery = (y: number) => {
@@ -255,10 +306,6 @@ export default function FDashboard() {
                 .sort((a, b) => b.total_amount - a.total_amount)
                 .map((r, i) => ({ ...r, rank: i + 1 }));
             setLeaderboard(lb);
-            // Always rebuild rep list from the clean leaderboard so stale names never persist
-            if (isAdmin && lb.length > 0) {
-                setAllReps(lb.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
-            }
         } else {
             setGrandTotalData(grandData || []);
             setDeptData(dData || []);
@@ -269,8 +316,7 @@ export default function FDashboard() {
         }
 
         setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam]);
+    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam, repsParam]);
 
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
@@ -293,11 +339,9 @@ export default function FDashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [
-        { value: 'Tous', label: 'Toute l\'équipe' },
-        { value: 'Vente Interne', label: 'Vente Interne' },
-        ...allReps.map(r => ({ value: r, label: r })),
-    ], [allReps]);
+    // Groups first, then every name — from the shared hook, so the Factures and
+    // Comptes pages offer exactly the same choices.
+    const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (

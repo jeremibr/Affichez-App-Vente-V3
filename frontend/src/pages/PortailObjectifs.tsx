@@ -8,6 +8,8 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { DEPARTMENTS } from '../lib/constants';
+import { ExportButton } from '../components/ExportButton';
+import { autoColumns } from '../lib/csv';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -80,6 +82,8 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const [loading, setLoading] = useState(true);
     const [rows, setRows]       = useState<MonthRow[]>([]);
     const [deptData, setDeptData] = useState<DeptMonthData>({});
+    /** Departments actually present, standard list plus anything the data adds. */
+    const [deptKeys, setDeptKeys] = useState<string[]>([...DEPARTMENTS]);
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const prevYear = year - 1;
@@ -128,9 +132,20 @@ export default function PortailObjectifs({ propRepName }: Props) {
             return { month: m, label, target, actual: factMap[m] ?? 0, prevActual: prevFactMap[m] ?? 0 };
         }));
 
+        // Every department the data mentions, on top of the standard list.
+        // get_rep_dept_actuals_factures returns "Non assigné" for billing whose
+        // department Zoho never set, and it is counted in the total above these
+        // cards — so leaving it out is what made them fail to add up.
+        const seen = new Set<string>(DEPARTMENTS);
+        for (const f of (factDeptRes.data ?? [])) seen.add(String(f.department));
+        for (const f of (prevDeptRes.data ?? [])) seen.add(String(f.department));
+        for (const k of Object.keys(dObjMap)) seen.add(k.slice(k.indexOf('-') + 1));
+        const deptList = [...seen].filter(Boolean);
+        setDeptKeys(deptList);
+
         // Dept × month matrix
         const dd: DeptMonthData = {};
-        for (const dept of DEPARTMENTS) {
+        for (const dept of deptList) {
             dd[dept] = {};
             for (let m = 1; m <= 12; m++) {
                 dd[dept][m] = {
@@ -155,8 +170,8 @@ export default function PortailObjectifs({ propRepName }: Props) {
     const pct = totals.target > 0 ? Math.round((totals.actual / totals.target) * 100) : 0;
     const { text: motivText, emoji: motivEmoji } = getMotivation(pct);
 
-    const hasDeptData = DEPARTMENTS.some(dept =>
-        Object.values(deptData[dept] ?? {}).some(({ target, actual, prevActual }) => target > 0 || actual > 0 || prevActual > 0)
+    const hasDeptData = deptKeys.some(dept =>
+        Object.values(deptData[dept] ?? {}).some(({ target, actual, prevActual }) => target !== 0 || actual !== 0 || prevActual !== 0)
     );
 
     // ─── Guard ────────────────────────────────────────────────────────────────
@@ -336,7 +351,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
                                 <BarChart2 className="w-3.5 h-3.5 text-slate-400" />
                             </div>
-                            <div>
+                            <div className="flex-1">
                                 <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
                                 <p className="text-xs text-slate-400">
                                     <span className="text-slate-400 font-medium">{prevYear}</span>
@@ -354,9 +369,33 @@ export default function PortailObjectifs({ propRepName }: Props) {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {DEPARTMENTS.map(dept => {
+                                <div className="flex justify-end">
+                                    {/* One row per department per month: the flat shape
+                                        a pivot table wants, rather than the card layout
+                                        the screen uses. */}
+                                    <ExportButton
+                                        rows={deptKeys.flatMap(d =>
+                                            Object.entries(deptData[d] ?? {}).map(([m, c]) => ({
+                                                departement: d,
+                                                mois: Number(m),
+                                                realise: c.actual,
+                                                objectif: c.target,
+                                                annee_precedente: c.prevActual,
+                                            })))}
+                                        columns={autoColumns([{ departement: '', mois: 0, realise: 0, objectif: 0, annee_precedente: 0 }])}
+                                        filename={`objectifs_par_departement_${year}`} label="CSV"
+                                        disabled={deptKeys.length === 0}
+                                    />
+                                </div>
+                                {deptKeys.map(dept => {
                                     const monthCells = deptData[dept] ?? {};
-                                    const hasRow = Object.values(monthCells).some(c => c.target > 0 || c.actual > 0 || c.prevActual > 0);
+                                    // `!== 0`, not `> 0`. A department whose net is
+                                    // NEGATIVE is still real: "Non assigné" holds refunds
+                                    // whose department could not be traced, and the total
+                                    // above these cards counts it. Skipping it left the
+                                    // cards short by exactly that amount — which is the
+                                    // discrepancy this page was reported for.
+                                    const hasRow = Object.values(monthCells).some(c => c.target !== 0 || c.actual !== 0 || c.prevActual !== 0);
                                     if (!hasRow) return null;
 
                                     const rowTotal = Object.values(monthCells).reduce(

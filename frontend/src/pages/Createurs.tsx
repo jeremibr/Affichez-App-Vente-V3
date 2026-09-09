@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { Loader2, X, FileSignature, AlertTriangle } from 'lucide-react';
+import { Loader2, X, FileSignature } from 'lucide-react';
 import type {
     CreatorSummaryRow, CreatorDetailRow, QuoteCreatorLinkStatus,
 } from '../types/database';
@@ -142,16 +142,13 @@ export default function Createurs() {
                 </p>
             </div>
 
-            <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50/60 border border-amber-100">
-                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-amber-900/80 leading-relaxed">
-                    <span className="font-semibold">Ces chiffres ne s&rsquo;additionnent pas avec ceux des autres pages.</span>{' '}
-                    Un devis saisi par Morgane et vendu par Dominic compte une fois ici sous Morgane, et une fois
-                    sur le tableau des factures sous Dominic. Le total de cette page est le nombre réel de
-                    documents&nbsp;; l&rsquo;additionner à un classement de représentants compterait chaque
-                    document deux fois.
-                </p>
-            </div>
+            {/* The amber "ces chiffres ne s'additionnent pas" banner that sat here
+                was removed on 2026-09-08 as noise on every load. The caveat is
+                still true and still recorded — the page subtitle says the figures
+                are per person who ENTERED the document regardless of who the sale
+                is credited to, the detail modal marks a different salesperson in
+                orange, and docs/COMPTES.md explains why the totals overlap the rep
+                dashboards by design. */}
 
             {backfillRunning && (
                 <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100">
@@ -227,21 +224,34 @@ export default function Createurs() {
                                         hint="Factures saisies. Les avoirs ne sont pas comptés."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                     <Th col="invoices_amount" label="Montant facturé"
-                                        hint="Avant taxes, et avant avoirs : Zoho n'indique pas qui crée un avoir."
+                                        hint="Avant taxes, avoirs déduits. Ces montants recoupent ceux des autres pages : un document saisi par une personne et vendu par une autre compte une fois ici et une fois là-bas."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {sortedData.map(r => (
-                                    <tr key={r.creator} className="hover:bg-slate-50/70 transition-colors">
+                                    // The whole row opens the person, not just the
+                                    // name: in a seven-column table the name is a
+                                    // small target and every other cell looked
+                                    // clickable without being so.
+                                    <tr
+                                        key={r.creator}
+                                        onClick={() => setOpenCreator(r)}
+                                        onKeyDown={e => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setOpenCreator(r);
+                                            }
+                                        }}
+                                        tabIndex={0}
+                                        role="button"
+                                        aria-label={`Voir les documents de ${r.creator}`}
+                                        className="cursor-pointer transition-colors hover:bg-slate-50/70
+                                                   focus:bg-slate-50 focus:outline-none
+                                                   focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-main/40"
+                                    >
                                         <td className="td">
-                                            <button
-                                                onClick={() => setOpenCreator(r)}
-                                                className="text-left font-semibold text-brand-dark hover:text-brand-main transition-colors"
-                                                title="Voir le détail des documents"
-                                            >
-                                                {r.creator}
-                                            </button>
+                                            <span className="font-semibold text-brand-dark">{r.creator}</span>
                                         </td>
                                         <td className="td text-right tabular-nums font-semibold text-slate-700">
                                             {r.quotes_created.toLocaleString('fr-CA')}

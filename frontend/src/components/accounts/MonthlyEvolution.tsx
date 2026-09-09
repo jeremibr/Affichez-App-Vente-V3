@@ -56,9 +56,14 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
     const maxAccounts = Math.max(1, ...data.map(d => Math.max(d.accounts, d.prevAccounts)));
     const maxRpa = Math.max(1, ...data.map(d => Math.max(d.rpa, d.prevRpa)));
 
-    // Plot geometry. viewBox units, scaled by CSS — so the chart stays sharp at
-    // any width without a resize observer.
-    const W = 720, H = 200, PAD_L = 8, PAD_R = 8, PAD_T = 12, PAD_B = 22;
+    // Plot geometry. viewBox units scaled by CSS, so the chart is sharp at any
+    // width without a resize observer — and `preserveAspectRatio="none"` below
+    // lets it stretch to the full card instead of sitting in a 720px box with
+    // empty space either side, which is how it first shipped.
+    //
+    // PAD_L leaves room for the value labels on the left; they are what makes
+    // the line readable as money rather than as a shape.
+    const W = 1000, H = 240, PAD_L = 54, PAD_R = 12, PAD_T = 16, PAD_B = 24;
     const plotW = W - PAD_L - PAD_R;
     const plotH = H - PAD_T - PAD_B;
     const step = plotW / 12;
@@ -78,14 +83,29 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                 </h3>
                 <InfoHint text={`Les barres montrent le nombre de comptes créés chaque mois. La ligne montre le revenu par compte sur ${windowLabel} — c'est elle qui dit si un mois a ramené de bons clients ou seulement beaucoup de clients. La ligne pâle est l'année précédente.`} />
                 <div className="ml-auto flex items-center gap-3">
-                    <Legend />
+                    <Legend year={year} previousYear={hasPrevious ? previousYear : null} />
                     <ExportButton rows={data} columns={MONTHLY_CSV} filename="comptes_par_mois" disabled={data.every(d => d.accounts === 0)} />
                 </div>
             </div>
 
             <div className="px-5 pt-4">
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-[200px]" role="img"
+                <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
+                     className="w-full h-[240px]" role="img"
                      aria-label="Comptes créés et revenu par compte, mois par mois">
+                    {/* Three gridlines and their values. Without them the line has
+                        no scale at all — you can see that August beat July, but not
+                        by $40 or $400. */}
+                    {[0, 0.5, 1].map(f => (
+                        <g key={f}>
+                            <line x1={PAD_L} x2={W - PAD_R}
+                                  y1={PAD_T + plotH * (1 - f)} y2={PAD_T + plotH * (1 - f)}
+                                  className="stroke-slate-100" strokeWidth={1} />
+                            <text x={PAD_L - 6} y={PAD_T + plotH * (1 - f) + 3} textAnchor="end"
+                                  className="fill-slate-300" style={{ fontSize: 9 }}>
+                                {Math.round(maxRpa * f).toLocaleString('fr-CA')}
+                            </text>
+                        </g>
+                    ))}
                     {/* Volume bars, current year */}
                     {data.map((d, i) => {
                         const h = (d.accounts / maxAccounts) * plotH;
@@ -99,23 +119,33 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                         );
                     })}
 
-                    {/* Previous year's quality line, behind the current one */}
+                    {/* Last year: dashed, grey, hollow square markers, thin. Two
+                        orange-ish lines of the same weight were the complaint —
+                        colour alone was not enough to tell them apart, so they now
+                        differ in colour AND dash AND marker shape. */}
                     {hasPrevious && (
-                        <path d={linePath('prevRpa')} fill="none"
-                              className="stroke-slate-300" strokeWidth={1.5}
-                              strokeDasharray="4 3" strokeLinejoin="round" />
+                        <>
+                            <path d={linePath('prevRpa')} fill="none"
+                                  className="stroke-slate-400" strokeWidth={1.5}
+                                  strokeDasharray="5 4" strokeLinejoin="round" />
+                            {data.map((d, i) => (
+                                <rect key={d.month} x={x(i) - 2.5} y={y(d.prevRpa) - 2.5}
+                                      width={5} height={5}
+                                      className="fill-white stroke-slate-400" strokeWidth={1.25} />
+                            ))}
+                        </>
                     )}
 
-                    {/* Current year */}
+                    {/* This year: solid, brand orange, filled round markers, thicker. */}
                     <path d={linePath('rpa')} fill="none"
-                          className="stroke-brand-main" strokeWidth={2} strokeLinejoin="round" />
+                          className="stroke-brand-main" strokeWidth={2.5} strokeLinejoin="round" />
                     {data.map((d, i) => (
-                        <circle key={d.month} cx={x(i)} cy={y(d.rpa)} r={2.5}
-                                className="fill-white stroke-brand-main" strokeWidth={1.5} />
+                        <circle key={d.month} cx={x(i)} cy={y(d.rpa)} r={3.5}
+                                className="fill-brand-main stroke-white" strokeWidth={1.5} />
                     ))}
 
                     {data.map((d, i) => (
-                        <text key={d.month} x={x(i)} y={H - 6} textAnchor="middle"
+                        <text key={d.month} x={x(i)} y={H - 8} textAnchor="middle"
                               className="fill-slate-400" style={{ fontSize: 10 }}>
                             {d.label}
                         </text>
@@ -167,21 +197,38 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
     );
 }
 
-function Legend() {
+/**
+ * Named years rather than "An dernier", and swatches that actually show the
+ * difference — a solid bar with a dot against a dashed one with a square. The
+ * legend has to be readable on its own, because it is what the reader consults
+ * when the two lines cross.
+ */
+function Legend({ year, previousYear }: { year: number | 'Toutes'; previousYear: number | null }) {
+    const thisLabel = year === 'Toutes' ? 'Revenu / compte' : `${year}`;
     return (
-        <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-400">
+        <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-400" translate="no">
             <span className="flex items-center gap-1.5">
-                <span className="w-3 h-2 rounded-sm bg-slate-100 border border-slate-200" />
-                Comptes
+                <span className="h-2.5 w-2 rounded-sm bg-slate-100 ring-1 ring-inset ring-slate-200" />
+                Comptes créés
             </span>
-            <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 rounded bg-brand-main" />
-                $ / compte
+            <span className="flex items-center gap-1.5 text-brand-main">
+                <svg width="22" height="8" aria-hidden>
+                    <line x1="0" y1="4" x2="22" y2="4" className="stroke-brand-main" strokeWidth={2.5} />
+                    <circle cx="11" cy="4" r="3" className="fill-brand-main stroke-white" strokeWidth={1.5} />
+                </svg>
+                {thisLabel} — $ / compte
             </span>
-            <span className="flex items-center gap-1.5">
-                <span className="w-3 h-0.5 rounded bg-slate-300" />
-                An dernier
-            </span>
+            {previousYear !== null && (
+                <span className="flex items-center gap-1.5">
+                    <svg width="22" height="8" aria-hidden>
+                        <line x1="0" y1="4" x2="22" y2="4" className="stroke-slate-400"
+                              strokeWidth={1.5} strokeDasharray="5 4" />
+                        <rect x="8.5" y="1.5" width="5" height="5"
+                              className="fill-white stroke-slate-400" strokeWidth={1.25} />
+                    </svg>
+                    {previousYear}
+                </span>
+            )}
         </div>
     );
 }

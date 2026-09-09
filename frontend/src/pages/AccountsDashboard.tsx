@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
-import { Loader2, Building2, Percent, DollarSign, Timer, Info } from 'lucide-react';
+import { Loader2, Building2, Percent, DollarSign, Timer } from 'lucide-react';
 import type {
     ZohoAccountKPIs, ZohoAccountBreakdownRow, ZohoAccountFilterOptions,
     ZohoAccountMonthlyRow,
@@ -13,6 +13,7 @@ import { Select } from '../components/Select';
 import { InfoHint } from '../components/InfoHint';
 import { ExportButton } from '../components/ExportButton';
 import { ClearFiltersButton } from '../components/ClearFiltersButton';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import type { CsvColumn } from '../lib/csv';
 
@@ -62,7 +63,7 @@ export default function AccountsDashboard() {
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
 
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', REP_DEFAULT);
     const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
     const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
     const [selectedDomaine, setSelectedDomaine] = useUrlState('domaine', 'Tous');
@@ -80,6 +81,9 @@ export default function AccountsDashboard() {
     const [monthly, setMonthly] = useState<ZohoAccountMonthlyRow[]>([]);
     const [monthlyPrev, setMonthlyPrev] = useState<ZohoAccountMonthlyRow[]>([]);
     const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
+
+    // Équipe entière / Interne / one rep. See hooks/useRepFilter.
+    const repFilter = useRepFilter(selectedRep, options?.reps ?? []);
 
     const yearParamValue = year === 'Toutes' ? null : year;
     // null is the RPC's "no cap", not a missing argument.
@@ -106,7 +110,7 @@ export default function AccountsDashboard() {
     const activeFilterCount = [
         yearParam !== '2026',
         selectedMonth !== 'Toutes',
-        selectedRep !== 'Tous',
+        selectedRep !== REP_DEFAULT,
         selectedSource !== 'Toutes',
         selectedService !== 'Tous',
         selectedDomaine !== 'Tous',
@@ -125,7 +129,8 @@ export default function AccountsDashboard() {
             p_domaine: selectedDomaine === 'Tous' ? null : selectedDomaine,
             p_region: selectedRegion === 'Toutes' ? null : selectedRegion,
         };
-        const rep = selectedRep === 'Tous' ? null : selectedRep;
+        const rep = repFilter.rep;
+        const reps = repFilter.reps;
         const source = selectedSource === 'Toutes' ? null : selectedSource;
         const service = selectedService === 'Tous' ? null : selectedService;
 
@@ -137,7 +142,7 @@ export default function AccountsDashboard() {
         // against the same month last year rather than only against its
         // neighbours.
         const monthlyArgs = {
-            p_rep: rep, p_source: source, p_service: service,
+            p_rep: rep, p_reps: reps, p_source: source, p_service: service,
             p_domaine: shared.p_domaine, p_region: shared.p_region,
             p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
         };
@@ -151,15 +156,18 @@ export default function AccountsDashboard() {
             { data: monData },
             { data: monPrevData },
         ] = await Promise.all([
-            supabase.rpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_source: source, p_service: service }),
-            supabase.rpc('get_zoho_accounts_by_rep',    { ...shared,             p_source: source, p_service: service }),
-            supabase.rpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep,                   p_service: service }),
-            supabase.rpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_source: source }),
+            supabase.rpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_source: source, p_service: service }),
+            // by_rep keeps p_reps (so a group narrows the list to its members)
+            // but never p_rep — picking one rep must not reduce their own
+            // breakdown to a single bar with nothing to compare it against.
+            supabase.rpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_source: source, p_service: service }),
+            supabase.rpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps,       p_service: service }),
+            supabase.rpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_reps: reps, p_source: source }),
             supabase.rpc('get_zoho_accounts_by_domaine',{
                 p_year: shared.p_year, p_month: shared.p_month,
                 p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
                 p_region: shared.p_region,
-                p_rep: rep, p_source: source, p_service: service,
+                p_rep: rep, p_reps: reps, p_source: source, p_service: service,
             }),
             supabase.rpc('get_zoho_accounts_monthly_summary', { ...monthlyArgs, p_year: yearParamValue }),
             supabase.rpc('get_zoho_accounts_monthly_summary', {
@@ -176,7 +184,7 @@ export default function AccountsDashboard() {
         setMonthly((monData as ZohoAccountMonthlyRow[]) ?? []);
         setMonthlyPrev((monPrevData as ZohoAccountMonthlyRow[]) ?? []);
         setLoading(false);
-    }, [yearParamValue, selectedMonth, selectedRep, selectedSource, selectedService,
+    }, [yearParamValue, selectedMonth, repFilter, selectedSource, selectedService,
         selectedDomaine, selectedRegion, windowMonths, excludeRatings]);
 
     const fetchOptions = useCallback(async () => {
@@ -262,7 +270,7 @@ export default function AccountsDashboard() {
                     <Select value={windowParam} onChange={setWindowParam} options={WINDOW_OPTIONS} variant="accent" className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={optionList('Tous', options?.reps, 'Tous les reps')} className="w-44" />
+                    <Select value={selectedRep} onChange={setSelectedRep} options={repFilter.options} className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Source">
                     <Select value={selectedSource} onChange={setSelectedSource} options={optionList('Toutes', options?.sources, 'Toutes les sources')} className="w-52" />
@@ -317,7 +325,9 @@ export default function AccountsDashboard() {
                         <KPICard
                             title="Revenus attribués"
                             value={formatCurrencyCAD(kpis?.revenue_attributed ?? 0)}
-                            subText={`Historique complet ${formatCurrencyCAD(kpis?.revenue_lifetime ?? 0)}`}
+                            subText={windowParam === 'Toute'
+                                ? 'Tout l\u2019historique de facturation'
+                                : `Factur\u00e9 dans les ${windowParam} mois suivant la cr\u00e9ation`}
                             icon={DollarSign}
                             hint={`Factures datées entre la création du compte et ${windowLabel}. La fenêtre est ce qui rend deux mois comparables : sans elle, un compte de 2021 bat toujours un compte de 2026 simplement parce qu'il a eu cinq ans de plus pour acheter. « Historique complet » ignore la fenêtre.`}
                         />
@@ -332,22 +342,14 @@ export default function AccountsDashboard() {
                         />
                     </div>
 
-                    {(kpis?.ventes_royer ?? 0) > 0 && (
-                        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100">
-                            <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                            <p className="text-xs text-slate-500 leading-relaxed">
-                                <span className="font-semibold text-slate-600">
-                                    {formatCurrencyCAD(kpis?.ventes_royer ?? 0)}
-                                </span>{' '}
-                                de ventes Royer &amp; Fils / VotreLogo.ca sur ces comptes, en plus des montants
-                                ci-dessus. Cette facturation se fait en dehors des deux organisations Zoho Books
-                                (QC et MTL) que l&rsquo;application lit, donc elle n&rsquo;apparaît dans aucune
-                                facture ici — elle vient d&rsquo;un champ de total du CRM. Les deux ne se
-                                chevauchent pas, mais ce sont deux entreprises différentes : elles sont affichées
-                                côte à côte plutôt qu&rsquo;additionnées.
-                            </p>
-                        </div>
-                    )}
+                    {/* The Royer & Fils / VotreLogo.ca note that used to sit here was
+                        removed on 2026-09-08: it was four lines of explanation on
+                        every load, for a figure most readers never needed. The
+                        caveat itself has not gone away — that business is invoiced
+                        outside the two Books organisations this app reads, so those
+                        2,028 accounts show almost no revenue here. It is documented
+                        in docs/COMPTES.md §8a, and the source table still marks the
+                        cohort with a dot and explains it on hover. */}
 
                     <MonthlyEvolution
                         current={monthly} previous={monthlyPrev}

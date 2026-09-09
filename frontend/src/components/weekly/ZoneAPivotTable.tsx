@@ -3,6 +3,8 @@ import type { ZoneA_DeptTotal } from '../../types/database';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
 import { DEPARTMENTS } from '../../lib/constants';
+import { ExportButton } from '../ExportButton';
+import type { CsvColumn } from '../../lib/csv';
 
 // Shorter display names for table headers
 const DEPT_SHORT: Record<string, string> = {
@@ -29,7 +31,24 @@ export function ZoneAPivotTable({
         <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Sommaire par Représentant</h2>
-                <span className="text-xs text-slate-400">{repPivotRows.length} reps</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400" translate="no">{repPivotRows.length} reps</span>
+                    {/* One column per department, built from the same list the table
+                        renders, so the file matches the screen even if DEPARTMENTS
+                        grows again (it did — EVENEMENT, 2026-09-07). */}
+                    <ExportButton
+                        rows={repPivotRows}
+                        columns={[
+                            { header: 'Representant', value: r => String(r.repName) },
+                            ...DEPARTMENTS.map(d => ({
+                                header: d,
+                                value: (r: { repName: string;[key: string]: string | number }) => Number(r[d] ?? 0),
+                            })),
+                        ] as CsvColumn<{ repName: string;[key: string]: string | number }>[]}
+                        filename="sommaire_par_rep" label="CSV"
+                        disabled={repPivotRows.length === 0}
+                    />
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">

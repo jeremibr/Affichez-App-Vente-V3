@@ -12,6 +12,8 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { OFFICES } from '../lib/constants';
 import { fetchAllCommRates, saveCommRate } from '../utils/commRates';
+import { ExportButton } from '../components/ExportButton';
+import { autoColumns } from '../lib/csv';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -351,6 +353,12 @@ export default function Paye() {
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
                     <Users className="w-4 h-4 text-slate-400" />
                     <h3 className="text-sm font-bold text-slate-800">Suivi des paiements</h3>
+                    <ExportButton
+                        rows={repData}
+                        columns={autoColumns(repData)}
+                        filename="suivi_paiements" label="CSV"
+                        disabled={repData.length === 0}
+                    />
                     <span className="ml-auto text-xs text-slate-400 italic">
                         Les taux sont sauvegardés dans la base de données
                     </span>

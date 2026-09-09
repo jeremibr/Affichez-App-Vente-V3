@@ -15,6 +15,8 @@ import { SortIcon } from '../components/SortIcon';
 import { cn } from '../lib/utils';
 import { useSort } from '../hooks/useSort';
 import { useRepList } from '../hooks/useRepList';
+import { ExportButton } from '../components/ExportButton';
+import { autoColumns } from '../lib/csv';
 
 const STATUS_LABELS: Record<string, string> = Object.fromEntries(TASK_STATUSES.map(s => [s.value, s.label]));
 
@@ -234,6 +236,12 @@ export default function TasksDashboard() {
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
                         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-sm font-bold text-slate-800">Classement des représentants</h3>
+                            <ExportButton
+                                rows={byRep}
+                                columns={autoColumns(byRep)}
+                                filename="taches_par_rep" label="CSV"
+                                disabled={byRep.length === 0}
+                            />
                             <span className="text-[11px] text-slate-400">{sortedReps.length} reps · {kpis?.active_reps ?? 0} actifs {isWeekly ? 'cette semaine' : 'sur la période'}</span>
                         </div>
                         {sortedReps.length === 0 ? (

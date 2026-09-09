@@ -4,6 +4,8 @@ import type { SommaireRow } from '../../types/database';
 import { MONTHS } from '../../lib/constants';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
+import { ExportButton } from '../ExportButton';
+import type { CsvColumn } from '../../lib/csv';
 
 interface SommaireTableRow {
     label: string;
@@ -15,6 +17,16 @@ interface SommaireTableRow {
     pct_atteint: number;
     deal_count: number;
 }
+
+const SOMMAIRE_CSV: CsvColumn<SommaireTableRow>[] = [
+    { header: 'Mois',            value: r => r.label },
+    { header: 'Annee precedente', value: r => r.prevYear },
+    { header: 'Realise',         value: r => r.actual_amount },
+    { header: 'Variation',       value: r => r.delta },
+    { header: 'Objectif',        value: r => r.objectif },
+    { header: 'Atteinte (%)',    value: r => r.pct_atteint },
+    { header: 'Documents',       value: r => r.deal_count },
+];
 
 export function SommaireTable({
     title,
@@ -95,7 +107,18 @@ export function SommaireTable({
             {/* Card header */}
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">{title}</h2>
-                <span className="text-xs text-slate-400 font-medium">{displayMonths.length === 1 ? displayMonths[0].label : `${year}`}</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-medium" translate="no">
+                        {displayMonths.length === 1 ? displayMonths[0].label : `${year}`}
+                    </span>
+                    {/* Exports the rows as sorted on screen, so the file matches
+                        what the reader is looking at rather than the raw order. */}
+                    <ExportButton
+                        rows={sortedData} columns={SOMMAIRE_CSV}
+                        filename={`sommaire_${year}`} label="CSV"
+                        disabled={sortedData.length === 0}
+                    />
+                </div>
             </div>
 
             {/* Table with horizontal scroll on mobile */}

@@ -482,6 +482,18 @@ export type ZohoAccountRow = {
      * hide them from the table while the dashboard still counted them.
      */
     is_internal: boolean;
+
+    /**
+     * What the Service column shows: the CRM multiselect when the account has
+     * one, otherwise the departments actually billed. 59% of accounts never had
+     * the CRM field filled in, so without the fallback the column sat empty for
+     * companies that had plainly bought things.
+     *
+     * `service_origin` says which branch won, so a borrowed value can be marked
+     * rather than passed off as a CRM answer.
+     */
+    service_resolved: string[];
+    service_origin: 'crm' | 'invoice' | 'none';
 };
 
 /**

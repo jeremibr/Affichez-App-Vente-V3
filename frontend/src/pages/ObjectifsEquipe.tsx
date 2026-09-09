@@ -6,6 +6,8 @@ import { Select } from '../components/Select';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import { ExportButton } from '../components/ExportButton';
+import { autoColumns } from '../lib/csv';
 
 interface Objective { id: string; year: number; month: number; department: string; target_amount: number; }
 
@@ -76,6 +78,11 @@ export default function ObjectifsEquipe() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <ExportButton
+                        rows={objectives} columns={autoColumns(objectives)}
+                        filename={`objectifs_equipe_${year}`}
+                        disabled={objectives.length === 0}
+                    />
                     <Select
                         value={String(year)}
                         onChange={v => setYear(Number(v))}

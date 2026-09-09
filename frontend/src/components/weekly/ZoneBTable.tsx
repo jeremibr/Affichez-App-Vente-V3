@@ -3,8 +3,22 @@ import { formatCurrencyCAD, formatShortDate, cn } from '../../lib/utils';
 import type { ZoneB_DetailRow, InvDetailRow } from '../../types/database';
 import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
+import { ExportButton } from '../ExportButton';
+import type { CsvColumn } from '../../lib/csv';
 
 type AnyDetailRow = ZoneB_DetailRow | InvDetailRow;
+
+/** Both row shapes carry these; the ones that differ are read defensively. */
+const DETAIL_CSV: CsvColumn<AnyDetailRow>[] = [
+    { header: 'Date',         value: r => ('sale_date' in r ? r.sale_date : r.invoice_date) ?? null },
+    { header: 'Numero',       value: r => ('quote_number' in r ? r.quote_number : r.invoice_number) ?? null },
+    { header: 'Client',       value: r => r.client_name },
+    { header: 'Representant', value: r => r.rep_name },
+    { header: 'Departement',  value: r => r.department },
+    { header: 'Bureau',       value: r => r.office },
+    { header: 'Statut',       value: r => String(r.status ?? '') },
+    { header: 'Montant',      value: r => Number(r.amount) },
+];
 
 interface ZoneBTableProps {
     lineItems: AnyDetailRow[];
@@ -43,9 +57,17 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                 <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
                     {module === 'factures' ? 'Liste détaillée des factures' : 'Liste détaillée des devis'}
                 </h2>
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider">
-                    {lineItems.length} transactions
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider"
+                          translate="no">
+                        {lineItems.length} transactions
+                    </span>
+                    <ExportButton
+                        rows={sortedData} columns={DETAIL_CSV}
+                        filename={module === 'factures' ? 'factures_semaine' : 'devis_semaine'}
+                        label="CSV" disabled={lineItems.length === 0}
+                    />
+                </div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
