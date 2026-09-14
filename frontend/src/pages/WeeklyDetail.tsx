@@ -12,6 +12,7 @@ import { useRepList } from '../hooks/useRepList';
 import { INTERNAL_REP_NAMES } from '../lib/constants';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 
 // "Je veux tout le temps qu'on puisse telecharger les rapports partout"
 // (2026-09-04). Exports the filtered line items for the selected week - the same
@@ -43,11 +44,16 @@ function fmtWeekRange(start: string, end: string): string {
 export default function WeeklyDetail() {
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
     const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
-    const [selectedRep, setSelectedRep] = useState('');
+    const [selectedRep, setSelectedRep] = useState(REP_DEFAULT);
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);
     const [lineItems, setLineItems] = useState<ZoneB_DetailRow[]>([]);
     const repList = useRepList();
+
+    // Groups first, then the current sales team by name. The rows arrive
+    // unfiltered and are narrowed in memory, so the hook's `matches` carries the
+    // same membership rule the server-side pages send as p_reps.
+    const repFilter = useRepFilter(selectedRep, repList);
 
     const clearData = () => { setSummaryData([]); setLineItems([]); };
 
@@ -98,16 +104,12 @@ export default function WeeklyDetail() {
     const isInternalRep = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
 
     const filteredSummary = useMemo(() => {
-        if (!selectedRep) return summaryData;
-        if (selectedRep === 'Vente Interne') return summaryData.filter(r => isInternalRep(r.rep_name));
-        return summaryData.filter(r => r.rep_name === selectedRep);
-    }, [summaryData, selectedRep]);
+        return summaryData.filter(r => repFilter.matches(r.rep_name));
+    }, [summaryData, repFilter]);
 
     const filteredLineItems = useMemo(() => {
-        if (!selectedRep) return lineItems;
-        if (selectedRep === 'Vente Interne') return lineItems.filter(r => isInternalRep(r.rep_name));
-        return lineItems.filter(r => r.rep_name === selectedRep);
-    }, [lineItems, selectedRep]);
+        return lineItems.filter(r => repFilter.matches(r.rep_name));
+    }, [lineItems, repFilter]);
 
     const grandTotal = useMemo(() =>
         filteredSummary.reduce((sum, row) => sum + Number(row.total_amount), 0), [filteredSummary]);
@@ -151,12 +153,8 @@ export default function WeeklyDetail() {
                     <Select
                         value={selectedRep}
                         onChange={setSelectedRep}
-                        options={[
-                            { value: '', label: 'Tous les reps' },
-                            { value: 'Vente Interne', label: 'Vente Interne' },
-                            ...repList.filter(r => !isInternalRep(r)).map(r => ({ value: r, label: r })),
-                        ]}
-                        variant={selectedRep ? 'accent' : 'default'}
+                        options={repFilter.options}
+                        variant={selectedRep !== REP_DEFAULT ? 'accent' : 'default'}
                         className="w-48"
                     />
                 </div>

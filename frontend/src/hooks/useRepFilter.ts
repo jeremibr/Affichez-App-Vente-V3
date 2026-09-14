@@ -2,40 +2,40 @@ import { useMemo } from 'react';
 import { useRepList } from './useRepList';
 
 /**
- * The rep filter, with two group options above the individual names.
+ * The rep filter, shared by every page that has one.
  *
- * Asked for on 2026-09-08. The dropdown used to list every name that has ever
- * owned a record — 30 of them on the accounts, most of whom left years ago —
- * with no way to say "just the current sales team".
+ *   Tous les reps    everyone — the sales team plus internal      ← DEFAULT
+ *   Interne          everybody NOT in the View dropdown
+ *   ── then each rep in the View dropdown, individually ──
  *
- *   Équipe entière   the reps in the View dropdown        ← DEFAULT
- *   Interne          everybody else
- *   Tous les reps    both, i.e. no filter at all
- *   ── then each rep individually ──
+ * **Only the current sales team is listed by name.** The other ~21 names on the
+ * data — internal billing entities and former staff — are what "Interne" is for;
+ * listing them individually as well made a 30-item dropdown in which the nine
+ * people anybody actually looks for were buried.
  *
- * "Équipe entière" is the default because it is the only one of the three that
- * answers "how is the sales team doing" — the question these dashboards exist
- * for. The other two are always one click away, and the two groups together are
- * exhaustive, so nothing is ever hidden without the reader choosing it.
+ * There is deliberately no "Équipe entière" option. "Tous les reps" is the
+ * default and already means team + internal, so a third group that meant
+ * "everyone except internal" was one more thing to reason about for a view
+ * nobody had asked to start on.
  *
- * The team list comes from useRepList(), the same source the View dropdown uses,
- * so the two can never disagree: allowed_users minus INTERNAL_REP_NAMES.
+ * The team list comes from useRepList() — the same source the View dropdown
+ * uses, allowed_users minus INTERNAL_REP_NAMES — so the two can never disagree.
  */
 
 export const REP_ALL = 'Tous';
-export const REP_TEAM = 'Equipe';
 export const REP_INTERNAL = 'Interne';
 
-/** What the page should default to. */
-export const REP_DEFAULT = REP_TEAM;
+/** What every page starts on. */
+export const REP_DEFAULT = REP_ALL;
 
 export interface RepFilter {
-    /** Options for the <Select>, groups first. */
+    /** Options for the <Select>: Tous, Interne, then the team by name. */
     options: { value: string; label: string }[];
     /**
      * The rep list to send as `p_reps`. NULL means "no filter" — used by
-     * "Tous les reps" and while the team list is still loading, because a
-     * half-loaded team would silently under-report rather than show everything.
+     * "Tous les reps", by a single rep (which uses `rep` instead), and while the
+     * team list is still loading, because a half-loaded team would silently
+     * under-report rather than show everything.
      */
     reps: string[] | null;
     /** The single name to send as `p_rep`, or null for a group. Kept separate
@@ -44,6 +44,14 @@ export interface RepFilter {
     rep: string | null;
     /** The current sales team, for anything that needs it directly. */
     team: string[];
+    /**
+     * Does one row belong to the current selection?
+     *
+     * For the pages that fetch every rep and filter in memory — the weekly and
+     * quarterly views — so the membership rule lives here rather than being
+     * re-implemented, slightly differently, on four pages.
+     */
+    matches: (repName: string | null | undefined) => boolean;
 }
 
 /**
@@ -55,35 +63,46 @@ export function useRepFilter(selected: string, allReps: string[]): RepFilter {
 
     return useMemo(() => {
         const teamSet = new Set(team.map(n => n.normalize('NFC')));
-        // Anyone in the data who is not on the current team: internal billing
-        // entities and former staff alike. Team + internal is exhaustive by
-        // construction, so the two groups always add up to "Tous".
+        // Everyone in the data who is not on the current team: internal billing
+        // entities and former staff alike. Never listed by name — this is the
+        // membership of the "Interne" option.
         const internal = allReps
             .filter(n => !teamSet.has(n.normalize('NFC')))
             .sort();
 
         const options = [
-            { value: REP_TEAM, label: 'Équipe entière' },
-            { value: REP_INTERNAL, label: 'Interne' },
             { value: REP_ALL, label: 'Tous les reps' },
+            { value: REP_INTERNAL, label: 'Interne' },
             ...team.map(n => ({ value: n, label: n })),
-            ...internal.map(n => ({ value: n, label: n })),
         ];
 
         let reps: string[] | null = null;
         let rep: string | null = null;
 
-        if (selected === REP_TEAM) {
-            // Until allowed_users has answered, team is []. Sending an empty
-            // array would filter everything out and show a page of zeros; NULL
-            // shows everything for the one render before the list arrives.
-            reps = team.length > 0 ? team : null;
-        } else if (selected === REP_INTERNAL) {
-            reps = internal.length > 0 ? internal : null;
+        if (selected === REP_INTERNAL) {
+            // Until allowed_users has answered, team is [] and internal is
+            // therefore everyone. Sending that would look like a working filter
+            // showing wrong numbers; NULL shows everything for the one render
+            // before the list arrives, which at least matches the default.
+            reps = team.length > 0 && internal.length > 0 ? internal : null;
         } else if (selected !== REP_ALL) {
-            rep = selected;
+            // A name. Anything unrecognised — an old ?rep=Equipe link from before
+            // the groups were reworked — falls through to no filter rather than
+            // an empty page, because `rep` stays null unless the name is a real
+            // team member.
+            if (teamSet.has(selected.normalize('NFC'))) rep = selected;
         }
 
-        return { options, reps, rep, team };
+        const teamHas = (n: string) => teamSet.has(n.normalize('NFC'));
+        const matches = (repName: string | null | undefined): boolean => {
+            if (selected === REP_ALL) return true;
+            const n = (repName ?? '').normalize('NFC');
+            if (selected === REP_INTERNAL) return n !== '' && !teamHas(n);
+            // A team member: exact match. Anything else (an old ?rep= value) is
+            // treated as no filter, matching how `rep` stays null above.
+            return teamHas(selected) ? n === selected.normalize('NFC') : true;
+        };
+
+        return { options, reps, rep, team, matches };
     }, [selected, allReps, team]);
 }

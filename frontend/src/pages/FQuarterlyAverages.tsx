@@ -8,13 +8,14 @@ import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 
 export default function FQuarterlyAverages() {
     const { isAdmin, repName: authRepName } = useAuth();
 
     const [year, setYear] = useUrlStateNumber('year', 2026);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_DEFAULT));
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
     const [teamTotals, setTeamTotals] = useState<QuarterTotalsRow[]>([]);
@@ -98,7 +99,10 @@ export default function FQuarterlyAverages() {
     }, [fetchAverages]);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Toute l\'équipe' }, ...uniqueReps.map(r => ({ value: r, label: r }))], [uniqueReps]);
+    // Groups first, then the current sales team by name. Former staff and
+    // internal billing live behind "Interne" rather than as 20 more rows.
+    const repFilter = useRepFilter(selectedRep, uniqueReps);
+    const repOptions = repFilter.options;
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
@@ -137,7 +141,7 @@ export default function FQuarterlyAverages() {
                     {[1, 2, 3, 4].map((q) => {
                         const dataForQuarter = groupedYoyData
                             .filter(d => d.quarter === q)
-                            .filter(d => !isAdmin || selectedRep === 'Tous' || d.rep_name === selectedRep);
+                            .filter(d => !isAdmin || repFilter.matches(d.rep_name));
                         return (
                             <QuarterBlock
                                 key={`q${q}`}
@@ -145,7 +149,7 @@ export default function FQuarterlyAverages() {
                                 data={dataForQuarter}
                                 currentYear={year}
                                 dealLabel="facture"
-                                previousTotalOverride={isAdmin && selectedRep === 'Tous' ? previousTotalByQuarter.get(q) : undefined}
+                                previousTotalOverride={isAdmin && selectedRep === REP_DEFAULT ? previousTotalByQuarter.get(q) : undefined}
                             />
                         );
                     })}

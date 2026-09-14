@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Affichez brand — preview</title>
+    <link rel="icon" href="assets/icons/icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&family=Inria+Serif:ital,wght@1,400&display=swap"
+      rel="stylesheet"
+    />
+    <!-- The kit's tokens, used here with no framework at all. If this page looks
+         right, tokens.css is valid and self-sufficient. -->
+    <link rel="stylesheet" href="tokens/tokens.css" />
+    <style>
+      :root {
+        --font-inter: "Inter";
+        --font-inria-serif: "Inria Serif";
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: var(--font-body);
+        font-size: 0.9375rem;
+        line-height: 1.6;
+        color: var(--color-ink);
+        background: var(--color-canvas);
+      }
+      h1, h2, h3 {
+        font-family: var(--font-display);
+        font-weight: 600;
+        color: var(--color-ink);
+        margin: 0;
+        letter-spacing: -0.02em;
+      }
+      .accent-serif {
+        font-family: var(--font-accent);
+        font-style: italic;
+        font-weight: 400;
+        letter-spacing: 0;
+        font-synthesis: none;
+      }
+      .eyebrow {
+        font-family: var(--font-display);
+        font-weight: 600;
+        font-size: 0.6875rem;
+        letter-spacing: var(--tracking-eyebrow);
+        text-transform: uppercase;
+        color: var(--color-ink);
+        margin: 0 0 0.5rem;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; padding: 0 2rem; }
+      section { padding: 3.5rem 0; border-top: 1px solid var(--color-hairline); }
+      section:first-of-type { border-top: 0; }
+      .grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+      .sw { border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-card); }
+      .sw i { display: block; height: 76px; }
+      .sw b { display: block; padding: 0.6rem 0.75rem 0.15rem; font-size: 0.8125rem; font-weight: 600; }
+      .sw code { display: block; padding: 0 0.75rem 0.7rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-ink-mute); }
+      .band { padding: 2.25rem 2rem; border-radius: var(--radius-xl); }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        height: 40px; padding: 0 1.25rem; border: 0; cursor: pointer;
+        border-radius: var(--radius-md);
+        font-family: var(--font-body); font-weight: 600; font-size: 0.9375rem;
+        transition: background-color 200ms var(--ease-out), border-color 200ms var(--ease-out);
+      }
+      .btn--primary { background: var(--color-primary); color: var(--color-on-primary); }
+      .btn--primary:hover { background: var(--color-primary-hover); }
+      .btn--secondary { background: #fff; color: var(--color-ink); border: 1px solid rgba(0,0,0,0.25); }
+      .btn--secondary:hover { border-color: var(--color-ink); background: var(--color-sand); }
+      .btn--dark { background: var(--color-ink); color: #fff; }
+      .btn--ghost { background: transparent; color: var(--color-ink); }
+      .btn--ghost:hover { background: var(--color-sand); }
+      .btn--danger { background: var(--color-danger); color: #fff; }
+      .field {
+        height: 40px; width: 260px; padding: 0 0.75rem;
+        border: 1px solid var(--color-hairline-input); border-radius: var(--radius-md);
+        font: inherit; color: var(--color-ink); background: #fff;
+      }
+      .field:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-ring); }
+      .chip {
+        display: inline-flex; align-items: center; gap: 0.4rem;
+        background: var(--color-ink); color: #fff; border-radius: var(--radius-pill);
+        padding: 0.35rem 1rem 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600;
+      }
+      .chip span { color: var(--color-lime); }
+      .tone { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600; }
+      .tone i { width: 8px; height: 8px; border-radius: 2px; }
+      .row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
+      .scale p { margin: 0 0 0.35rem; }
+      .mono { font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-ink-mute); }
+      table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+      th, td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--color-hairline); }
+      th { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: var(--tracking-label); color: var(--color-ink-mute); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <!-- Hero: sand, the site's own opening -->
+    <div style="background: var(--color-sand)">
+      <div class="wrap" style="padding-block: 3rem 3.5rem">
+        <img src="assets/logo/affichez-logo.svg" alt="Affichez" height="32" style="height: 32px" />
+        <h1 style="font-size: 3.25rem; line-height: 1.06; margin-top: 2.5rem; max-width: 18ch">
+          The brand, <em class="accent-serif">assembled</em>.
+        </h1>
+        <p style="font-size: 1.0625rem; color: var(--color-ink-secondary); max-width: 52ch; margin-top: 1rem">
+          Every value on this page comes from <code class="mono">tokens/tokens.css</code>
+          with no framework loaded. If it looks right here, it will look right in an app.
+        </p>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <section>
+        <p class="eyebrow">Colour</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">Action orange</h2>
+        <div class="grid">
+          <div class="sw"><i style="background: var(--color-primary)"></i><b>primary</b><code>#F5570E</code></div>
+          <div class="sw"><i style="background: var(--color-primary-hover)"></i><b>primary-hover</b><code>#FF712F</code></div>
+          <div class="sw"><i style="background: var(--color-primary-deep)"></i><b>primary-deep</b><code>#D94C0C</code></div>
+          <div class="sw"><i style="background: var(--color-primary-press)"></i><b>primary-press</b><code>#C4460B · text</code></div>
+          <div class="sw"><i style="background: var(--color-primary-subdued)"></i><b>primary-subdued</b><code>#FDE3D6</code></div>
+          <div class="sw"><i style="background: var(--color-primary-wash)"></i><b>primary-wash</b><code>#FEF3ED</code></div>
+        </div>
+
+        <h2 style="font-size: 1.5rem; margin: 2.25rem 0 1.5rem">Section bands</h2>
+        <div class="grid">
+          <div class="sw"><i style="background: var(--color-black)"></i><b>black</b><code>#000000</code></div>
+          <div class="sw"><i style="background: var(--color-sand)"></i><b>sand</b><code>#F3F3F1</code></div>
+          <div class="sw"><i style="background: var(--color-stone)"></i><b>stone</b><code>#E7E6E2</code></div>
+          <div class="sw"><i style="background: var(--color-lavender)"></i><b>lavender</b><code>#C9B3F9</code></div>
+          <div class="sw"><i style="background: var(--color-mint)"></i><b>mint</b><code>#CDE6D8</code></div>
+          <div class="sw"><i style="background: var(--color-lime)"></i><b>lime</b><code>#CCD602 · on black</code></div>
+        </div>
+
+        <h2 style="font-size: 1.5rem; margin: 2.25rem 0 1.5rem">Status — not brand colours</h2>
+        <div class="row">
+          <span class="tone" style="background: var(--tone-critical-soft); color: var(--tone-critical-ink)"><i style="background: var(--tone-critical)"></i>Critical</span>
+          <span class="tone" style="background: var(--tone-warn-soft); color: var(--tone-warn-ink)"><i style="background: var(--tone-warn); border-radius: 3px"></i>Needs work</span>
+          <span class="tone" style="background: var(--tone-good-soft); color: var(--tone-good-ink)"><i style="background: var(--tone-good); border-radius: 50%"></i>Good</span>
+          <span class="tone" style="background: var(--tone-neutral-soft); color: var(--tone-neutral-ink)"><i style="background: var(--tone-neutral)"></i>Not measured</span>
+        </div>
+        <p class="mono" style="margin-top: 0.75rem">Colour + word + mark shape — so the status survives greyscale and colour blindness.</p>
+      </section>
+
+      <section>
+        <p class="eyebrow">Typography</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">Inter 600, one serif accent word</h2>
+        <div class="scale">
+          <p style="font-size: 3.25rem; line-height: 1.06; letter-spacing: -0.03em; font-family: var(--font-display); font-weight: 600">Agence <em class="accent-serif">marketing</em> 360 <span class="mono" style="letter-spacing: 0">5xl 52</span></p>
+          <p style="font-size: 2.5rem; line-height: 1.1; letter-spacing: -0.025em; font-family: var(--font-display); font-weight: 600">Display heading <span class="mono" style="letter-spacing: 0">4xl 40</span></p>
+          <p style="font-size: 1.875rem; line-height: 1.18; letter-spacing: -0.02em; font-family: var(--font-display); font-weight: 600">Section title <span class="mono" style="letter-spacing: 0">3xl 30</span></p>
+          <p style="font-size: 1.25rem; line-height: 1.35; font-family: var(--font-display); font-weight: 600">Subsection <span class="mono">xl 20</span></p>
+          <p style="font-size: 0.9375rem; color: var(--color-ink-secondary)">Body copy sits at 15px with a 1.6 line height, in ink-secondary. <span class="mono">md 15</span></p>
+          <p style="font-size: 0.8125rem; color: var(--color-ink-secondary)">Dense tables drop to 13px. <span class="mono">sm 13</span></p>
+          <p class="eyebrow" style="margin-top: 1rem">Eyebrow · no dashes</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Components</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">10px rectangles, never pills</h2>
+        <div class="row">
+          <button class="btn btn--primary">Primary action</button>
+          <button class="btn btn--secondary">Secondary</button>
+          <button class="btn btn--dark">Dark</button>
+          <button class="btn btn--ghost">Ghost</button>
+          <button class="btn btn--danger">Delete</button>
+        </div>
+        <div class="row" style="margin-top: 1.25rem">
+          <input class="field" placeholder="you@company.com" />
+          <a href="#" style="color: var(--color-primary-press); font-weight: 600">Rencontrer l'agence →</a>
+        </div>
+        <div class="row" style="margin-top: 1.25rem">
+          <span class="chip"><span>+</span>Création de site Web</span>
+          <span class="chip"><span>+</span>Publicité Web</span>
+          <span class="chip"><span>+</span>Hébergement</span>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Bands</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">Full width, for the big moments</h2>
+        <div class="band" style="background: var(--color-black); border-bottom-left-radius: var(--radius-signature)">
+          <img src="assets/logo/affichez-logo-white.svg" alt="Affichez" style="height: 26px" />
+          <p style="color: #fff; font-weight: 600; font-size: 1.125rem; margin: 1.25rem 0 0">
+            Site Web <span style="color: var(--color-lime)">+</span> Référencement
+            <span style="color: var(--color-lime)">+</span> Publicité
+          </p>
+        </div>
+        <div class="band" style="background: var(--color-lavender); margin-top: 1rem">
+          <h3 style="font-size: 1.875rem; letter-spacing: -0.02em">Découvertes <em class="accent-serif">détaillées</em></h3>
+        </div>
+        <div class="band" style="background: var(--color-primary); margin-top: 1rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem">
+          <div>
+            <img src="assets/logo/affichez-logo-white.svg" alt="Affichez" style="height: 28px" />
+            <p style="color: #fff; font-weight: 600; margin: 0.75rem 0 0">Imaginer · Réaliser · Propulser</p>
+          </div>
+          <p style="color: #fff; font-size: 0.75rem; margin: 0">Type on orange is white.</p>
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Assets</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">Logo and icons</h2>
+        <div class="row" style="gap: 2rem; align-items: flex-end">
+          <img src="assets/logo/affichez-logo.svg" alt="Wordmark, orange" style="height: 30px" />
+          <img src="assets/logo/affichez-mark.svg" alt="Mark" style="height: 30px" />
+          <img src="assets/icons/icon.svg" alt="App icon" style="height: 44px" />
+          <img src="assets/icons/apple-icon-180.png" alt="iOS icon" style="height: 44px" />
+          <img src="assets/icons/favicon-32.png" alt="Favicon 32" style="height: 32px; image-rendering: pixelated" />
+        </div>
+        <div class="band" style="background: var(--color-black); margin-top: 1.25rem; padding: 1.5rem 2rem">
+          <img src="assets/logo/affichez-logo-white.svg" alt="Wordmark, white" style="height: 30px" />
+        </div>
+      </section>
+
+      <section>
+        <p class="eyebrow">Contrast</p>
+        <h2 style="font-size: 1.5rem; margin-bottom: 1.5rem">What is safe where</h2>
+        <table>
+          <thead><tr><th>Pair</th><th>Ratio</th><th>Verdict</th></tr></thead>
+          <tbody>
+            <tr><td>#F5570E on white</td><td>3.4:1</td><td>Fills, icons, large type only</td></tr>
+            <tr><td>#C4460B on white</td><td>5.0:1</td><td>Orange text — use this</td></tr>
+            <tr><td>White on #F5570E</td><td>3.4:1</td><td>Everything on orange (brand decision)</td></tr>
+            <tr><td>Black on lavender / mint / sand / stone</td><td>10:1+</td><td>Always fine</td></tr>
+            <tr><td>#C4460B on lavender</td><td>2.7:1</td><td>Fails — accents turn ink on bands</td></tr>
+            <tr><td>Lime on black</td><td>13:1</td><td>Fine. Lime on white is invisible</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section style="padding-bottom: 4rem">
+        <p class="mono">
+          Affichez branding kit · extracted from affichez.ca 2026-09-11 · see
+          <code>brand-guide.md</code>
+        </p>
+      </section>
+    </div>
+  </body>
+</html>

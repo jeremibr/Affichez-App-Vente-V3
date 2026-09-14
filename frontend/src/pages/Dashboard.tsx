@@ -11,6 +11,7 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 
 interface DashboardKPIs {
     ytd_total: number;
@@ -66,11 +67,7 @@ export default function Dashboard() {
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? 'Tous' : (authRepName ?? 'Tous'));
-
-    const repParam = isAdmin
-        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
-        : (authRepName ?? null);
+    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_DEFAULT));
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -82,7 +79,53 @@ export default function Dashboard() {
     const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    /**
+     * Every rep who quoted anything this year, read WITHOUT a rep filter.
+     *
+     * It used to be scraped out of the leaderboard this page had just loaded.
+     * That was harmless only while the leaderboard ignored the rep filter; now
+     * that it honours it, the scrape would feed the filter its own output —
+     * pick "Interne", the leaderboard comes back holding only internal names,
+     * allReps then equals the internal group, and the next render computes
+     * allReps-minus-team = the same set for a different reason. One unfiltered
+     * read per year keeps the two apart.
+     */
     const [allReps, setAllReps] = useState<string[]>([]);
+
+    /**
+     * The rep filter. See useRepFilter — the dropdown lists the current sales
+     * team by name plus two groups, and everyone else (former staff, internal
+     * billing) sits behind "Interne" instead of adding 20 rows nobody scrolls.
+     *
+     * THE BUG this replaced: 'Tous' and 'Vente Interne' BOTH resolved to
+     * repParam = null, so the two sent an identical query and switching between
+     * them changed nothing. repParam was also the effect dependency, so the page
+     * did not even refetch.
+     *
+     * p_rep and p_reps are both sent because they do different jobs: p_rep
+     * filters rows AND selects that rep's own objective from rep_objectives,
+     * while p_reps filters rows only and leaves the team objective in place. A
+     * group has no single target, so a group sends p_rep = null.
+     */
+    const repFilter = useRepFilter(selectedRep, allReps);
+    const repParam = isAdmin ? repFilter.rep : (authRepName ?? null);
+    // Only an admin gets the groups; a rep is pinned to their own name, where
+    // p_rep already does the right thing and a list would add nothing.
+    const repsParam = isAdmin ? repFilter.reps : null;
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        let cancelled = false;
+        (async () => {
+            const { data } = await supabase.rpc('get_rep_leaderboard', { p_year: year });
+            if (cancelled || !data) return;
+            const names = (data as LeaderboardEntry[]).map(r => r.rep_name).filter(Boolean);
+            // 'Vente interne' is dropped by excluded_reps, so it never comes back
+            // here — but it is a real biller and belongs in the Interne group.
+            setAllReps([...new Set([...names, 'Vente interne'])].sort());
+        })();
+        return () => { cancelled = true; };
+    }, [year, isAdmin]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -100,13 +143,13 @@ export default function Dashboard() {
             { data: clientData },
             { data: leaderData }
         ] = await Promise.all([
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam }),
-            supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam }),
-            supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam })
+            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setGrandTotalData(grandData || []);
@@ -129,12 +172,8 @@ export default function Dashboard() {
         baseLeader.sort((a, b) => Number(b.total_amount) - Number(a.total_amount));
         baseLeader.forEach((r, i) => { r.rank = i + 1; });
         setLeaderboard(baseLeader);
-        if (isAdmin && baseLeader.length > 0) {
-            setAllReps(baseLeader.filter(r => r.rep_name !== 'Vente Interne').map(r => r.rep_name).sort());
-        }
         setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam]);
+    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam, repsParam]);
 
     // Always keep a current reference so the Realtime callback never goes stale
     const fetchDataRef = useRef(fetchData);
@@ -156,11 +195,7 @@ export default function Dashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [
-        { value: 'Tous', label: "Toute l'équipe" },
-        { value: 'Vente Interne', label: 'Vente Interne' },
-        ...allReps.map(r => ({ value: r, label: r })),
-    ], [allReps]);
+    const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
     return (

@@ -1,0 +1,323 @@
+/* =============================================================================
+   Affichez brand — Tailwind CSS 4 theme + base + component helpers
+   Load AFTER `tokens.css`, which defines every value this file exposes.
+
+   In a Tailwind 4 app your entry stylesheet becomes:
+
+     @import "tailwindcss";
+     @import "./branding/tokens/tokens.css";
+     @import "./branding/tokens/tailwind-v4.css";
+
+   Tailwind 3 or a non-Tailwind app: skip this file, use `tokens.css` and read
+   §3-§5 of brand-guide.md for the type scale and the helper classes.
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   Type scale — one modular ramp, rem against a 16px root. Every size in the
+   product comes from it; never inline a px size. Each step carries its own
+   line-height and tracking, so changing a size never needs companion classes.
+
+   2xs/xs: eyebrows, table furniture, legal lines.
+   sm (13px) dense tables · md (15px) prose — these are the two body sizes.
+   xl and up are headings and get tightened tracking.
+   -------------------------------------------------------------------------- */
+@theme {
+  --text-2xs: 0.6875rem; /* 11px */
+  --text-2xs--line-height: 1.45;
+  --text-2xs--letter-spacing: 0.02em;
+
+  --text-xs: 0.75rem; /* 12px */
+  --text-xs--line-height: 1.5;
+
+  --text-sm: 0.8125rem; /* 13px */
+  --text-sm--line-height: 1.55;
+
+  --text-base: 0.875rem; /* 14px */
+  --text-base--line-height: 1.6;
+
+  --text-md: 0.9375rem; /* 15px — body */
+  --text-md--line-height: 1.6;
+
+  --text-lg: 1.0625rem; /* 17px */
+  --text-lg--line-height: 1.5;
+
+  --text-xl: 1.25rem; /* 20px */
+  --text-xl--line-height: 1.35;
+  --text-xl--letter-spacing: -0.01em;
+
+  --text-2xl: 1.5rem; /* 24px */
+  --text-2xl--line-height: 1.25;
+  --text-2xl--letter-spacing: -0.015em;
+
+  --text-3xl: 1.875rem; /* 30px */
+  --text-3xl--line-height: 1.18;
+  --text-3xl--letter-spacing: -0.02em;
+
+  --text-4xl: 2.5rem; /* 40px */
+  --text-4xl--line-height: 1.1;
+  --text-4xl--letter-spacing: -0.025em;
+
+  --text-5xl: 3.25rem; /* 52px */
+  --text-5xl--line-height: 1.06;
+  --text-5xl--letter-spacing: -0.03em;
+
+  --text-6xl: 4.75rem; /* 76px — one hero figure per app, at most */
+  --text-6xl--line-height: 0.92;
+  --text-6xl--letter-spacing: -0.035em;
+
+  --tracking-eyebrow: 0.12em;
+  --tracking-label: 0.08em;
+}
+
+/* -----------------------------------------------------------------------------
+   Brand colours, radii, fonts and shadows as Tailwind utilities, so components
+   write `bg-primary`, `text-lime`, `bg-lavender`, `rounded-md` — never
+   `bg-[color:var(--color-…)]` and never a hex.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--color-canvas);
+  --color-foreground: var(--color-ink);
+  --color-border: var(--color-hairline);
+  --color-ring: var(--color-ring);
+
+  /* Action orange */
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-press: var(--color-primary-press);
+  --color-primary-deep: var(--color-primary-deep);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-primary-subdued: var(--color-primary-subdued);
+  --color-primary-wash: var(--color-primary-wash);
+
+  /* Identity + text */
+  --color-ink: var(--color-ink);
+  --color-ink-secondary: var(--color-ink-secondary);
+  --color-ink-mute: var(--color-ink-mute);
+
+  /* Section bands */
+  --color-sand: var(--color-sand);
+  --color-stone: var(--color-stone);
+  --color-lavender: var(--color-lavender);
+  --color-lavender-soft: var(--color-lavender-soft);
+  --color-mint: var(--color-mint);
+  --color-mint-soft: var(--color-mint-soft);
+  --color-lime: var(--color-lime);
+  --color-amber: var(--color-amber);
+
+  /* Surfaces + rules */
+  --color-canvas: var(--color-canvas);
+  --color-canvas-soft: var(--color-canvas-soft);
+  --color-hairline: var(--color-hairline);
+  --color-hairline-strong: var(--color-hairline-strong);
+
+  /* Status, as `text-danger`, `bg-tone-good-soft`, … */
+  --color-danger: var(--color-danger);
+  --color-success: var(--color-success);
+  --color-tone-critical: var(--tone-critical);
+  --color-tone-critical-ink: var(--tone-critical-ink);
+  --color-tone-critical-soft: var(--tone-critical-soft);
+  --color-tone-warn: var(--tone-warn);
+  --color-tone-warn-ink: var(--tone-warn-ink);
+  --color-tone-warn-soft: var(--tone-warn-soft);
+  --color-tone-good: var(--tone-good);
+  --color-tone-good-ink: var(--tone-good-ink);
+  --color-tone-good-soft: var(--tone-good-soft);
+  --color-tone-neutral: var(--tone-neutral);
+  --color-tone-neutral-ink: var(--tone-neutral-ink);
+  --color-tone-neutral-soft: var(--tone-neutral-soft);
+
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --font-accent: var(--font-accent);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-3xl: var(--radius-3xl);
+  --radius-signature: var(--radius-signature);
+  --radius-full: var(--radius-pill);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-elevated: var(--shadow-2);
+  --shadow-float: var(--shadow-3);
+
+  --ease-brand: var(--ease-out);
+}
+
+/* -----------------------------------------------------------------------------
+   Base layer
+   Headings live HERE, in @layer base, so a utility on an element always wins.
+   Declared unlayered, a base `h2 { font-size: 2rem }` silently beats
+   `class="text-xl"`, which is the bug that makes people reach for
+   `role="heading"` on a <p>.
+   -------------------------------------------------------------------------- */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-hairline);
+  }
+
+  /* The 16px root is what makes the rem scale mean what it says. Never set a
+     rem font-size on <html> — it resolves against <html>'s own size, so the
+     whole scale rebases. The body owns the base size. */
+  html {
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    height: 100%;
+    background: var(--color-canvas);
+    color: var(--color-ink);
+  }
+
+  body {
+    font-family: var(--font-body);
+    font-weight: 400;
+    font-size: var(--text-md);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Tailwind 4's preflight sets buttons to `cursor: default`. In an app,
+     buttons and menu items should read as clickable, the way links do. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="menuitem"],
+  [role="option"],
+  select:not(:disabled),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+
+  /* The affichez.ca heading voice: Inter 600 — never 700, even at 55px —
+     black, sentence case. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  h1 {
+    font-size: var(--text-4xl);
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+  }
+
+  h2 {
+    font-size: var(--text-2xl);
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: var(--text-xl);
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-size: var(--text-md);
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px var(--color-canvas) inset !important;
+    -webkit-text-fill-color: var(--color-ink) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  ::selection {
+    background-color: rgba(245, 87, 14, 0.18);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /* Honour the OS setting: motion becomes instant, never removed outright —
+     elements must still arrive at their final state. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Component helpers
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* The site's small uppercase kicker above a title ("ILS NOUS FONT
+     CONFIANCE"). No dashes around it — that framing belonged to the retired
+     brand. On a dark band, recolour with a utility (`text-white/70`). */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-ink);
+  }
+
+  /* Small-caps furniture: column headers, field labels, legal lines. */
+  .label-caps {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-eyebrow);
+    color: var(--color-ink-mute);
+  }
+
+  /* The brand's accent word — ONE word of a display heading, in Inria Serif
+     italic ("Agence *marketing* 360"). Only the 400 italic face is loaded, so
+     the weight is pinned and synthesis is off: a 600 heading must never
+     fake-bold the serif. Rendered by <Accented> from `*marked*` copy. */
+  .accent-serif {
+    font-family: var(--font-accent);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: 0;
+    font-synthesis: none;
+  }
+
+  /* Tabular figures — numeric cells, money, anything that should line up. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}

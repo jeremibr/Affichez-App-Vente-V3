@@ -1,0 +1,146 @@
+/* =============================================================================
+   Affichez brand tokens — 2026
+   Extracted from the live affichez.ca on 2026-09-11 (Elementor kit globals +
+   downloaded assets + computed styles of the rendered page).
+
+   Framework-agnostic: plain CSS custom properties on :root. Drop this file in,
+   import it once, and reference the variables. A Tailwind 4 project should ALSO
+   load `tailwind-v4.css`, which turns these into utilities.
+
+   Two fonts must be provided by the host app (see brand-guide.md §3):
+     --font-inter        Inter (variable, latin)
+     --font-inria-serif  Inria Serif 400 italic
+   Both have a fallback stack below, so the file is safe to use before the
+   fonts are wired up.
+   ============================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------------
+     Brand — action orange
+     Orange means ACTION: the logo, primary buttons, links, active states, the
+     focus ring. It never marks severity or status.
+     ------------------------------------------------------------------------ */
+  --color-primary: #f5570e; /* the Affichez orange */
+  --color-primary-hover: #ff712f; /* the site's own button hover */
+  --color-primary-deep: #d94c0c; /* pressed fill */
+  --color-primary-press: #c4460b; /* orange as TEXT on white — 5:1 (AA) */
+  --color-primary-soft: #ff712f; /* orange on dark surfaces */
+  --color-primary-subdued: #fde3d6; /* pale orange — selected tint, soft tags */
+  --color-primary-wash: #fef3ed; /* faintest orange — large tinted blocks */
+  --color-on-primary: #ffffff; /* type on an orange fill is WHITE */
+
+  /* ---------------------------------------------------------------------------
+     Brand — identity black
+     ------------------------------------------------------------------------ */
+  --color-black: #000000; /* full-width dark bands */
+  --color-ink: #000000; /* headings and primary text */
+  --color-ink-secondary: #3d3d3b; /* body copy */
+  --color-ink-mute: #6b6b68; /* captions — AA on white AND on sand */
+
+  /* ---------------------------------------------------------------------------
+     Brand — the site's section bands
+     Used full-width to mark a big moment. Most of a page stays white.
+     ------------------------------------------------------------------------ */
+  --color-sand: #f3f3f1; /* warm off-white — hero/services band, page ground */
+  --color-stone: #e7e6e2; /* warm grey — news band, hairline rules */
+  --color-lavender: #c9b3f9; /* stats band */
+  --color-lavender-soft: #efe8fe;
+  --color-mint: #cde6d8; /* testimonials band */
+  --color-mint-soft: #ebf5ef;
+  --color-lime: #ccd602; /* the "+" between services — ONLY on black */
+  --color-amber: #e38800; /* the site's secondary orange */
+  --color-star: #ffab40; /* rating stars */
+
+  /* ---------------------------------------------------------------------------
+     Surfaces
+     ------------------------------------------------------------------------ */
+  --color-canvas: #ffffff; /* default page / card background */
+  --color-canvas-soft: #f3f3f1; /* = sand — app chrome, page ground */
+  --color-white: #ffffff;
+
+  /* ---------------------------------------------------------------------------
+     Hairlines and focus
+     ------------------------------------------------------------------------ */
+  --color-hairline: #e7e6e2; /* = stone — warm light rule */
+  --color-hairline-strong: #d4d3ce; /* emphasised rule */
+  --color-hairline-input: #dddddd; /* the site's own form-field border */
+  --color-ring: rgba(245, 87, 14, 0.35); /* orange focus ring */
+
+  /* ---------------------------------------------------------------------------
+     Status colours — deliberately NOT brand colours
+     Critical is crimson and "needs work" is amber so a status never reads like
+     a call to action. Every status must also carry a WORD, not colour alone.
+     ------------------------------------------------------------------------ */
+  --color-danger: #d0263f;
+  --color-danger-ink: #b01e34; /* danger as TEXT on white (AA) */
+  --color-danger-soft: #fce9ec;
+  --color-warning: #e38800;
+  --color-warning-ink: #9a5b00; /* amber as TEXT on white (AA) */
+  --color-warning-soft: #fdf0dc;
+  --color-success: #157347;
+  --color-success-ink: #10603b;
+  --color-success-soft: #e6f3ec;
+
+  /* Tone aliases — pick a TONE in components, never a hex. */
+  --tone-critical: var(--color-danger);
+  --tone-critical-ink: var(--color-danger-ink);
+  --tone-critical-soft: var(--color-danger-soft);
+  --tone-warn: var(--color-warning);
+  --tone-warn-ink: var(--color-warning-ink);
+  --tone-warn-soft: var(--color-warning-soft);
+  --tone-good: var(--color-success);
+  --tone-good-ink: var(--color-success-ink);
+  --tone-good-soft: var(--color-success-soft);
+  --tone-neutral: var(--color-hairline-strong);
+  --tone-neutral-ink: var(--color-ink-mute);
+  --tone-neutral-soft: var(--color-canvas-soft);
+
+  /* ---------------------------------------------------------------------------
+     Typography
+     Inter everywhere; Inria Serif italic ONLY for the one accent word a
+     display heading carries.
+     ------------------------------------------------------------------------ */
+  --font-display:
+    var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body:
+    var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-accent: var(--font-inria-serif), Georgia, "Times New Roman", serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --tracking-eyebrow: 0.12em;
+  --tracking-label: 0.08em;
+
+  /* ---------------------------------------------------------------------------
+     Radii
+     10px is the brand's control radius — every button and field on
+     affichez.ca. Controls are rectangles, never pills.
+     ------------------------------------------------------------------------ */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px; /* buttons, inputs, toggles, tabs */
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 32px; /* photos and feature panels */
+  --radius-signature: 8.4375rem; /* 135px — the site's one sweeping corner */
+  --radius-pill: 9999px; /* chips, tags, avatars, status badges ONLY */
+
+  /* ---------------------------------------------------------------------------
+     Elevation — quiet and neutral. The site itself is flat (colour bands, not
+     cards), so shadows never carry a tint.
+     ------------------------------------------------------------------------ */
+  --shadow-1: rgba(0, 0, 0, 0.06) 0px 1px 3px;
+  --shadow-2: rgba(0, 0, 0, 0.08) 0px 8px 24px, rgba(0, 0, 0, 0.04) 0px 2px 6px;
+  --shadow-3:
+    rgba(0, 0, 0, 0.1) 0px 24px 48px -12px, rgba(0, 0, 0, 0.05) 0px 4px 12px;
+  --shadow-card:
+    rgba(0, 0, 0, 0.05) 0px 1px 3px, 0px 0px 0px 1px var(--color-hairline);
+  --shadow-edge: 0px 0px 0px 1px var(--color-hairline);
+
+  /* ---------------------------------------------------------------------------
+     Motion
+     ------------------------------------------------------------------------ */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+}

@@ -909,19 +909,44 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                     </div>
                 )}
 
+                {/*
+                  * The figures are held back until the fetch lands, and carry
+                  * translate="no".
+                  *
+                  * Both are needed for the same reason. Chrome Translate is on
+                  * for these users; it replaces a text node with its own and
+                  * then stops tracking it, so a node that rendered "0,00 $"
+                  * during the load kept showing "$0.00" after the real total
+                  * arrived — reopening the modal looked like it "fixed" the
+                  * number because that built a fresh node. Not rendering a
+                  * placeholder number means there is nothing wrong to freeze;
+                  * translate="no" means it is never swapped in the first place.
+                  */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-3">
                     <span className="text-sm text-slate-500" translate="no">
-                        {`${invoiceCount} facture${invoiceCount > 1 ? 's' : ''}`}
-                        {creditCount > 0 && ` · ${creditCount} avoir${creditCount > 1 ? 's' : ''}`}
+                        {loading ? '' : (
+                            <>
+                                {`${invoiceCount} facture${invoiceCount > 1 ? 's' : ''}`}
+                                {creditCount > 0 && ` · ${creditCount} avoir${creditCount > 1 ? 's' : ''}`}
+                            </>
+                        )}
                     </span>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                         <ExportButton
                             rows={invoices} columns={INVOICE_CSV}
                             filename={`factures_${(account.account_name ?? 'compte').replace(/[^\w-]+/g, '_').slice(0, 40)}`}
                             disabled={invoices.length === 0}
                         />
-                        <span className="text-sm font-semibold text-brand-dark">
-                            Total net <span className="tabular-nums text-base">{formatCurrencyCAD(net)}</span>
+                        {/* Label small and muted, amount large and dark — at the
+                          * same weight and size the two ran together. */}
+                        <span className="flex items-baseline gap-2" translate="no">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                Total net
+                            </span>
+                            <span className={cn('text-lg font-bold tabular-nums',
+                                net < 0 ? 'text-rose-600' : 'text-brand-dark')}>
+                                {loading ? '—' : formatCurrencyCAD(net)}
+                            </span>
                         </span>
                     </div>
                 </div>

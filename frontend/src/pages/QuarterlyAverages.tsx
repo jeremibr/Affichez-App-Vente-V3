@@ -19,10 +19,11 @@ const YOY_CSV: CsvColumn<YoYRow>[] = [
 import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 
 export default function QuarterlyAverages() {
     const [year, setYear] = useUrlStateNumber('year', 2026);
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    const [selectedRep, setSelectedRep] = useUrlState('rep', REP_DEFAULT);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
@@ -89,7 +90,10 @@ export default function QuarterlyAverages() {
     }, [fetchAverages]);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Toute l\'équipe' }, ...uniqueReps.map(r => ({ value: r, label: r }))], [uniqueReps]);
+    // Groups first, then the current sales team by name. Former staff and
+    // internal billing live behind "Interne" rather than as 20 more rows.
+    const repFilter = useRepFilter(selectedRep, uniqueReps);
+    const repOptions = repFilter.options;
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
@@ -133,14 +137,14 @@ export default function QuarterlyAverages() {
                     {[1, 2, 3, 4].map((q) => {
                         const dataForQuarter = groupedYoyData
                             .filter(d => d.quarter === q)
-                            .filter(d => selectedRep === 'Tous' || d.rep_name === selectedRep);
+                            .filter(d => repFilter.matches(d.rep_name));
                         return (
                             <QuarterBlock
                                 key={`q${q}`}
                                 quarter={q}
                                 data={dataForQuarter}
                                 currentYear={year}
-                                previousTotalOverride={selectedRep === 'Tous' ? previousTotalByQuarter.get(q) : undefined}
+                                previousTotalOverride={selectedRep === REP_DEFAULT ? previousTotalByQuarter.get(q) : undefined}
                             />
                         );
                     })}
