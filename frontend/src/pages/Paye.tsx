@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
-import { supabase } from '../lib/supabase';
+import { cachedRpc } from '../lib/rpcCache';
 import {
     Loader2,
     TrendingUp, Users, Wallet, Pencil, Check, X,
@@ -179,7 +179,7 @@ export default function Paye() {
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const { data } = await supabase.rpc('get_inv_rep_leaderboard', {
+        const { data } = await cachedRpc('get_inv_rep_leaderboard', {
             p_year: year,
             p_office: officeParam,
             p_status: null,

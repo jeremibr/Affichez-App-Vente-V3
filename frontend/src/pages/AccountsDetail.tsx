@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import {
     Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight,
     ChevronsLeft, ChevronsRight, X,
@@ -244,7 +245,7 @@ export default function AccountsDetail() {
     const fetchInvoiceTotals = useCallback(async (pageRows: ZohoAccountRow[], id: number) => {
         const ids = pageRows.map(r => r.zoho_account_id).filter(Boolean);
         if (ids.length === 0) { setInvoiceTotals({}); return; }
-        const { data } = await supabase.rpc('get_account_invoice_totals', { p_account_ids: ids });
+        const { data } = await cachedRpc('get_account_invoice_totals', { p_account_ids: ids });
         if (!data || id !== requestId.current) return;
         const byAccount: Record<string, LeadInvoiceTotals> = {};
         for (const row of data as LeadInvoiceTotals[]) byAccount[row.account_id] = row;
@@ -283,14 +284,12 @@ export default function AccountsDetail() {
     }, [buildQuery, page, fetchInvoiceTotals, setPage]);
 
     const fetchOptions = useCallback(async () => {
-        const { data } = await supabase
-            .rpc('get_zoho_account_filter_options', {
+        const { data } = await cachedRpc<ZohoAccountFilterOptions>('get_zoho_account_filter_options', {
                 p_year: year === 'Toutes' ? null : year,
                 // null = every rating, so the dropdowns still offer a source or a
                 // rep carried only by internal accounts when that filter is on.
                 p_exclude_ratings: null,
-            })
-            .single<ZohoAccountFilterOptions>();
+            }, { single: true });
         if (data) { setOptions(data); setServiceVariants(data.service_variants ?? {}); }
     }, [year]);
 
@@ -340,7 +339,10 @@ export default function AccountsDetail() {
                         label={total > 0 ? `Exporter ${total.toLocaleString('fr-CA')} comptes` : 'Exporter CSV'}
                     />
                     <button
-                        onClick={() => fetchDataRef.current()}
+                        // The whole point of this button is to bypass the
+                        // cache; without the drop it would replay the same
+                        // answer and look broken.
+                        onClick={() => { invalidateRpcCache(); fetchDataRef.current(); }}
                         className="btn btn-xs btn-quiet"
                     >
                         <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
@@ -699,9 +701,9 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
         (async () => {
             setLoading(true);
             const [{ data: inv }, { data: dept }, { data: cts }] = await Promise.all([
-                supabase.rpc('get_account_invoices', { p_account_id: account.zoho_account_id }),
-                supabase.rpc('get_account_revenue_by_department', { p_account_id: account.zoho_account_id }),
-                supabase.rpc('get_account_contacts', { p_account_id: account.zoho_account_id }),
+                cachedRpc('get_account_invoices', { p_account_id: account.zoho_account_id }),
+                cachedRpc('get_account_revenue_by_department', { p_account_id: account.zoho_account_id }),
+                cachedRpc('get_account_contacts', { p_account_id: account.zoho_account_id }),
             ]);
             if (cancelled) return;
             setInvoices((inv as LeadInvoiceRow[]) ?? []);

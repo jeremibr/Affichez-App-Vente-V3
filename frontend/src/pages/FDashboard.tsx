@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, Unlink } from 'lucide-react';
 import type { SommaireRow, InvoiceUnassignedSummary, UnassignedInvoiceRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
@@ -114,7 +115,7 @@ export default function FDashboard() {
         if (!isAdmin) return;
         let cancelled = false;
         (async () => {
-            const { data } = await supabase.rpc('get_inv_rep_leaderboard', { p_year: year });
+            const { data } = await cachedRpc('get_inv_rep_leaderboard', { p_year: year });
             if (cancelled || !data) return;
             const names = (data as LeaderboardEntry[])
                 .map(r => r.rep_name).filter(Boolean);
@@ -147,15 +148,15 @@ export default function FDashboard() {
             { data: leaderData },
             { data: unassignedData }
         ] = await Promise.all([
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
             // No status filter: an invoice is unattributed regardless of whether it is paid.
-            supabase.rpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
+            cachedRpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setUnassigned((unassignedData as InvoiceUnassignedSummary[])?.[0] ?? null);
@@ -329,7 +330,7 @@ export default function FDashboard() {
         const sub = supabase.channel('inv-db-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
                 clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 3000);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 3000);
             })
             .subscribe();
         return () => { clearTimeout(timer); supabase.removeChannel(sub); };
@@ -658,7 +659,7 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const { data } = await supabase.rpc('get_unassigned_invoices', {
+            const { data } = await cachedRpc('get_unassigned_invoices', {
                 p_year: year, p_office: office, p_month: month,
                 p_dept: dept, p_rep: rep, p_limit: 500,
             });

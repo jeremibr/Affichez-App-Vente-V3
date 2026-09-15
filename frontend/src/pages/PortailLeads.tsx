@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Percent, DollarSign } from 'lucide-react';
 import type { ZohoLeadKPIs, ZohoLeadsMonthlyRow, ZohoLeadFilterOptions } from '../types/database';
 import { MONTHS } from '../lib/constants';
@@ -49,8 +50,8 @@ export default function PortailLeads({ propRepName }: Props) {
             { data: kpiData },
             { data: monthData },
         ] = await Promise.all([
-            supabase.rpc('get_zoho_lead_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
-            supabase.rpc('get_zoho_leads_monthly_summary', { p_year: year, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
+            cachedRpc('get_zoho_lead_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
+            cachedRpc('get_zoho_leads_monthly_summary', { p_year: year, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
         ]);
 
         setKpis((kpiData as ZohoLeadKPIs[])?.[0] ?? null);
@@ -59,12 +60,11 @@ export default function PortailLeads({ propRepName }: Props) {
     }, [year, selectedMonth, selectedSource, selectedService, repParam]);
 
     const fetchOptions = useCallback(async () => {
-        const { data } = await supabase
+        const { data } = await cachedRpc<ZohoLeadFilterOptions>(
             // Lead-only, to match get_zoho_lead_kpis and the monthly summary above —
             // a source that only contacts carry would otherwise be offered here and
             // empty the whole portal.
-            .rpc('get_zoho_lead_filter_options', { p_year: year, p_stage: 'lead' })
-            .single<ZohoLeadFilterOptions>();
+            'get_zoho_lead_filter_options', { p_year: year, p_stage: 'lead' }, { single: true });
         if (data) setOptions(data);
     }, [year]);
 
@@ -85,7 +85,7 @@ export default function PortailLeads({ propRepName }: Props) {
             .channel(`portail-leads-${repName}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_leads' }, () => {
                 if (timer) clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 1500);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 1500);
             })
             .subscribe();
         return () => {

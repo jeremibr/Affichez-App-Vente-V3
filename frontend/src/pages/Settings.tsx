@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import {
     Target, History, Save, RefreshCcw,
     AlertCircle, CheckCircle2, Calendar, ChevronRight,
@@ -266,7 +267,7 @@ function LinkageCard() {
     const [lastRun, setLastRun] = useState<string | null>(null);
 
     const fetchStatus = async () => {
-        const { data } = await supabase.rpc('get_invoice_linkage_status').single();
+        const { data } = await cachedRpc('get_invoice_linkage_status', undefined, { single: true });
         setStatus((data as InvoiceLinkageStatus) ?? null);
     };
 
@@ -296,6 +297,9 @@ function LinkageCard() {
                     `${(data.orgs ?? []).reduce((n: number, o: { linked: number }) => n + o.linked, 0)} li\u00e9s, ` +
                     `${data.remaining ?? 0} restant`,
                 );
+                // The sync just wrote rows; the linkage figures it reports
+                // are exactly what changed.
+                invalidateRpcCache();
                 await fetchStatus();
             }
         } catch (err) {
@@ -595,7 +599,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
     const [zohoUsersError, setZohoUsersError] = useState(false);
 
     useEffect(() => {
-        supabase.rpc('get_distinct_rep_names').then(({ data }) => {
+        cachedRpc('get_distinct_rep_names').then(({ data }) => {
             if (data) setRepOptions((data as { rep_name: string }[]).map(r => r.rep_name));
         });
         setZohoUsersLoading(true);
@@ -877,7 +881,7 @@ function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'succe
         if (!value.trim() || value.trim().length < 2) { setSearchResults([]); setShowDropdown(false); return; }
         const timer = setTimeout(async () => {
             setSearching(true);
-            const { data } = await supabase.rpc('search_clients', { p_query: value.trim(), p_limit: 20 });
+            const { data } = await cachedRpc('search_clients', { p_query: value.trim(), p_limit: 20 });
             setSearchResults((data || []).map((r: { client_name: string }) => r.client_name));
             setShowDropdown(true);
             setSearching(false);

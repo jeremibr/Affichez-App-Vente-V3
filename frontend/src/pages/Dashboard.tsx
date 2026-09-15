@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
@@ -117,7 +118,7 @@ export default function Dashboard() {
         if (!isAdmin) return;
         let cancelled = false;
         (async () => {
-            const { data } = await supabase.rpc('get_rep_leaderboard', { p_year: year });
+            const { data } = await cachedRpc('get_rep_leaderboard', { p_year: year });
             if (cancelled || !data) return;
             const names = (data as LeaderboardEntry[]).map(r => r.rep_name).filter(Boolean);
             // 'Vente interne' is dropped by excluded_reps, so it never comes back
@@ -143,13 +144,13 @@ export default function Dashboard() {
             { data: clientData },
             { data: leaderData }
         ] = await Promise.all([
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            supabase.rpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
+            cachedRpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setGrandTotalData(grandData || []);
@@ -186,7 +187,7 @@ export default function Dashboard() {
     useEffect(() => {
         const sub = supabase
             .channel('db-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchDataRef.current())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => { invalidateRpcCache(); fetchDataRef.current(); })
             .subscribe();
         return () => { supabase.removeChannel(sub); };
     }, []);

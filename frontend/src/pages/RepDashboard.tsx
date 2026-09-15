@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { cachedRpc } from '../lib/rpcCache';
 import {
     Loader2, TrendingUp, Target, Briefcase, FileText,
     ClipboardList, User, ChevronDown, X,
@@ -205,7 +205,7 @@ export default function RepDashboard() {
     // Load rep list once
     const loadReps = useCallback(async () => {
         if (repsLoadedRef.current) return;
-        const { data } = await supabase.rpc('get_inv_rep_leaderboard', {
+        const { data } = await cachedRpc('get_inv_rep_leaderboard', {
             p_year: 2026, p_office: null, p_status: null,
             p_month: null, p_dept: null, p_rep: null,
         });
@@ -232,9 +232,9 @@ export default function RepDashboard() {
             { data: prevGrandData },
             { data: kpiData },
         ] = await Promise.all([
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
         ]);
         setDevisGrandTotal(grandData || []);
         setDevisPrevGrandTotal(prevGrandData || []);
@@ -252,10 +252,10 @@ export default function RepDashboard() {
             { data: kpiData },
             { data: clientData },
         ] = await Promise.all([
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_inv_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
-            supabase.rpc('get_inv_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: monthParam, p_dept: null, p_rep: repParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_inv_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: monthParam, p_dept: null, p_rep: repParam }),
+            cachedRpc('get_inv_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: monthParam, p_dept: null, p_rep: repParam }),
         ]);
         setInvGrandTotal(grandData || []);
         setInvPrevGrandTotal(prevGrandData || []);

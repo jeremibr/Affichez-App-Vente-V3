@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useUrlStateNumber } from '../hooks/useUrlState';
 import { Target, Loader2, FileText, User, BarChart2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { cachedRpc } from '../lib/rpcCache';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useAdminView } from '../contexts/AdminViewContext';
@@ -99,11 +100,11 @@ export default function PortailObjectifs({ propRepName }: Props) {
                 .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
             supabase.from('rep_objectives_dept').select('month, department, target_amount')
                 .eq('rep_name', repName).eq('year', year).eq('module', 'factures'),
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
-            supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: year }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repName }),
+            cachedRpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: year }),
             // Previous year actuals
-            supabase.rpc('get_inv_sommaire_grand_total', { p_year: prevYear, p_office: null, p_status: null, p_rep: repName }),
-            supabase.rpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: prevYear }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: prevYear, p_office: null, p_status: null, p_rep: repName }),
+            cachedRpc('get_rep_dept_actuals_factures', { p_rep: repName, p_year: prevYear }),
         ]);
 
         const objMap: Record<number, number> = {};

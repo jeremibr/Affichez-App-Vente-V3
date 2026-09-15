@@ -13,6 +13,7 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { useRepList } from '../hooks/useRepList';
 import { Select } from './Select';
 import { Logo } from './Logo';
+import { prefetchRoute } from '../lib/prefetch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,11 @@ function SubItems({ items, open }: { items: NavItem[]; open: boolean }) {
                                 key={item.href}
                                 to={item.href}
                                 end={item.end}
+                                // The screen's chunk and its first query start
+                                // loading while the pointer is still travelling.
+                                onMouseEnter={() => prefetchRoute(item.href)}
+                                onFocus={() => prefetchRoute(item.href)}
+                                onTouchStart={() => prefetchRoute(item.href)}
                                 className={({ isActive }) => cn(
                                     "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all",
                                     isActive

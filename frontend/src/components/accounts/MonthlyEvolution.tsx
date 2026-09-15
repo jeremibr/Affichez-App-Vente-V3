@@ -48,13 +48,6 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                 prevRpa,
                 // Null rather than 0 when there is no prior month to compare
                 // against: "no data" and "flat" are different answers.
-                //
-                // Both the dollar gap and the percentage are kept. A percentage
-                // on its own is unreadable at these volumes — "+240 %" is a good
-                // month or a rounding artefact on two accounts, and the column
-                // gave you no way to tell which. Same shape as the VS column on
-                // the Devis and Factures dashboards.
-                deltaAmount: prevRpa > 0 ? curRpa - prevRpa : null,
                 delta: prevRpa > 0 ? ((curRpa - prevRpa) / prevRpa) * 100 : null,
             };
         });
@@ -184,15 +177,25 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                                 <td className="py-1.5 px-2 text-right tabular-nums text-ink-mute">{d.invoiced}</td>
                                 <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">{formatCurrencyCAD(d.amount)}</td>
                                 <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-ink text-xs">{formatCurrencyCAD(d.rpa)}</td>
+                                {/* Last year's revenue per account, with this
+                                  * year's change under it. The top line is
+                                  * deliberately the 2025 VALUE and not the
+                                  * gap — the percentage already says how far
+                                  * apart the two are, so printing the
+                                  * difference as well said the same thing
+                                  * twice and left the number being compared
+                                  * against nowhere on the row. Neutral ink,
+                                  * because it is a reference figure rather
+                                  * than a result; only the change is
+                                  * coloured. */}
                                 {hasPrevious && (
                                     <td className="py-1.5 pl-2 text-right tabular-nums">
-                                        {d.delta === null || d.deltaAmount === null ? (
+                                        {d.delta === null ? (
                                             <span className="text-ink-faint text-xs">—</span>
                                         ) : (
                                             <div className="flex flex-col items-end gap-0.5 leading-tight">
-                                                <span className={cn('text-xs font-semibold whitespace-nowrap',
-                                                    d.deltaAmount >= 0 ? 'text-tone-good-ink' : 'text-tone-critical')}>
-                                                    {d.deltaAmount >= 0 ? '+' : ''}{formatCurrencyCAD(d.deltaAmount)}
+                                                <span className="text-xs font-semibold whitespace-nowrap text-ink-mute">
+                                                    {formatCurrencyCAD(d.prevRpa)}
                                                 </span>
                                                 <span className={cn('text-2xs font-bold',
                                                     d.delta >= 0 ? 'text-tone-good' : 'text-tone-critical')}>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Percent, DollarSign } from 'lucide-react';
 import type {
     ZohoLeadKPIs, ZohoLeadBreakdownRow, ZohoLeadFilterOptions,
@@ -57,19 +58,19 @@ export default function LeadsDashboard() {
             { data: srcData },
             { data: svcData },
         ] = await Promise.all([
-            supabase.rpc('get_zoho_lead_kpis', {
+            cachedRpc('get_zoho_lead_kpis', {
                 p_year: yearParamValue, p_month: monthParam, p_rep: repParam,
                 p_source: sourceParam, p_service: serviceParam,
             }),
-            supabase.rpc('get_zoho_leads_by_rep', {
+            cachedRpc('get_zoho_leads_by_rep', {
                 p_year: yearParamValue, p_month: monthParam,
                 p_source: sourceParam, p_service: serviceParam,
             }),
-            supabase.rpc('get_zoho_leads_by_source', {
+            cachedRpc('get_zoho_leads_by_source', {
                 p_year: yearParamValue, p_month: monthParam,
                 p_rep: repParam, p_service: serviceParam,
             }),
-            supabase.rpc('get_zoho_leads_by_service', {
+            cachedRpc('get_zoho_leads_by_service', {
                 p_year: yearParamValue, p_month: monthParam,
                 p_rep: repParam, p_source: sourceParam,
             }),
@@ -83,13 +84,12 @@ export default function LeadsDashboard() {
     }, [yearParamValue, selectedMonth, selectedRep, selectedSource, selectedService]);
 
     const fetchOptions = useCallback(async () => {
-        const { data } = await supabase
+        const { data } = await cachedRpc<ZohoLeadFilterOptions>(
             // p_stage: 'lead' because every figure on this page counts leads only.
             // Without it the dropdowns were built from leads AND contacts, so a rep
             // or source carried solely by contacts could be picked and returned an
             // all-zero dashboard — which reads as broken data, not an empty filter.
-            .rpc('get_zoho_lead_filter_options', { p_year: yearParamValue, p_stage: 'lead' })
-            .single<ZohoLeadFilterOptions>();
+            'get_zoho_lead_filter_options', { p_year: yearParamValue, p_stage: 'lead' }, { single: true });
         if (data) setOptions(data);
     }, [yearParamValue]);
 
@@ -110,7 +110,7 @@ export default function LeadsDashboard() {
             .channel('leads-dashboard-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_leads' }, () => {
                 if (timer) clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 1500);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 1500);
             })
             .subscribe();
         return () => {

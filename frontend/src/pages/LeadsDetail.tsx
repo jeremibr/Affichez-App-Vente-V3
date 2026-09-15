@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight, FileText, X } from 'lucide-react';
 import type {
     ZohoLeadRow, ZohoLeadFilterOptions, LeadInvoiceRow, LeadInvoiceTotals,
@@ -153,7 +154,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
 
         const ids = [...new Set(pageRows.map(r => r.account_id).filter((id): id is string => !!id))];
         if (ids.length === 0) { setInvoiceTotals({}); return; }
-        const { data, error } = await supabase.rpc('get_lead_invoice_totals', { p_account_ids: ids });
+        const { data, error } = await cachedRpc('get_lead_invoice_totals', { p_account_ids: ids });
         if (isStale()) return;
         if (error || !data) { setInvoiceTotals({}); return; }
         const byAccount: Record<string, LeadInvoiceTotals> = {};
@@ -227,11 +228,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
      * de-duplicating here would have needed all ~29k of them.
      */
     const fetchOptions = useCallback(async () => {
-        const { data, error } = await supabase
+        const { data, error } = await cachedRpc<ZohoLeadFilterOptions>(
             // p_stage stays null here, unlike the dashboard: this table really does
             // list both modules, so its dropdowns should cover both.
-            .rpc('get_zoho_lead_filter_options', { p_year: year === 'Toutes' ? null : year, p_stage: null })
-            .single<ZohoLeadFilterOptions>();
+            'get_zoho_lead_filter_options', { p_year: year === 'Toutes' ? null : year, p_stage: null }, { single: true });
         if (error || !data) return;
         setAllSources(data.sources ?? []);
         setAllServices(data.services ?? []);
@@ -253,7 +253,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
             .channel('zoho-leads-detail-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_leads' }, () => {
                 if (timer) clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 1500);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 1500);
             })
             .subscribe();
         return () => {
@@ -402,7 +402,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                     </p>
                 </div>
                 <button
-                    onClick={() => { fetchData(); fetchOptions(); }}
+                    onClick={() => { invalidateRpcCache(); fetchData(); fetchOptions(); }}
                     className="btn btn-sm btn-secondary"
                 >
                     <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
@@ -686,7 +686,7 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const { data } = await supabase.rpc('get_lead_invoices', { p_account_id: lead.account_id });
+            const { data } = await cachedRpc('get_lead_invoices', { p_account_id: lead.account_id });
             if (cancelled) return;
             setRows((data as LeadInvoiceRow[]) ?? []);
             setLoading(false);

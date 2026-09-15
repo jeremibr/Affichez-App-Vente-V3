@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { invalidateRpcCache } from '../lib/rpcCache';
 
 interface AuthContextType {
     user: User | null;
@@ -87,7 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => { supabase.removeChannel(channel); };
     }, [user, resolvePerms]);
 
-    const signOut = async () => { await supabase.auth.signOut(); };
+    // Cached rows were read under the previous session's permissions. They
+    // must not survive into the next one, even on the same machine.
+    const signOut = async () => { invalidateRpcCache(); await supabase.auth.signOut(); };
 
     return (
         <AuthContext.Provider value={{ user, loading, signOut, ...perms }}>

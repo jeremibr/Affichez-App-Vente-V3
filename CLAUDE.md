@@ -43,10 +43,78 @@ The app throws at startup if either variable is missing (see `src/lib/supabase.t
 
 ### Data Layer
 All data flows through `src/lib/supabase.ts` (the singleton Supabase client). Pages call either:
-- `supabase.rpc('function_name', params)` — for analytics (KPIs, summaries, leaderboards, YoY)
-- `supabase.from('table').select(...)` — for CRUD in Settings (reps, objectives, quarters, webhook_log)
+- **`cachedRpc('function_name', params)`** from `src/lib/rpcCache.ts` — for analytics (KPIs, summaries, leaderboards, YoY). **Not `supabase.rpc` directly**; see Performance below.
+- `supabase.from('table').select(...)` — for CRUD in Settings (reps, objectives, quarters, webhook_log). Deliberately uncached: a stale row after a write is a bug, not a saving.
 
 There is no service layer abstraction; Supabase calls are made directly inside page components using `useCallback`-wrapped async functions. Real-time subscriptions (Supabase Realtime) are set up in `useEffect` and cleaned up on unmount.
+
+### Performance: four rules that are easy to undo by accident
+
+Measured 2026-09-15. The Comptes RPCs averaged 1.2–2.7 s each and the page fires
+seven of them; `get_tasks_weekly` averaged 2.6 s. None of it was data volume —
+the largest table is 62k rows. After the fixes below the same queries run in
+15–90 ms. Each rule is one line away from being reverted, and reverting it
+fails silently.
+
+**1. A `LANGUAGE sql` helper must not carry `SET search_path`.** Postgres
+refuses to inline a SQL function whose `pg_proc.proconfig` is non-NULL, and an
+un-inlined function is a `Function Scan`: the caller's predicates and indexes
+cannot reach the table, so the whole table is read every time. That single
+clause on `zoho_accounts_scoped` was costing 3× on every Comptes screen.
+
+`SET search_path` protects SECURITY **DEFINER** functions, which run as their
+owner. These are SECURITY INVOKER — they already run with the caller's
+privileges, so a poisoned search_path gains the caller nothing. The bodies are
+schema-qualified anyway. Keep the SET clause on SECURITY DEFINER functions
+(`tasks_visible_reps`, `refresh_zoho_service_labels`); never add it back to the
+invoker helpers. A guard query:
+
+```sql
+SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public' AND p.proconfig IS NOT NULL AND p.prosecdef = false
+  AND p.proname LIKE 'zoho_%';   -- must return zero rows
+```
+
+**2. Filter dates with a RANGE, never `EXTRACT(... FROM col)`.** Wrapping the
+column in a function makes the predicate unservable by any btree index on it.
+`EXTRACT(YEAR FROM created_time AT TIME ZONE 'America/Toronto') = p_year` is
+exactly `created_time >= make_timestamptz(p_year,1,1,0,0,0,'America/Toronto')
+AND created_time < make_timestamptz(p_year+1,…)`, and only the second form uses
+`zoho_accounts_created_idx`. Same for ISO years on `zoho_tasks`: ISO year Y is
+`[date_trunc('week', make_date(Y,1,4)), date_trunc('week', make_date(Y+1,1,4)))`.
+
+**3. `zoho_service_labels` is a MATERIALIZED view.** As a plain view it
+seq-scanned `zoho_leads`, `zoho_accounts` and `invoices` — 30,208 rows sorted —
+to produce **15**, at 354 ms a call, and four RPCs join it. `cron.schedule`
+refreshes it every 10 minutes (`refresh-zoho-service-labels-10m`). The cost is
+staleness: a service Zoho has never billed or quoted before shows its raw
+spelling and is missing from the Service filter until the next refresh. If you
+add a sync that can introduce a new service, call
+`public.refresh_zoho_service_labels()` at the end of it.
+
+**4. A refetch must invalidate the cache first.** `cachedRpc` holds results for
+60 s (10 min for filter options and week lists) and de-duplicates in-flight
+requests, which is what makes navigation instant — a round trip between two
+dashboards issues **zero** network requests. It also means a Realtime handler
+that calls `fetchData()` without `invalidateRpcCache()` is answered out of the
+entry the event says is stale, and the page looks refreshed while showing old
+numbers. Every Realtime handler, every "Actualiser" button, the post-sync status
+read in Settings and `signOut` already call it — keep it that way when adding
+more. `cachedRpc` deliberately never serves stale data: past the TTL it waits
+for the real answer, because a revenue total that silently changes a second
+after someone reads it is worse than one that took a second to arrive.
+
+**Routes are lazy** (`React.lazy` in `App.tsx`), so first paint carries a 147 kB
+gzip core plus a 2–8 kB screen instead of one 216 kB bundle. `src/lib/prefetch.ts`
+warms both the chunk and the screen's first query on nav-link hover, so add new
+routes to `ROUTE_CHUNKS` there when you add them to `App.tsx`.
+
+**Where the time actually goes.** Per-request overhead to Supabase is ~25 ms
+from Montreal and dominates the query itself for the fast screens —
+`get_dashboard_kpis` runs in 0.6 ms. So *the number of requests matters more
+than the cost of each*, which is why the cache and the prefetch are worth more
+than further SQL tuning. The project is in **us-east-1**; anyone measuring from
+elsewhere will see a much larger fixed cost that the Quebec users do not.
 
 ### Zoho Sync (Supabase Edge Functions)
 

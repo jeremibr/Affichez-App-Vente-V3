@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { formatCurrencyCAD } from '../lib/utils';
 import { Loader2, Calendar, TrendingUp, Briefcase, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { AvailableWeek, ZoneA_SummaryRow, ZoneA_DeptTotal, InvDetailRow } from '../types/database';
@@ -42,7 +43,7 @@ export default function FWeeklyDetail() {
 
     const fetchAvailableWeeks = useCallback(async (showLoader = true) => {
         if (showLoader) setLoading(true);
-        const { data } = await supabase.rpc('get_inv_available_weeks', {
+        const { data } = await cachedRpc('get_inv_available_weeks', {
             p_year: new Date().getFullYear(),
             p_office: null,
             p_status: null,
@@ -62,7 +63,7 @@ export default function FWeeklyDetail() {
         if (showLoader) setLoading(true);
         const [{ data: sData }, { data: lData }] = await Promise.all([
             supabase.from('v_inv_weekly_summary').select('*').eq('week_start', weekStart),
-            supabase.rpc('get_inv_weekly_detail', { p_week_start: weekStart, p_office: null, p_status: null, p_rep: null })
+            cachedRpc('get_inv_weekly_detail', { p_week_start: weekStart, p_office: null, p_status: null, p_rep: null })
         ]);
         setSummaryData(sData || []);
         setLineItems(lData || []);
@@ -74,6 +75,7 @@ export default function FWeeklyDetail() {
     useEffect(() => {
         const channel = supabase.channel('inv-weekly')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+                invalidateRpcCache();
                 fetchAvailableWeeks(false);
                 if (selectedWeek) fetchWeekData(selectedWeek, false);
             }).subscribe();

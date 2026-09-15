@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, Building2, Percent, DollarSign, Timer } from 'lucide-react';
 import type {
     ZohoAccountKPIs, ZohoAccountBreakdownRow, ZohoAccountFilterOptions,
@@ -156,21 +157,21 @@ export default function AccountsDashboard() {
             { data: monData },
             { data: monPrevData },
         ] = await Promise.all([
-            supabase.rpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_source: source, p_service: service }),
+            cachedRpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_source: source, p_service: service }),
             // by_rep keeps p_reps (so a group narrows the list to its members)
             // but never p_rep — picking one rep must not reduce their own
             // breakdown to a single bar with nothing to compare it against.
-            supabase.rpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_source: source, p_service: service }),
-            supabase.rpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps,       p_service: service }),
-            supabase.rpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_reps: reps, p_source: source }),
-            supabase.rpc('get_zoho_accounts_by_domaine',{
+            cachedRpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_source: source, p_service: service }),
+            cachedRpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps,       p_service: service }),
+            cachedRpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_reps: reps, p_source: source }),
+            cachedRpc('get_zoho_accounts_by_domaine',{
                 p_year: shared.p_year, p_month: shared.p_month,
                 p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
                 p_region: shared.p_region,
                 p_rep: rep, p_reps: reps, p_source: source, p_service: service,
             }),
-            supabase.rpc('get_zoho_accounts_monthly_summary', { ...monthlyArgs, p_year: yearParamValue }),
-            supabase.rpc('get_zoho_accounts_monthly_summary', {
+            cachedRpc('get_zoho_accounts_monthly_summary', { ...monthlyArgs, p_year: yearParamValue }),
+            cachedRpc('get_zoho_accounts_monthly_summary', {
                 ...monthlyArgs,
                 p_year: yearParamValue === null ? null : yearParamValue - 1,
             }),
@@ -188,12 +189,10 @@ export default function AccountsDashboard() {
         selectedDomaine, selectedRegion, windowMonths, excludeRatings]);
 
     const fetchOptions = useCallback(async () => {
-        const { data } = await supabase
-            .rpc('get_zoho_account_filter_options', {
+        const { data } = await cachedRpc<ZohoAccountFilterOptions>('get_zoho_account_filter_options', {
                 p_year: yearParamValue,
                 p_exclude_ratings: excludeRatings,
-            })
-            .single<ZohoAccountFilterOptions>();
+            }, { single: true });
         if (data) setOptions(data);
     }, [yearParamValue, excludeRatings]);
 
@@ -216,7 +215,7 @@ export default function AccountsDashboard() {
             .channel('accounts-dashboard-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_accounts' }, () => {
                 if (timer) clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 1500);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 1500);
             })
             .subscribe();
         return () => {

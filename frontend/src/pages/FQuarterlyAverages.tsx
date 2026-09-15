@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow, QuarterTotalsRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
@@ -71,10 +72,10 @@ export default function FQuarterlyAverages() {
         setLoading(true);
         const p_office = selectedOffice === 'Toutes' ? null : selectedOffice;
         const [{ data, error }, totalsRes] = await Promise.all([
-            supabase.rpc('get_inv_quarterly_yoy', { p_year: year, p_office, p_status: null, p_rep: repParam }),
+            cachedRpc('get_inv_quarterly_yoy', { p_year: year, p_office, p_status: null, p_rep: repParam }),
             // True whole-team totals only matter for the admin "Tous" view.
             isAdmin
-                ? supabase.rpc('get_inv_quarterly_yoy_totals', { p_year: year, p_office, p_status: null })
+                ? cachedRpc('get_inv_quarterly_yoy_totals', { p_year: year, p_office, p_status: null })
                 : Promise.resolve({ data: [] as QuarterTotalsRow[], error: null }),
         ]);
         if (error) console.error('Error fetching invoice quarterly averages:', error);
@@ -93,7 +94,7 @@ export default function FQuarterlyAverages() {
     useEffect(() => {
         fetchAverages();
         const channel = supabase.channel('inv-quarterly')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => fetchAverages())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => { invalidateRpcCache(); fetchAverages(); })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [fetchAverages]);

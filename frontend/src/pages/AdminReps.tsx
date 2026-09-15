@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { cachedRpc } from '../lib/rpcCache';
 import { Loader2, ClipboardList, FileText, Wallet, User, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -96,7 +96,7 @@ export default function AdminReps() {
     // Load rep list once from the leaderboard RPC
     const loadReps = useCallback(async () => {
         setLoadingReps(true);
-        const { data } = await supabase.rpc('get_inv_rep_leaderboard', {
+        const { data } = await cachedRpc('get_inv_rep_leaderboard', {
             p_year: 2026, p_office: null, p_status: null,
             p_month: null, p_dept: null, p_rep: null,
         });

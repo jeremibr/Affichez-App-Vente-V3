@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import {
     Loader2, TrendingUp, Target, Briefcase, ClipboardList,
     User, X, ChevronRight,
@@ -60,10 +61,10 @@ export default function PortailDevis({ propRepName }: Props) {
             { data: kpiData },
             { data: clientData },
         ] = await Promise.all([
-            supabase.rpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
-            supabase.rpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: null, p_dept: null, p_rep: repParam }),
-            supabase.rpc('get_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: null, p_dept: null, p_rep: repParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year - 1, p_office: null, p_status: null, p_rep: repParam }),
+            cachedRpc('get_dashboard_kpis', { p_year: year, p_office: null, p_status: null, p_month: null, p_dept: null, p_rep: repParam }),
+            cachedRpc('get_top_clients', { p_year: year, p_office: null, p_status: null, p_limit: 20, p_month: null, p_dept: null, p_rep: repParam }),
         ]);
         setGrandTotal(grandData || []);
         setPrevGrandTotal(prevGrandData || []);
@@ -80,7 +81,7 @@ export default function PortailDevis({ propRepName }: Props) {
         const sub = supabase.channel(`portail-devis-${repName}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
                 clearTimeout(timer);
-                timer = setTimeout(() => fetchDataRef.current(), 2000);
+                timer = setTimeout(() => { invalidateRpcCache(); fetchDataRef.current(); }, 2000);
             }).subscribe();
         return () => { clearTimeout(timer); supabase.removeChannel(sub); };
     }, [repName]);

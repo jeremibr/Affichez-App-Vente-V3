@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
-import { supabase } from '../lib/supabase';
+import { cachedRpc } from '../lib/rpcCache';
 import { Loader2, X, FileSignature } from 'lucide-react';
 import type {
     CreatorSummaryRow, CreatorDetailRow, QuoteCreatorLinkStatus,
@@ -67,10 +67,10 @@ export default function Createurs() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         const [{ data }, { data: st }] = await Promise.all([
-            supabase.rpc('get_creator_summary', {
+            cachedRpc('get_creator_summary', {
                 p_year: yearParamValue, p_month: monthParamValue, p_office: officeParamValue,
             }),
-            supabase.rpc('get_quote_creator_link_status'),
+            cachedRpc('get_quote_creator_link_status'),
         ]);
         // PostgREST can hand a NUMERIC back as a string. Everything downstream
         // then still LOOKS right — formatCurrencyCAD coerces, and so does the
@@ -390,7 +390,7 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
         let cancelled = false;
         (async () => {
             setLoading(true);
-            const { data } = await supabase.rpc('get_creator_detail', {
+            const { data } = await cachedRpc('get_creator_detail', {
                 p_creator: creator.creator,
                 p_year: year,
                 p_month: month,

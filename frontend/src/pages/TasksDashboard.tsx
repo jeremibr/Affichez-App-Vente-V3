@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import {
     Loader2, FilePlus2, CheckCircle2, Percent, Activity, Inbox, AlertTriangle,
     TrendingUp, TrendingDown, Minus, ChevronLeft, ChevronRight,
@@ -85,7 +86,7 @@ export default function TasksDashboard() {
 
     // Available weeks for the week switcher (newest-first)
     const fetchWeeks = useCallback(async () => {
-        const { data } = await supabase.rpc('get_tasks_available_weeks', { p_year: new Date().getFullYear() });
+        const { data } = await cachedRpc('get_tasks_available_weeks', { p_year: new Date().getFullYear() });
         const weeks: TasksAvailableWeek[] = data || [];
         setAvailableWeeks(weeks);
         if (weeks.length > 0 && !weeks.find(w => w.week_start === selectedWeek)) {
@@ -108,11 +109,11 @@ export default function TasksDashboard() {
             { data: weeklyData },
             { data: wowData },
         ] = await Promise.all([
-            supabase.rpc('get_tasks_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_week_start: weekParam }),
-            supabase.rpc('get_tasks_by_rep', { p_year: year, p_month: monthParam, p_week_start: weekParam }),
-            supabase.rpc('get_tasks_by_status', { p_rep: repParam }),
-            supabase.rpc('get_tasks_weekly', { p_year: year, p_rep: repParam }),
-            supabase.rpc('get_tasks_wow', { p_rep: repParam }),
+            cachedRpc('get_tasks_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_week_start: weekParam }),
+            cachedRpc('get_tasks_by_rep', { p_year: year, p_month: monthParam, p_week_start: weekParam }),
+            cachedRpc('get_tasks_by_status', { p_rep: repParam }),
+            cachedRpc('get_tasks_weekly', { p_year: year, p_rep: repParam }),
+            cachedRpc('get_tasks_wow', { p_rep: repParam }),
         ]);
 
         setKpis(kpiData?.[0] ?? null);
@@ -133,6 +134,7 @@ export default function TasksDashboard() {
         const sub = supabase
             .channel('tasks-dashboard-changes')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'zoho_tasks' }, () => {
+                invalidateRpcCache();
                 fetchWeeksRef.current();
                 fetchDataRef.current();
             })

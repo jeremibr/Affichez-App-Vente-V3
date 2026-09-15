@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
+import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow, QuarterTotalsRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
@@ -63,8 +64,8 @@ export default function QuarterlyAverages() {
         setLoading(true);
         const p_office = selectedOffice === 'Toutes' ? null : selectedOffice;
         const [{ data, error }, { data: totalsData, error: totalsError }] = await Promise.all([
-            supabase.rpc('get_quarterly_yoy', { p_year: year, p_office, p_status: null }),
-            supabase.rpc('get_quarterly_yoy_totals', { p_year: year, p_office, p_status: null }),
+            cachedRpc('get_quarterly_yoy', { p_year: year, p_office, p_status: null }),
+            cachedRpc('get_quarterly_yoy_totals', { p_year: year, p_office, p_status: null }),
         ]);
         if (error) console.error("Error fetching quarterly averages:", error);
         else setYoyData(data || []);
@@ -84,7 +85,7 @@ export default function QuarterlyAverages() {
     useEffect(() => {
         fetchAverages();
         const channel = supabase.channel('quarterly-sales')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => fetchAverages())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => { invalidateRpcCache(); fetchAverages(); })
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [fetchAverages]);

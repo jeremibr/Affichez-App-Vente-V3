@@ -1,36 +1,52 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminViewProvider } from './contexts/AdminViewContext';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import WeeklyDetail from './pages/WeeklyDetail';
-import QuarterlyAverages from './pages/QuarterlyAverages';
-import SettingsPage from './pages/Settings';
+
 import Login from './pages/Login';
-import FDashboard from './pages/FDashboard';
-import FWeeklyDetail from './pages/FWeeklyDetail';
-import FQuarterlyAverages from './pages/FQuarterlyAverages';
-import AdminReps from './pages/AdminReps';
-import Paye from './pages/Paye';
-import PayeRepSettings from './pages/PayeRepSettings';
-import PortailDevis from './pages/PortailDevis';
-import PortailFactures from './pages/PortailFactures';
-import PortailPaye from './pages/PortailPaye';
-import PortailObjectifs from './pages/PortailObjectifs';
-import PortailParametres from './pages/PortailParametres';
-import ObjectifsEquipe from './pages/ObjectifsEquipe';
+
 // Leads module — hidden from the UI while the Comptes module replaces it.
 // The pages and every get_zoho_lead* RPC behind them are left intact: the
 // account view is the same data at a different grain, and until it is trusted
 // this is the only way back to a number someone has already quoted.
 // import LeadsDashboard from './pages/LeadsDashboard';
 // import LeadsDetail from './pages/LeadsDetail';
-import AccountsDashboard from './pages/AccountsDashboard';
-import AccountsDetail from './pages/AccountsDetail';
-import Createurs from './pages/Createurs';
-import PortailLeads from './pages/PortailLeads';
-import TasksDashboard from './pages/TasksDashboard';
+
+/**
+ * Every screen is its own chunk.
+ *
+ * The app used to ship as a single 820 KB bundle, so a rep opening their own
+ * portal first downloaded Settings, both payroll screens and every admin page
+ * — none of which they can even reach. Now the first paint carries the shell
+ * and the one route being visited.
+ *
+ * Layout imports these same modules for its hover prefetch (see
+ * src/lib/prefetch.ts), and Vite gives both importers the same chunk, so
+ * hovering a nav link downloads the screen before the click lands.
+ */
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const WeeklyDetail = lazy(() => import('./pages/WeeklyDetail'));
+const QuarterlyAverages = lazy(() => import('./pages/QuarterlyAverages'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const FDashboard = lazy(() => import('./pages/FDashboard'));
+const FWeeklyDetail = lazy(() => import('./pages/FWeeklyDetail'));
+const FQuarterlyAverages = lazy(() => import('./pages/FQuarterlyAverages'));
+const AdminReps = lazy(() => import('./pages/AdminReps'));
+const Paye = lazy(() => import('./pages/Paye'));
+const PayeRepSettings = lazy(() => import('./pages/PayeRepSettings'));
+const PortailDevis = lazy(() => import('./pages/PortailDevis'));
+const PortailFactures = lazy(() => import('./pages/PortailFactures'));
+const PortailPaye = lazy(() => import('./pages/PortailPaye'));
+const PortailObjectifs = lazy(() => import('./pages/PortailObjectifs'));
+const PortailParametres = lazy(() => import('./pages/PortailParametres'));
+const ObjectifsEquipe = lazy(() => import('./pages/ObjectifsEquipe'));
+const AccountsDashboard = lazy(() => import('./pages/AccountsDashboard'));
+const AccountsDetail = lazy(() => import('./pages/AccountsDetail'));
+const Createurs = lazy(() => import('./pages/Createurs'));
+const PortailLeads = lazy(() => import('./pages/PortailLeads'));
+const TasksDashboard = lazy(() => import('./pages/TasksDashboard'));
 
 function AppRoutes() {
     const { user, loading, canAccessFactures, isAdmin } = useAuth();
@@ -48,6 +64,7 @@ function AppRoutes() {
     }
 
     return (
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
             <Route path="/" element={<Layout />}>
                 {/* ─── Devis module — accessible to all authenticated users ─── */}
@@ -102,6 +119,15 @@ function AppRoutes() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
+    );
+}
+
+function RouteFallback() {
+    return (
+        <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-press" />
+        </div>
     );
 }
 
