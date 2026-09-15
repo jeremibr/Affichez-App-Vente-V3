@@ -422,6 +422,43 @@ them for anything categorical: module identity, department badges, payroll
 columns. Never use a `--tone-*` for a category or a `--color-data-*` for a
 status.
 
+### Rep names always carry a face
+
+Anywhere a rep name is shown — filter dropdowns, leaderboards, tables, pickers,
+the View switcher, the signed-in user row — it goes through `RepAvatar` /
+`RepName` (`src/components/RepAvatar.tsx`). Never render a bare `{rep_name}`.
+
+`src/lib/reps.ts` resolves a name to one of four things, in order:
+
+| | when |
+|---|---|
+| the portrait | one of the nine in `public/reps/` |
+| a group glyph | "Tous les reps", "Interne" — a label standing for several people |
+| a building glyph | "Vente interne", "Magasin Affichez", "Zoho Books" — not a person |
+| initials on a stable colour | everyone else |
+
+**The nine portraits are the whole View list**, so every name a filter offers has
+a real face. The ~60 other names in the data — former staff, CRM task owners,
+invoice creators — reach only the initials branch. That is deliberate: a single
+stock silhouette repeated sixty times removes the one thing an avatar is for,
+which is telling rows apart at a glance.
+
+The initials colour comes from `dataToneIndex` in `src/lib/dataTone.ts`, the
+same hash `TagCell` uses for service and source badges — one implementation, so
+a rep without a photo is the same colour on every screen.
+
+**It is a snapshot and it does not sync.** A rep added to `allowed_users`
+appears in every dropdown immediately and silently falls back to initials. To
+add a face: put the portrait in `assets/reps-source/` (outside `frontend/`, so
+Vite neither serves nor bundles it), run `scratchpad/build_rep_photos.py` to cut
+it square at 128x128, and add the name to `PHOTO_BY_NAME`. Do not serve the
+768x768 originals — the whole nine-photo set is 23 KB at 128 and 574 KB at 768,
+for something drawn between 20px and 48px.
+
+Avatars are **not** lazy-loaded, on purpose: nine files totalling 23 KB are all
+in cache after the first screen, and `loading="lazy"` only bought a visible
+pop-in every time a dropdown opened.
+
 ### Component Patterns
 
 Pages are self-contained — state, data fetching, filters, and rendering are colocated. Feature-specific sub-components live in `src/components/{feature}/` (e.g., `weekly/ZoneAPivotTable`, `dashboard/SommaireTable`).

@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!u?.email) { setPerms(DEFAULT_PERMS); return; }
 
         // Always read live from allowed_users so role/permission changes take effect
-        // on the user's next page load — no need to log out + back in.
+        // on the user's next page load - no need to log out + back in.
         const { data } = await supabase
             .from('allowed_users')
             .select('role, can_access_factures, rep_name')

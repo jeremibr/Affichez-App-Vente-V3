@@ -17,14 +17,15 @@ import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import type { CsvColumn } from '../lib/csv';
+import { RepAvatar } from '../components/RepAvatar';
 
 /**
- * Comptes — tableau de bord.
+ * Comptes - tableau de bord.
  *
  * Reads Zoho CRM's Accounts module, which is the grain Dominic actually works
  * in: "c'est des comptes, les contacts je m'en fous, tout est basé sur le
  * compte" (2026-09-04). A company with three contacts is ONE account, so its
- * revenue is counted once with no dedupe layer — that was the hardest part of
+ * revenue is counted once with no dedupe layer - that was the hardest part of
  * the leads dashboard and it simply does not arise here.
  *
  * Two things on this page do not exist on the leads one, and both come straight
@@ -44,7 +45,7 @@ import type { CsvColumn } from '../lib/csv';
 /** Excluded by default. Both are Affichez's own entities, not clients: LUMEN
  *  (Hydro-Québec) alone carries six figures on an internal rating and would
  *  otherwise sit at the top of every list. The Statut filter switches them back
- *  on — the data layer keeps every account. */
+ *  on - the data layer keeps every account. */
 const DEFAULT_EXCLUDED_RATINGS = ['Compte interne : Ne pas reprendre', 'Fournisseur'];
 
 const WINDOW_OPTIONS = [
@@ -94,7 +95,7 @@ export default function AccountsDashboard() {
     /**
      * Back to the default view in one navigation: 2026, twelve-month window,
      * clients only, no other filter. Setting `year` to its default drops the
-     * param and the rest ride along as companions — nine separate calls would
+     * param and the rest ride along as companions - nine separate calls would
      * leave eight params behind.
      *
      * The year and the window are reset too, deliberately: they are part of what
@@ -159,7 +160,7 @@ export default function AccountsDashboard() {
         ] = await Promise.all([
             cachedRpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_source: source, p_service: service }),
             // by_rep keeps p_reps (so a group narrows the list to its members)
-            // but never p_rep — picking one rep must not reduce their own
+            // but never p_rep - picking one rep must not reduce their own
             // breakdown to a single bar with nothing to compare it against.
             cachedRpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_source: source, p_service: service }),
             cachedRpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps,       p_service: service }),
@@ -199,8 +200,8 @@ export default function AccountsDashboard() {
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
     // Both effects set state: fetchData flips `loading` before awaiting, and
-    // fetchOptions writes in the awaited continuation. Neither cascades — the
-    // write happens after a round trip, not during the render pass — and this is
+    // fetchOptions writes in the awaited continuation. Neither cascades - the
+    // write happens after a round trip, not during the render pass - and this is
     // the same shape every other dashboard in the app uses.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -244,7 +245,7 @@ export default function AccountsDashboard() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
-                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Comptes — Tableau de bord</h1>
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Comptes · Tableau de bord</h1>
                 <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                     Comptes clients du CRM, et ce qu&rsquo;ils ont facturé après leur arrivée
                 </p>
@@ -311,7 +312,7 @@ export default function AccountsDashboard() {
                             value={(kpis?.accounts_created ?? 0).toLocaleString('fr-CA')}
                             subText="Nouveaux comptes sur la période"
                             icon={Building2}
-                            hint="Comptes créés dans Zoho CRM sur la période choisie, comptés sur le calendrier de Montréal. Un compte = une entreprise, peu importe le nombre de contacts qu'il porte. Par défaut les comptes internes d'Affichez et les fournisseurs sont exclus — changez « Statut » pour les inclure."
+                            hint="Comptes créés dans Zoho CRM sur la période choisie, comptés sur le calendrier de Montréal. Un compte = une entreprise, peu importe le nombre de contacts qu'il porte. Par défaut les comptes internes d'Affichez et les fournisseurs sont exclus : changez « Statut » pour les inclure."
                         />
                         <KPICard
                             title="Comptes facturés"
@@ -344,7 +345,7 @@ export default function AccountsDashboard() {
                     {/* The Royer & Fils / VotreLogo.ca note that used to sit here was
                         removed on 2026-09-08: it was four lines of explanation on
                         every load, for a figure most readers never needed. The
-                        caveat itself has not gone away — that business is invoiced
+                        caveat itself has not gone away - that business is invoiced
                         outside the two Books organisations this app reads, so those
                         2,028 accounts show almost no revenue here. It is documented
                         in docs/COMPTES.md §8a, and the source table still marks the
@@ -360,10 +361,10 @@ export default function AccountsDashboard() {
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
                         <BreakdownTable
                             title="Par source" rows={bySource} filename="comptes_par_source"
-                            note="Les sources marquées d'un point sont des listes de clients rachetées (Royer & Fils, PLOGG/BUCCO), pas des campagnes : leur volume ne se compare pas à celui de Meta Ads ou de Google. Attention en particulier à Royer & Fils / VotreLogo.ca : cette entreprise est facturée en dehors des deux organisations Zoho Books que l'application lit, donc ses revenus n'apparaissent presque pas ici — un taux de facturation très bas sur cette ligne ne veut PAS dire que ces clients n'achètent rien."
+                            note="Les sources marquées d'un point sont des listes de clients rachetées (Royer & Fils, PLOGG/BUCCO), pas des campagnes : leur volume ne se compare pas à celui de Meta Ads ou de Google. Attention en particulier à Royer & Fils / VotreLogo.ca : cette entreprise est facturée en dehors des deux organisations Zoho Books que l'application lit, donc ses revenus n'apparaissent presque pas ici : un taux de facturation très bas sur cette ligne ne veut PAS dire que ces clients n'achètent rien."
                         />
                         <BreakdownTable
-                            title="Par représentant" rows={byRep} filename="comptes_par_rep"
+                            title="Par représentant" rows={byRep} filename="comptes_par_rep" people
                         />
                         <BreakdownTable
                             title="Par domaine d'activité" rows={byDomaine} filename="comptes_par_domaine"
@@ -390,11 +391,15 @@ const BREAKDOWN_CSV: CsvColumn<ZohoAccountBreakdownRow>[] = [
     { header: 'Liste rachetée',     value: r => r.is_bulk_import },
 ];
 
-function BreakdownTable({ title, rows, note, filename }: {
+function BreakdownTable({ title, rows, note, filename, people }: {
     title: string;
     rows: ZohoAccountBreakdownRow[];
     note?: string;
     filename: string;
+    /** The labels are rep names, so each one gets its face. This table is also
+     *  used for sources, services and industries, where an avatar would be
+     *  meaningless. */
+    people?: boolean;
 }) {
     const totalAccounts = rows.reduce((s, r) => s + r.nb_accounts, 0);
     return (
@@ -431,12 +436,13 @@ function BreakdownTable({ title, rows, note, filename }: {
                                                 {r.is_bulk_import && (
                                                     <span
                                                         className="w-1.5 h-1.5 rounded-full bg-tone-warn shrink-0"
-                                                        title={"Liste de clients rachetée, pas une campagne — le volume ne se compare pas à celui d'une campagne publicitaire."
+                                                        title={"Liste de clients rachetée, pas une campagne : le volume ne se compare pas à celui d'une campagne publicitaire."
                                                             + (r.label.includes('Royer')
                                                                 ? " Cette entreprise est aussi facturée hors des organisations Zoho Books lues par l'application : ses revenus réels n'apparaissent pas dans cette ligne."
                                                                 : '')}
                                                     />
                                                 )}
+                                                {people && <RepAvatar name={r.label} size="xs" />}
                                                 {r.label}
                                             </p>
                                             <div className="mt-1 h-1 rounded-full bg-stone w-full max-w-[100px]">

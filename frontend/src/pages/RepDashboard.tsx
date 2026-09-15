@@ -12,6 +12,7 @@ import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { MONTHS, INTERNAL_REP_NAMES } from '../lib/constants';
+import { RepAvatar } from '../components/RepAvatar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,9 +69,11 @@ function RepPicker({ reps, selected, onChange }: {
                 onClick={() => setOpen(v => !v)}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-hairline-strong rounded-md text-sm font-semibold text-ink-secondary hover:border-primary hover:text-primary-press transition-all shadow-xs"
             >
-                <div className="w-7 h-7 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
-                    {selected ? selected.charAt(0) : <User className="w-3.5 h-3.5" />}
-                </div>
+                {selected
+                    ? <RepAvatar name={selected} size="md" />
+                    : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center shrink-0">
+                          <User className="w-3.5 h-3.5" />
+                      </div>}
                 {selected || 'Choisir un représentant'}
                 <ChevronDown className={cn("w-4 h-4 text-ink-mute transition-transform ml-1", open && "rotate-180")} />
             </button>
@@ -95,12 +98,7 @@ function RepPicker({ reps, selected, onChange }: {
                                             : "text-ink-secondary hover:bg-sand font-medium"
                                     )}
                                 >
-                                    <div className={cn(
-                                        "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                                        rep === selected ? "bg-primary/20 text-primary-press" : "bg-stone text-ink-secondary"
-                                    )}>
-                                        {rep.charAt(0)}
-                                    </div>
+                                    <RepAvatar name={rep} size="md" />
                                     {rep}
                                 </button>
                             ))
@@ -289,9 +287,7 @@ export default function RepDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     {/* Rep avatar */}
-                    <div className="w-12 h-12 rounded-xl bg-primary-wash text-primary-press flex items-center justify-center text-lg font-bold shrink-0 border border-primary/20">
-                        {selectedRep ? selectedRep.charAt(0) : '?'}
-                    </div>
+                    <RepAvatar name={selectedRep} size="lg" square />
                     <div>
                         <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                             {selectedRep || 'Choisir un représentant'}
@@ -368,7 +364,7 @@ export default function RepDashboard() {
                         </div>
 
                         <SommaireTable
-                            title={`Performance Devis — ${selectedRep}`}
+                            title={`Performance Devis · ${selectedRep}`}
                             data={devisGrandTotal}
                             prevYearData={devisPrevGrandTotal}
                             year={year}
@@ -419,7 +415,7 @@ export default function RepDashboard() {
                             <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
                                 <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
                                     <Trophy className="w-4 h-4 text-ink-mute" />
-                                    Top clients — {selectedRep}
+                                    Top clients · {selectedRep}
                                 </h3>
                                 {topClients.length > 5 && (
                                     <button
@@ -451,7 +447,7 @@ export default function RepDashboard() {
                         </div>
 
                         <SommaireTable
-                            title={`Performance Factures — ${selectedRep}`}
+                            title={`Performance Factures · ${selectedRep}`}
                             data={invGrandTotal}
                             prevYearData={invPrevGrandTotal}
                             year={year}
@@ -471,7 +467,7 @@ export default function RepDashboard() {
                 <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
                 <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
-                        <h3 className="text-sm font-semibold text-ink">Tous les clients — {selectedRep}</h3>
+                        <h3 className="text-sm font-semibold text-ink">Tous les clients · {selectedRep}</h3>
                         <button onClick={() => setShowClients(false)} className="p-1.5 rounded-md text-ink-mute hover:text-ink-secondary hover:bg-stone transition-all">
                             <X className="w-4 h-4" />
                         </button>
@@ -505,7 +501,7 @@ export default function RepDashboard() {
     );
 }
 
-// Placeholder for quarterly view — shows the BarChart2 icon nicely
+// Placeholder for quarterly view - shows the BarChart2 icon nicely
 export function RepPlaceholderCard({ label }: { label: string }) {
     return (
         <div className="bg-white rounded-xl shadow-card p-10 flex flex-col items-center gap-3 text-center">

@@ -297,7 +297,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                 </div>
             </div>
 
-            {/* Filters — year only */}
+            {/* Filters - year only */}
             <FilterBar>
                 <FilterGroup label="Année">
                     <Select value={String(year)} onChange={v => setYear(Number(v))} options={yearOptions} variant="accent" className="w-28" />
@@ -316,7 +316,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
             <div className="bg-white rounded-xl shadow-card overflow-hidden">
                 <div className="px-5 py-4 border-b border-hairline-strong bg-sand flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                        <h3 className="text-sm font-semibold text-ink">Détail des paies — {year}</h3>
+                        <h3 className="text-sm font-semibold text-ink">Détail des paies · {year}</h3>
                         <ExportButton
                             rows={entries}
                             columns={autoColumns(entries)}
@@ -492,7 +492,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                         </tbody>
 
                         <tfoot>
-                            {/* Add row — admin only */}
+                            {/* Add row - admin only */}
                             {canEdit && (
                                 <tr className="border-t border-hairline-strong bg-white">
                                     <td colSpan={9} className="px-4 py-2">
@@ -530,7 +530,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
             {/* ─── Net total banner ────────────────────────────────────────── */}
             <div className="bg-white rounded-xl shadow-card px-4 md:px-6 py-4 md:py-5 flex items-center justify-between flex-wrap gap-4">
                 <div>
-                    <p className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total Net — {year}</p>
+                    <p className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total Net · {year}</p>
                     <p className="text-2xl md:text-3xl font-bold text-ink mt-1 tabular-nums">{formatCurrencyCAD(netTotal)}</p>
                     <p className="text-xs text-ink-mute mt-1">
                         Paies{n(meta.previous_year_balance) !== 0 ? ` + Solde ${year - 1}` : ''}{n(meta.annual_bonus) !== 0 ? ' + Bonus' : ''}

@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 
 /**
  * From this many options the dropdown grows a search box. Some of these lists are
- * long — 25 sources, 55 industries, 30 reps — and scrolling a 55-item list to
+ * long - 25 sources, 55 industries, 30 reps - and scrolling a 55-item list to
  * find "Dentiste" is not a way to use a filter.
  */
 const SEARCHABLE_FROM = 4;
@@ -17,6 +17,14 @@ function foldForSearch(v: string): string {
 export interface SelectOption {
     value: string;
     label: string;
+    /**
+     * Drawn to the left of the label, in the list and on the trigger.
+     *
+     * A node rather than an icon name so the caller decides what it is - every
+     * rep filter passes a <RepAvatar>. It is decorative: the label still
+     * carries the meaning, and nothing here depends on the icon rendering.
+     */
+    icon?: React.ReactNode;
 }
 
 interface SelectProps {
@@ -111,6 +119,7 @@ export function Select({
                     open && (isAccent ? "bg-primary-subdued ring-2 ring-primary/25" : "bg-stone ring-2 ring-hairline-strong")
                 )}
             >
+                {selected?.icon}
                 <span className="flex-1 text-left truncate">{selected?.label ?? '—'}</span>
                 <ChevronDown className={cn(
                     "w-3.5 h-3.5 shrink-0 transition-transform duration-150",
@@ -166,7 +175,10 @@ export function Select({
                                             : "text-ink-secondary hover:bg-sand font-medium"
                                     )}
                                 >
-                                    <span translate="no">{opt.label}</span>
+                                    <span className="flex items-center gap-2 min-w-0">
+                                        {opt.icon}
+                                        <span className="truncate" translate="no">{opt.label}</span>
+                                    </span>
                                     {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-primary-press" />}
                                 </button>
                             );

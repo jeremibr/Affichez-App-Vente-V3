@@ -7,7 +7,7 @@ import { supabase } from './supabase';
  * Three things, and only three:
  *
  * 1. **A TTL.** Inside it, a repeat call resolves from memory with no network
- *    at all — the page paints on the next frame. This is what makes moving
+ *    at all - the page paints on the next frame. This is what makes moving
  *    between screens instant.
  * 2. **In-flight de-duplication.** Two callers asking for the same thing before
  *    the first reply lands share one request. That is what makes `prefetch()`
@@ -19,12 +19,12 @@ import { supabase } from './supabase';
  * **Stale data is never served.** A common trick here is stale-while-
  * revalidate: paint the old numbers immediately, fetch in the background, swap
  * them when it lands. It is faster still, and it is the wrong trade for this
- * app — these are sales figures people quote in meetings, and a revenue total
+ * app - these are sales figures people quote in meetings, and a revenue total
  * that silently changes a second after you read it is worse than one that took
  * a second to arrive. Past the TTL we wait for the real answer.
  *
  * The TTLs are set against how often the data underneath can actually change,
- * which is the Zoho sync cadence — five minutes for invoices, twelve hours for
+ * which is the Zoho sync cadence - five minutes for invoices, twelve hours for
  * accounts and leads. Sixty seconds is comfortably inside all of them.
  */
 
@@ -89,7 +89,7 @@ export interface CachedRpcOptions {
     /** Override the TTL in ms. 0 forces a fresh read and still fills the cache. */
     ttl?: number;
     /**
-     * The RPC returns one row and the caller wants the row, not an array —
+     * The RPC returns one row and the caller wants the row, not an array -
      * the cached equivalent of `.single()`. Unlike `.single()` this does not
      * error when the RPC returns nothing; it resolves to null, which is what
      * every call site here already handles.
@@ -105,11 +105,11 @@ export interface CachedRpcResult<T> {
 /**
  * `supabase.rpc(fn, args)`, cached.
  *
- * Errors are returned, never cached — a failed request must not pin a page to
+ * Errors are returned, never cached - a failed request must not pin a page to
  * an error for the next minute.
  */
 // `T` defaults the way supabase.rpc's own `data` is typed. Every call site here
-// already casts the result to a row type from src/types/database.ts — narrowing
+// already casts the result to a row type from src/types/database.ts - narrowing
 // the default to `unknown` would only force those same casts to be written
 // twice. Pass the type parameter where the result is used directly, as the
 // `single: true` callers do.
@@ -162,7 +162,7 @@ export function prefetchRpc(fn: string, args?: Record<string, unknown>, opts: Ca
 /**
  * Drop cached answers.
  *
- * With no argument, everything — what a Realtime event or a sign-out wants.
+ * With no argument, everything - what a Realtime event or a sign-out wants.
  * With a prefix, just the functions whose name starts with it, so
  * `invalidateRpcCache('get_inv_')` clears the invoice screens and leaves the
  * rest alone.

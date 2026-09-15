@@ -15,13 +15,14 @@ import { SortIcon } from '../components/SortIcon';
 import { useSort } from '../hooks/useSort';
 import type { CsvColumn } from '../lib/csv';
 import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
+import { RepAvatar } from '../components/RepAvatar';
 
 /**
- * Créé par — who keyed a quote or an invoice in, as opposed to who sold it.
+ * Créé par - who keyed a quote or an invoice in, as opposed to who sold it.
  *
  * Asked for on 2026-09-04. Dominic wants to see the quotes Morgane Owczarzak and
  * Guillaume Montambeault put through, "même si c'est pas les autres
- * représentants" — including the ones where somebody else is the salesperson.
+ * représentants" - including the ones where somebody else is the salesperson.
  *
  * ────────────────────────────────────────────────────────────────────────────
  * WHY THIS IS ITS OWN PAGE, AND MUST STAY THAT WAY
@@ -73,8 +74,8 @@ export default function Createurs() {
             cachedRpc('get_quote_creator_link_status'),
         ]);
         // PostgREST can hand a NUMERIC back as a string. Everything downstream
-        // then still LOOKS right — formatCurrencyCAD coerces, and so does the
-        // totals row — but sorting would compare "1000" against "9" as text and
+        // then still LOOKS right - formatCurrencyCAD coerces, and so does the
+        // totals row - but sorting would compare "1000" against "9" as text and
         // put the smaller number first. Coerced once, here, rather than at each
         // of the dozen places that read these fields.
         setRows(((data as CreatorSummaryRow[]) ?? []).map(r => ({
@@ -108,7 +109,7 @@ export default function Createurs() {
     );
 
     /**
-     * Sortable columns. Asked for in the meeting — "on pourrait trier" — and the
+     * Sortable columns. Asked for in the meeting - "on pourrait trier" - and the
      * reason is the page's shape: it lists everyone who has ever keyed a document
      * in, so finding the two people Dominic actually cares about means sorting by
      * the column that answers his question rather than scrolling.
@@ -144,7 +145,7 @@ export default function Createurs() {
 
             {/* The amber "ces chiffres ne s'additionnent pas" banner that sat here
                 was removed on 2026-09-08 as noise on every load. The caveat is
-                still true and still recorded — the page subtitle says the figures
+                still true and still recorded - the page subtitle says the figures
                 are per person who ENTERED the document regardless of who the sale
                 is credited to, the detail modal marks a different salesperson in
                 orange, and docs/COMPTES.md explains why the totals overlap the rep
@@ -251,7 +252,7 @@ export default function Createurs() {
                                                    focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
                                     >
                                         <td className="td">
-                                            <span className="font-semibold text-ink">{r.creator}</span>
+                                            <span className="inline-flex items-center gap-2 font-semibold text-ink"><RepAvatar name={r.creator} size="sm" />{r.creator}</span>
                                         </td>
                                         <td className="td text-right tabular-nums font-semibold text-ink-secondary">
                                             {r.quotes_created.toLocaleString('fr-CA')}
@@ -317,8 +318,8 @@ export default function Createurs() {
  * A sortable column heading with a one-line definition beside it.
  *
  * The definitions are short on purpose: they answer the two questions this table
- * actually provokes — "does gagné mean accepted?" and "does that include
- * refunds?" — and nothing else. A longer explanation belongs in docs/COMPTES.md.
+ * actually provokes - "does gagné mean accepted?" and "does that include
+ * refunds?" - and nothing else. A longer explanation belongs in docs/COMPTES.md.
  */
 function Th({ col, label, hint, align = 'right', sortConfig, onSort }: {
     col: keyof CreatorSummaryRow;
@@ -372,7 +373,7 @@ const DETAIL_CSV: CsvColumn<CreatorDetailRow>[] = [
 /**
  * One person's documents. The `Vendu par` column is the whole point of the
  * modal: it shows, row by row, that the creator and the salesperson are
- * routinely different people — which is why this page's totals can never be
+ * routinely different people - which is why this page's totals can never be
  * added to a rep's.
  */
 function CreatorDetailModal({ creator, year, month, office, onClose }: {
@@ -410,7 +411,7 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
         return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    // How often the creator is NOT the salesperson — the number that justifies
+    // How often the creator is NOT the salesperson - the number that justifies
     // the page existing at all.
     const soldByOthers = rows.filter(r => r.sold_by && r.sold_by !== creator.creator).length;
 

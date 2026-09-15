@@ -136,7 +136,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
         // Every department the data mentions, on top of the standard list.
         // get_rep_dept_actuals_factures returns "Non assigné" for billing whose
         // department Zoho never set, and it is counted in the total above these
-        // cards — so leaving it out is what made them fail to add up.
+        // cards - so leaving it out is what made them fail to add up.
         const seen = new Set<string>(DEPARTMENTS);
         for (const f of (factDeptRes.data ?? [])) seen.add(String(f.department));
         for (const f of (prevDeptRes.data ?? [])) seen.add(String(f.department));
@@ -226,7 +226,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                 <p className="text-2xs text-white mt-1">
                                     {totals.target > 0
                                         ? `sur ${formatCurrencyCAD(totals.target)} objectif`
-                                        : 'Objectif non fixé — configurez dans Paramètres'}
+                                        : 'Objectif non fixé : configurez dans Paramètres'}
                                     {totals.prevActual > 0 && (
                                         <span className="ml-2 opacity-70">· {formatCurrencyCAD(totals.prevActual)} en {prevYear}</span>
                                     )}
@@ -392,7 +392,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                     // NEGATIVE is still real: "Non assigné" holds refunds
                                     // whose department could not be traced, and the total
                                     // above these cards counts it. Skipping it left the
-                                    // cards short by exactly that amount — which is the
+                                    // cards short by exactly that amount - which is the
                                     // discrepancy this page was reported for.
                                     const hasRow = Object.values(monthCells).some(c => c.target !== 0 || c.actual !== 0 || c.prevActual !== 0);
                                     if (!hasRow) return null;
@@ -436,7 +436,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                 </div>
                                             </div>
 
-                                            {/* Month table — one clean row per metric */}
+                                            {/* Month table - one clean row per metric */}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead>

@@ -6,7 +6,7 @@ export const DEPARTMENTS = [
     'APPLICATION',
     'SERVICES IA',
     // Added 2026-09-07. Zoho Books had been billing under "ÉVÈNEMENT" since May
-    // 2025 — 160 invoices, $142,918 — and the sync discarded every one of them
+    // 2025 - 160 invoices, $142,918 - and the sync discarded every one of them
     // because its department mapping had no entry for the label. Spelled without
     // accents to match NUMERIQUE, which Zoho writes as "NUMÉRIQUE".
     // NOTE: objectives_factures has no target rows for this department yet, so
@@ -57,7 +57,7 @@ export const INTERNAL_REP_NAMES = [
 
 // LEAD_SOURCES / LEAD_SERVICES used to live here. They were the legacy `leads`
 // table's vocabulary, and only one of the six sources ("Meta Ads") exists in
-// Zoho CRM at all — the real top source, "Publicité/Recherche Google", was
+// Zoho CRM at all - the real top source, "Publicité/Recherche Google", was
 // never offered. Filter options now come from the data itself, via the
 // get_zoho_lead_filter_options RPC, which also folds Zoho's case variants.
 
@@ -67,7 +67,7 @@ export const LEAD_STATUSES = [
     { value: 'lost',   label: 'Perdu' },
 ] as const;
 
-// Zoho CRM Task statuses — the real French picklist values from this org's CRM.
+// Zoho CRM Task statuses - the real French picklist values from this org's CRM.
 // (value = raw Zoho value stored in zoho_tasks.status; completion itself is derived
 // from closed_time, so these are only used for the filter dropdown + labels/colors.)
 export const TASK_STATUSES = [
@@ -76,7 +76,7 @@ export const TASK_STATUSES = [
     { value: 'Achevé',       label: 'Achevé' },
 ] as const;
 
-// Zoho CRM Task priorities — the real French values from this org's CRM
+// Zoho CRM Task priorities - the real French values from this org's CRM
 // ('Normal' and 'Normale' both occur in the data).
 export const TASK_PRIORITIES = [
     { value: 'Top Prioritaire', label: 'Top prioritaire' },

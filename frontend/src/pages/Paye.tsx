@@ -14,6 +14,7 @@ import { OFFICES } from '../lib/constants';
 import { fetchAllCommRates, saveCommRate } from '../utils/commRates';
 import { ExportButton } from '../components/ExportButton';
 import { autoColumns } from '../lib/csv';
+import { RepAvatar } from '../components/RepAvatar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ export default function Paye() {
         const rows: RepMonthlyData[] = (data || []) as RepMonthlyData[];
         setRepData(rows);
 
-        // Initialize paye records — read persisted rates from Supabase
+        // Initialize paye records - read persisted rates from Supabase
         const savedRates = await fetchAllCommRates();
         setPayeRecords(prev => {
             const next = { ...prev };
@@ -405,14 +406,14 @@ export default function Paye() {
                                             {/* Rep name */}
                                             <td className="px-5 py-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className={cn(
-                                                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                                                        paye.paid
-                                                            ? "bg-tone-good-soft text-tone-good-ink"
-                                                            : "bg-primary-wash text-primary-press"
-                                                    )}>
-                                                        {rep.rep_name.charAt(0)}
-                                                    </div>
+                                                    <RepAvatar
+                                                        name={rep.rep_name}
+                                                        size="md"
+                                                        // Paid reps keep the green they had when this
+                                                        // was a letter circle - as a ring, so the state
+                                                        // survives putting a photo inside it.
+                                                        className={cn('ring-2', paye.paid ? 'ring-tone-good' : 'ring-transparent')}
+                                                    />
                                                     <span className="font-semibold text-ink">{rep.rep_name}</span>
                                                 </div>
                                             </td>
@@ -459,7 +460,7 @@ export default function Paye() {
                             <tfoot>
                                 <tr className="border-t-2 border-hairline-strong bg-sand/80">
                                     <td className="px-5 py-3 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">
-                                        Total — {repData.length} reps
+                                        Total · {repData.length} reps
                                     </td>
                                     <td className="px-4 py-3" />
                                     <td className="px-4 py-3 text-center font-bold text-ink tabular-nums">

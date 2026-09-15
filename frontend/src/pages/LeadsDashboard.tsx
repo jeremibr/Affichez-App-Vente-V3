@@ -16,7 +16,7 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
  * Leads dashboard, over Zoho's Leads module.
  *
  * Reads zoho_leads (stage = 'lead'), not the legacy hand-entered `leads` table
- * this page used to query — that held 192 rows, all dated 2026-01-01, and had not
+ * this page used to query - that held 192 rows, all dated 2026-01-01, and had not
  * been updated since May. Contacts are deliberately out of scope: most were
  * created directly in Zoho as clients and were never leads, so including them put
  * conversion at ~99% and inflated revenue several-fold.
@@ -40,7 +40,7 @@ export default function LeadsDashboard() {
 
     // Filter values come from the data, not a hardcoded list. The old constants
     // were the legacy table's six sources, of which only "Meta Ads" exists in
-    // Zoho — the real top source, "Publicité/Recherche Google", was not offered.
+    // Zoho - the real top source, "Publicité/Recherche Google", was not offered.
     const [options, setOptions] = useState<ZohoLeadFilterOptions | null>(null);
 
     const yearParamValue = year === 'Toutes' ? null : year;
@@ -88,7 +88,7 @@ export default function LeadsDashboard() {
             // p_stage: 'lead' because every figure on this page counts leads only.
             // Without it the dropdowns were built from leads AND contacts, so a rep
             // or source carried solely by contacts could be picked and returned an
-            // all-zero dashboard — which reads as broken data, not an empty filter.
+            // all-zero dashboard - which reads as broken data, not an empty filter.
             'get_zoho_lead_filter_options', { p_year: yearParamValue, p_stage: 'lead' }, { single: true });
         if (data) setOptions(data);
     }, [yearParamValue]);
@@ -143,7 +143,7 @@ export default function LeadsDashboard() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
-                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Leads — Tableau de bord</h1>
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Leads · Tableau de bord</h1>
                 <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                     Leads entrants du module Leads de Zoho CRM, et ce qu&rsquo;ils ont rapporté
                 </p>
@@ -195,7 +195,7 @@ export default function LeadsDashboard() {
                             value={(kpis?.leads_converted ?? 0).toLocaleString('fr-CA')}
                             subText={`${(kpis?.conversion_rate ?? 0).toFixed(1)} % des leads`}
                             icon={TrendingUp}
-                            hint="Leads que Zoho a marqués comme convertis en contact/compte. Presque tous les leads finissent par l'être, donc ce taux bouge peu — regardez plutôt « Leads facturés »."
+                            hint="Leads que Zoho a marqués comme convertis en contact/compte. Presque tous les leads finissent par l'être, donc ce taux bouge peu : regardez plutôt « Leads facturés »."
                         />
                         <KPICard
                             title="Leads facturés"

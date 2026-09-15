@@ -14,6 +14,7 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import LeadsDetail from './LeadsDetail';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
+import { RepAvatar } from '../components/RepAvatar';
 
 interface Props { propRepName?: string; }
 
@@ -61,7 +62,7 @@ export default function PortailLeads({ propRepName }: Props) {
 
     const fetchOptions = useCallback(async () => {
         const { data } = await cachedRpc<ZohoLeadFilterOptions>(
-            // Lead-only, to match get_zoho_lead_kpis and the monthly summary above —
+            // Lead-only, to match get_zoho_lead_kpis and the monthly summary above -
             // a source that only contacts carry would otherwise be offered here and
             // empty the whole portal.
             'get_zoho_lead_filter_options', { p_year: year, p_stage: 'lead' }, { single: true });
@@ -120,7 +121,7 @@ export default function PortailLeads({ propRepName }: Props) {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Mes Leads</h1>
-                    <p className="text-xs md:text-sm text-ink-mute mt-0.5">{repName}</p>
+                    <p className="text-xs md:text-sm text-ink-mute mt-0.5 inline-flex items-center gap-2"><RepAvatar name={repName} size="sm" />{repName}</p>
                 </div>
                 {/* Tab switcher */}
                 <div className="flex items-center gap-1 bg-stone rounded-md p-1">
@@ -182,7 +183,7 @@ export default function PortailLeads({ propRepName }: Props) {
                                     value={formatCurrencyCAD(kpis?.revenue_attributed ?? 0)}
                                     subText={`Valeur client totale ${formatCurrencyCAD(kpis?.revenue_lifetime ?? 0)}`}
                                     icon={DollarSign}
-                                    hint="Factures datées à partir de l’arrivée du lead — un lead ne peut pas avoir généré des revenus antérieurs à lui. La valeur client totale ajoute tout l’historique du compte. Compté une seule fois par compte."
+                                    hint="Factures datées à partir de l’arrivée du lead : un lead ne peut pas avoir généré des revenus antérieurs à lui. La valeur client totale ajoute tout l’historique du compte. Compté une seule fois par compte."
                                 />
                             </div>
 

@@ -10,6 +10,7 @@ import type {
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { RepAvatar } from '../components/RepAvatar';
 import {
     formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, clipServices, cn,
 } from '../lib/utils';
@@ -81,7 +82,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    // Changing any filter must return to page 1 — otherwise a narrower result set
+    // Changing any filter must return to page 1 - otherwise a narrower result set
     // leaves you stranded on a page that no longer exists, showing nothing.
     //
     // Both params move in ONE navigation. Calling the two setters in sequence
@@ -104,7 +105,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
 
-    // Invoice rollups for the accounts on the current page only — one RPC per
+    // Invoice rollups for the accounts on the current page only - one RPC per
     // page rather than per row. Keyed by CRM account id, so two contacts at the
     // same company share an entry, which is also how Zoho owns the invoices.
     const [invoiceTotals, setInvoiceTotals] = useState<Record<string, LeadInvoiceTotals>>({});
@@ -122,7 +123,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const [allReps, setAllReps] = useState<string[]>([]);
     // Every raw spelling behind each service label. Zoho stores the same service
     // under variants that differ in case or spacing, so matching the label alone
-    // silently dropped rows — "Distribution Publicitaire" returned 166 of 2,209.
+    // silently dropped rows - "Distribution Publicitaire" returned 166 of 2,209.
     const [serviceVariants, setServiceVariants] = useState<Record<string, string[]>>({});
 
     const effectiveRepName = propRepName ?? null;
@@ -224,7 +225,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
 
     /**
      * Options are scoped to the year only, so choosing one filter never empties
-     * the others. The DISTINCT runs in Postgres — pulling rows to the browser and
+     * the others. The DISTINCT runs in Postgres - pulling rows to the browser and
      * de-duplicating here would have needed all ~29k of them.
      */
     const fetchOptions = useCallback(async () => {
@@ -298,7 +299,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         return out;
     }, [page, totalPages]);
 
-    // Counts describe the current page — `total` is the figure for everything.
+    // Counts describe the current page - `total` is the figure for everything.
     const counts = useMemo(() => ({
         leads: rows.filter(r => r.stage === 'lead').length,
         contacts: rows.filter(r => r.stage === 'contact').length,
@@ -329,7 +330,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         { value: 'lead', label: 'Leads seulement' },
         { value: 'contact', label: 'Contacts seulement' },
     ];
-    // "Sans factures" also catches records with no CRM account at all — from the
+    // "Sans factures" also catches records with no CRM account at all - from the
     // table's side those are indistinguishable from an account that was never
     // billed, and both show an em dash in the Factures column.
     const invoicedOptions = [
@@ -396,7 +397,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-ink">Leads — Détail</h1>
+                    <h1 className="text-2xl font-semibold text-ink">Leads · Détail</h1>
                     <p className="mt-1 text-sm text-ink-mute">
                         Leads et contacts synchronisés depuis Zoho CRM
                     </p>
@@ -511,7 +512,14 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                                                 ? <a href={`mailto:${r.email}`} className="text-primary-press hover:underline">{r.email}</a>
                                                 : '—'}
                                         </td>
-                                        <td className="td">{r.rep_name ?? r.owner_name ?? '—'}</td>
+                                        <td className="td">
+                                            {(r.rep_name ?? r.owner_name)
+                                                ? <span className="inline-flex items-center gap-2">
+                                                      <RepAvatar name={r.rep_name ?? r.owner_name} size="sm" />
+                                                      {r.rep_name ?? r.owner_name}
+                                                  </span>
+                                                : '—'}
+                                        </td>
                                         <td className="td"><SourceCell row={r} /></td>
                                         <td className="td"><ServiceCell row={r} /></td>
                                         <td className="td">

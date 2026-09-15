@@ -10,6 +10,7 @@ import { useAdminView } from '../contexts/AdminViewContext';
 import { useRepList } from '../hooks/useRepList';
 import { Select } from '../components/Select';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
+import { RepAvatar } from '../components/RepAvatar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -386,23 +387,18 @@ export default function PortailParametres({ propRepName }: Props) {
             {isAdmin && !propRepName && !viewAsRep ? (
                 /* ─── Admin view: bordered container with hero + content ─── */
                 <div className="rounded-xl border border-primary/20 shadow-card overflow-visible">
-                    {/* Hero — orange gradient */}
+                    {/* Hero - orange gradient */}
                     <div className="bg-primary rounded-t-xl px-6 py-6 md:py-7">
                         <p className="text-2xs font-semibold text-white uppercase tracking-eyebrow mb-5">
                             Objectifs du représentant
                         </p>
                         <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
-                                <div className={cn(
-                                    "w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-semibold shrink-0 transition-all",
-                                    adminPickedRep
-                                        ? "bg-white text-primary-press shadow-lg shadow-black/10"
-                                        : "bg-black/15 text-white"
-                                )}>
-                                    {adminPickedRep
-                                        ? adminPickedRep.charAt(0).toUpperCase()
-                                        : <Users className="w-6 h-6" />}
-                                </div>
+                                {adminPickedRep
+                                    ? <RepAvatar name={adminPickedRep} size="lg" square className="w-14 h-14 ring-2 ring-white/70 shadow-lg shadow-black/10" />
+                                    : <div className="w-14 h-14 rounded-xl bg-black/15 text-white flex items-center justify-center shrink-0">
+                                          <Users className="w-6 h-6" />
+                                      </div>}
                                 <div className="min-w-0">
                                     {adminPickedRep ? (
                                         <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight truncate">

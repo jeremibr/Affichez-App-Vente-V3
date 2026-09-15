@@ -9,12 +9,12 @@ import { formatCurrencyCAD, formatShortDate, cn } from '../../lib/utils';
  *
  * The first one is the reason both of them exist. Until 2026-09-07 the invoice
  * and quote syncs silently discarded any record whose department they did not
- * recognise — no error, no log, nothing on screen. That had been quietly losing
+ * recognise - no error, no log, nothing on screen. That had been quietly losing
  * 160 invoices and $142,918 since May 2025, because Zoho Books had started
  * billing under a department called "ÉVÈNEMENT" that the mapping had never heard
  * of, plus 92 credit notes worth -$117,764 whose department could not be
- * resolved. Dominic reported the symptom in the 2026-09-04 meeting — numbers
- * that would not add up — and nobody could find the cause, because there was
+ * resolved. Dominic reported the symptom in the 2026-09-04 meeting - numbers
+ * that would not add up - and nobody could find the cause, because there was
  * nothing to find it with.
  *
  * The records now land with no department rather than being thrown away, and
@@ -106,7 +106,7 @@ export function UnmappedDepartmentsCard() {
                     </table>
                     <p className="text-2xs text-ink-mute mt-3 leading-relaxed">
                         Une étiquette vide veut dire que Zoho lui-même n&rsquo;a pas de département sur ces
-                        documents — rien à corriger dans l&rsquo;application. Une étiquette nommée veut dire
+                        documents : rien à corriger dans l&rsquo;application. Une étiquette nommée veut dire
                         qu&rsquo;il manque une correspondance.
                     </p>
                 </div>
@@ -121,7 +121,7 @@ export function UnmappedDepartmentsCard() {
  * Invoices are not shown as "pending" because they never are: Zoho puts
  * `created_by` straight on the invoice list payload. An estimate's creator lives
  * only on the detail endpoint and only as an id, so every quote costs one API
- * call — 7,961 of them, against a ceiling of 100 calls per minute per
+ * call - 7,961 of them, against a ceiling of 100 calls per minute per
  * organisation. A cron job takes a slice every three minutes until it is done.
  */
 export function QuoteCreatorCard() {
@@ -176,7 +176,7 @@ export function QuoteCreatorCard() {
                         Récupère qui a <em>saisi</em> chaque devis, ce que Zoho ne donne que document par
                         document. Chaque exécution traite une tranche&nbsp;; un travail automatique reprend
                         toutes les 3&nbsp;minutes jusqu&rsquo;à ce qu&rsquo;il ne reste rien. Les factures sont
-                        déjà complètes — Zoho fournit leur créateur directement.
+                        déjà complètes : Zoho fournit leur créateur directement.
                     </p>
                 </div>
                 <button

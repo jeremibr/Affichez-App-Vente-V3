@@ -17,7 +17,7 @@ docs/
 # OS
 .DS_Store
 Thumbs.db
-
+team-reps/
 # Editor
 .vscode/*
 !.vscode/extensions.json

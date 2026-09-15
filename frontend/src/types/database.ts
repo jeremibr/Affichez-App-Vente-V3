@@ -89,13 +89,13 @@ export type InvDetailRow = {
 export type AttributionOrigin = 'own' | 'lead' | 'account' | 'invoice';
 
 /**
- * A row of `zoho_leads` — one Zoho CRM record, Lead or Contact, told apart by
+ * A row of `zoho_leads` - one Zoho CRM record, Lead or Contact, told apart by
  * `stage`. Synced by the zoho-lead-sync edge function; read-only in the app.
  *
  * `lead_source` and `service_interest` exist only on Zoho's Leads module. For a
  * contact they are inherited from the originating lead by a DB trigger, in which
- * case `attribution_inherited` is true. A contact created directly in Zoho —
- * which no lead points at — has neither, and both come back empty.
+ * case `attribution_inherited` is true. A contact created directly in Zoho -
+ * which no lead points at - has neither, and both come back empty.
  */
 export type ZohoLeadRow = {
     zoho_record_id: string;
@@ -141,7 +141,7 @@ export type ZohoLeadRow = {
     service_origin?: AttributionOrigin | null;
 
     /**
-     * CRM account this record belongs to — the join key to invoices. A contact
+     * CRM account this record belongs to - the join key to invoices. A contact
      * takes it from Account_Name; a lead only has one once converted. Invoices
      * are owned by the account, so contacts at the same company share them.
      */
@@ -175,7 +175,7 @@ export type ZohoLeadRow = {
  * service under several spellings that differ only in case or spacing, and
  * offering both meant picking one silently excluded the other's rows.
  * `service_variants` maps each label to every raw spelling behind it, so a query
- * can match them all at once — the stored array keeps Zoho's original casing.
+ * can match them all at once - the stored array keeps Zoho's original casing.
  */
 export type ZohoLeadFilterOptions = {
     sources: string[];
@@ -302,7 +302,7 @@ export type LeadInvoiceRow = {
     books_customer_id: string | null;
 };
 
-/** Per-account rollup from get_lead_invoice_totals — one row per account with invoices. */
+/** Per-account rollup from get_lead_invoice_totals - one row per account with invoices. */
 export type LeadInvoiceTotals = {
     account_id: string;
     invoice_count: number;
@@ -328,7 +328,7 @@ export type InvoiceLinkageStatus = {
  * Two conversion figures on purpose. `leads_converted` is Zoho's own flow, which
  * marks ~97% of leads converted and so says little; `leads_invoiced` is the lead's
  * account actually being billed after the lead arrived. The second is the one that
- * moves. They are nested, not overlapping — every invoiced lead is also converted.
+ * moves. They are nested, not overlapping - every invoiced lead is also converted.
  *
  * `revenue_attributed` counts only invoices dated on or after the lead arrived;
  * `revenue_lifetime` is the account's whole billing history. Both are summed once
@@ -344,7 +344,7 @@ export type ZohoLeadKPIs = {
     revenue_lifetime: number;
 };
 
-/** One row of any get_zoho_leads_by_* breakdown — same shape for rep, source and service. */
+/** One row of any get_zoho_leads_by_* breakdown - same shape for rep, source and service. */
 export type ZohoLeadBreakdownRow = {
     label: string;
     nb_leads: number;
@@ -353,7 +353,7 @@ export type ZohoLeadBreakdownRow = {
     total_amount: number;
 };
 
-/** get_zoho_leads_monthly_summary — `month` is 1-12. */
+/** get_zoho_leads_monthly_summary - `month` is 1-12. */
 export type ZohoLeadsMonthlyRow = {
     month: number;
     nb_leads: number;
@@ -364,7 +364,7 @@ export type ZohoLeadsMonthlyRow = {
 
 /**
  * Invoicing the app cannot tie to a CRM account (get_invoice_unassigned_summary).
- * Internal billing — the company invoicing itself — is reported separately rather
+ * Internal billing - the company invoicing itself - is reported separately rather
  * than counted as a gap, since it will never have a CRM account.
  */
 export type InvoiceUnassignedSummary = {
@@ -398,10 +398,10 @@ export type UnassignedInvoiceRow = {
 // The Comptes module reads the ACCOUNT as the record, not the lead or the
 // contact. An account is unique where a contact is not: a company with three
 // contacts is one account, so revenue is counted once without any dedupe layer.
-// That is the whole reason this module exists — see docs/COMPTES.md.
+// That is the whole reason this module exists - see docs/COMPTES.md.
 
 /**
- * One row of zoho_accounts_enriched — a Zoho account with its lifetime invoice
+ * One row of zoho_accounts_enriched - a Zoho account with its lifetime invoice
  * rollup attached. Revenue here is lifetime, not windowed: a row is an account,
  * and the 12-month attribution window is a property of a cohort comparison,
  * which lives on the dashboard RPCs instead.
@@ -453,7 +453,7 @@ export type ZohoAccountRow = {
     /**
      * Royer & Fils / VotreLogo.ca promo revenue, from a Zoho CRM rollup field.
      * That business is invoiced outside the QC and MTL Books orgs, so it never
-     * appears in `invoices` and must never be added to revenue_lifetime — the
+     * appears in `invoices` and must never be added to revenue_lifetime - the
      * two measure different companies.
      */
     ventes_totales: number | null;
@@ -469,7 +469,7 @@ export type ZohoAccountRow = {
     last_invoice_date: string | null;
     has_invoices: boolean;
 
-    /** "Client Royer & Fils / VotreLogo.ca" or "Client PLOGG/BUCCO" — an acquired
+    /** "Client Royer & Fils / VotreLogo.ca" or "Client PLOGG/BUCCO" - an acquired
      *  customer list, not a campaign. Flagged so a 2,028-account import is never
      *  read against a Meta Ads bar as though they measured the same thing. */
     is_bulk_import: boolean;
@@ -478,7 +478,7 @@ export type ZohoAccountRow = {
      * Rating is one of Affichez's own entities ("Compte interne : Ne pas
      * reprendre", "Fournisseur") rather than a client. Precomputed in the view
      * because PostgREST's `rating=not.in.(...)` becomes NOT (rating IN ...),
-     * which is NULL — not TRUE — for the 977 accounts with no rating, and would
+     * which is NULL - not TRUE - for the 977 accounts with no rating, and would
      * hide them from the table while the dashboard still counted them.
      */
     is_internal: boolean;
@@ -501,7 +501,7 @@ export type ZohoAccountRow = {
  *
  * `revenue_per_account` is the figure the module exists for: what a cohort
  * actually billed, per account acquired. Divided by accounts_created, not by
- * accounts_invoiced — the accounts that bought nothing are exactly what makes a
+ * accounts_invoiced - the accounts that bought nothing are exactly what makes a
  * bad source bad.
  *
  * `ventes_royer` sits beside the invoice figures and never inside them.
@@ -517,7 +517,7 @@ export type ZohoAccountKPIs = {
     ventes_royer: number;
 };
 
-/** One row of any get_zoho_accounts_by_* breakdown — rep, source, service, domaine. */
+/** One row of any get_zoho_accounts_by_* breakdown - rep, source, service, domaine. */
 export type ZohoAccountBreakdownRow = {
     label: string;
     nb_accounts: number;
@@ -527,7 +527,7 @@ export type ZohoAccountBreakdownRow = {
     is_bulk_import: boolean;
 };
 
-/** get_zoho_accounts_monthly_summary — `month` is 1-12, every month present. */
+/** get_zoho_accounts_monthly_summary - `month` is 1-12, every month present. */
 export type ZohoAccountMonthlyRow = {
     month: number;
     nb_accounts: number;
@@ -541,7 +541,7 @@ export type ZohoAccountMonthlyRow = {
  *
  * Drawn from the stored data, never from Zoho's picklist definition. Accounts
  * hold 26 distinct sources against 21 live picklist entries, and the orphans
- * include "Publicité/Recherche Google" (108 accounts) — the segment Dominic
+ * include "Publicité/Recherche Google" (108 accounts) - the segment Dominic
  * asked to report on. A hardcoded list offers every source except that one.
  */
 export type ZohoAccountFilterOptions = {
@@ -555,7 +555,7 @@ export type ZohoAccountFilterOptions = {
     ratings: string[];
 };
 
-/** get_account_revenue_by_department — one row per (year, department) for one account. */
+/** get_account_revenue_by_department - one row per (year, department) for one account. */
 export type AccountDeptRevenueRow = {
     year: number;
     department: string;
@@ -573,10 +573,10 @@ export type AccountDeptRevenueRow = {
 // These numbers deliberately do NOT reconcile with the rep figures elsewhere. A
 // quote created by Morgane and sold by Dominic is counted here under Morgane and
 // on the Factures dashboard under Dominic. That is what Jérémi warned about in
-// the 2026-09-04 meeting — "faut pas que ça fausse les chiffres" — and the
+// the 2026-09-04 meeting - "faut pas que ça fausse les chiffres" - and the
 // agreed answer was a separate page, never a column on an existing table.
 
-/** get_creator_summary — one row per person who has created a quote or invoice. */
+/** get_creator_summary - one row per person who has created a quote or invoice. */
 export type CreatorSummaryRow = {
     creator: string;
     quotes_created: number;
@@ -588,7 +588,7 @@ export type CreatorSummaryRow = {
     win_rate: number;
 };
 
-/** get_creator_detail — quotes and invoices in one list. `sold_by` is the point:
+/** get_creator_detail - quotes and invoices in one list. `sold_by` is the point:
  *  it is routinely somebody other than the creator. */
 export type CreatorDetailRow = {
     module: 'devis' | 'factures';
@@ -604,7 +604,7 @@ export type CreatorDetailRow = {
 };
 
 /**
- * get_quote_creator_link_status — progress of the quote back-fill.
+ * get_quote_creator_link_status - progress of the quote back-fill.
  *
  * Quotes only. Invoices need no back-fill: Zoho puts `created_by` on the invoice
  * list payload, while an estimate's creator exists only on the detail endpoint
@@ -621,7 +621,7 @@ export type QuoteCreatorLinkStatus = {
 };
 
 /**
- * get_unmapped_department_summary — records Zoho sent under a department name
+ * get_unmapped_department_summary - records Zoho sent under a department name
  * the sync does not recognise.
  *
  * Expected to be empty. A row means the money is safely stored but missing from
@@ -639,7 +639,7 @@ export type UnmappedDepartmentRow = {
 };
 
 /**
- * get_account_contacts — the people at one company.
+ * get_account_contacts - the people at one company.
  *
  * Shown only on the Comptes detail modal, and counted nowhere. The Comptes
  * module measures companies on purpose; this exists because once someone has

@@ -18,17 +18,18 @@ import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { TagCell } from '../components/TagCell';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import type { CsvColumn } from '../lib/csv';
+import { RepAvatar } from '../components/RepAvatar';
 import {
     formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, cn,
 } from '../lib/utils';
 
 /**
- * Comptes — détail.
+ * Comptes - détail.
  *
  * The searchable client directory Dominic asked for on 2026-09-04: "avoir comme
  * une search feature que tu peux aller chercher ton client, puis tu cliques puis
- * ça show les stats". Clicking a row opens the account's full billing history —
- * per department, per year — which is the "data client" half of that ask.
+ * ça show les stats". Clicking a row opens the account's full billing history -
+ * per department, per year - which is the "data client" half of that ask.
  *
  * Filtering, sorting, counting and paging all happen in Postgres. The page shows
  * 100 of 20,645 rows, so a filter applied in the browser would search 100
@@ -94,14 +95,14 @@ export default function AccountsDetail() {
     // Équipe entière / Interne / one rep. See hooks/useRepFilter.
     const repFilter = useRepFilter(selectedRep, options?.reps ?? []);
 
-    // A filter change invalidates the page number — page 7 of a 3-page result is
+    // A filter change invalidates the page number - page 7 of a 3-page result is
     // an empty table, which reads as "no data" rather than "wrong page".
     //
     // Both params MUST move in one navigation. Calling the filter setter and then
     // setPage(1) looks equivalent and is not: react-router hands each setter the
     // search params from the render that created it, so the page reset starts
     // from a snapshot taken before the filter change and its navigate()
-    // overwrites it. The filter then appears to do nothing at all — the dropdown
+    // overwrites it. The filter then appears to do nothing at all - the dropdown
     // snaps back and the table never changes. LeadsDetail hit this exact bug and
     // UrlStateCompanions in hooks/useUrlState exists to solve it.
     const toPage1 = { page: null };
@@ -121,7 +122,7 @@ export default function AccountsDetail() {
      * Debounced search, with the page reset skipped on the first run.
      *
      * The effect fires once on mount, and resetting the page there silently threw
-     * away `?page=3` from a shared link, a bookmark or a browser Back — the table
+     * away `?page=3` from a shared link, a bookmark or a browser Back - the table
      * jumped to page 1 about a third of a second after loading, with no
      * indication why.
      */
@@ -132,7 +133,7 @@ export default function AccountsDetail() {
      * `year` is set to its own default value, which makes useUrlState drop the
      * param; the other eight ride along as companions. Nine separate setter calls
      * would leave eight of the params behind, for the same reason a filter change
-     * cannot reset the page on its own — see toPage1 above.
+     * cannot reset the page on its own - see toPage1 above.
      *
      * `search` is component state rather than a URL param, so it is cleared
      * separately and costs no navigation.
@@ -176,7 +177,7 @@ export default function AccountsDetail() {
     /**
      * Bounds for the year/month filter, as an ISO half-open range on
      * created_time. Built in Montreal time so an account created 31 December at
-     * 20:00 EST counts in December and not in January — the same rule the RPCs
+     * 20:00 EST counts in December and not in January - the same rule the RPCs
      * apply with AT TIME ZONE.
      */
     const dateBounds = useMemo(() => {
@@ -210,7 +211,7 @@ export default function AccountsDetail() {
         if (selectedRegion !== 'Toutes') query = query.eq('region_administrative', selectedRegion);
         if (selectedInvoiced !== 'Tous') query = query.eq('has_invoices', selectedInvoiced === 'avec');
         // A precomputed boolean, not `rating not.in (...)`: PostgREST turns that
-        // into NOT (rating IN ...), which is NULL — and therefore false — for the
+        // into NOT (rating IN ...), which is NULL - and therefore false - for the
         // 977 accounts with no rating, silently hiding them.
         if (ratingScope !== 'Tous') query = query.eq('is_internal', false);
         if (selectedService !== 'Tous') {
@@ -233,7 +234,7 @@ export default function AccountsDetail() {
     /**
      * Monotonic request id. Nine filters over 20,645 rows means a broad query and
      * a narrow one are regularly in flight together, and they do not come back in
-     * the order they were sent — so without this guard an older, wider response
+     * the order they were sent - so without this guard an older, wider response
      * lands last and overwrites the filtered result. On screen that looks exactly
      * like the filter having been ignored: the dropdown says "Meta Ads" and the
      * table shows every account.
@@ -299,7 +300,7 @@ export default function AccountsDetail() {
     useEffect(() => { fetchOptions(); }, [fetchOptions]);
 
     /** The export runs the same filters with no LIMIT, so what lands in Excel is
-     *  the whole filtered set — not the 100 rows that happen to be on screen. */
+     *  the whole filtered set - not the 100 rows that happen to be on screen. */
     const exportRows = useCallback(async () => {
         const { data } = await buildQuery(true).range(0, EXPORT_MAX - 1);
         return (data as ZohoAccountRow[]) ?? [];
@@ -326,7 +327,7 @@ export default function AccountsDetail() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Comptes — Détail</h1>
+                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Comptes · Détail</h1>
                     <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                         Répertoire des comptes clients. Cliquez sur un compte pour voir sa facturation par
                         département et par année.
@@ -490,7 +491,7 @@ export default function AccountsDetail() {
                                             </td>
                                             <td className="td whitespace-nowrap text-ink-mute">{formatPhone(a.phone) ?? '—'}</td>
                                             <td className="td text-ink-mute">{a.billing_city ?? '—'}</td>
-                                            <td className="td text-ink-mute">{a.rep_name ?? '—'}</td>
+                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{a.rep_name ? <><RepAvatar name={a.rep_name} size="sm" />{a.rep_name}</> : '—'}</span></td>
                                             <td className="td">
                                                 <span className="inline-flex items-center gap-1.5">
                                                     {a.is_bulk_import && (
@@ -519,7 +520,7 @@ export default function AccountsDetail() {
                                                     {a.service_origin === 'invoice' && (
                                                         <span
                                                             className="text-ink-faint"
-                                                            title="Service déduit des départements facturés — le CRM n'en indique aucun"
+                                                            title="Service déduit des départements facturés : le CRM n'en indique aucun"
                                                         >*</span>
                                                     )}
                                                 </span>
@@ -687,7 +688,7 @@ const INVOICE_CSV: CsvColumn<LeadInvoiceRow>[] = [
  * line items underneath.
  *
  * The pivot is the answer to "il a acheté combien par département par année,
- * puis voir la progression" — reading a year-over-year trend off a flat list of
+ * puis voir la progression" - reading a year-over-year trend off a flat list of
  * invoices is exactly the work this page exists to remove.
  */
 function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onClose: () => void }) {
@@ -720,7 +721,7 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
         return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    /** Departments as rows, years as columns — the shape people read a trend in. */
+    /** Departments as rows, years as columns - the shape people read a trend in. */
     const pivot = useMemo(() => {
         const years = [...new Set(deptRows.map(r => r.year))].sort((a, b) => a - b);
         const depts = [...new Set(deptRows.map(r => r.department))].sort();
@@ -893,7 +894,7 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                                             </td>
                                             <td className="td text-ink-mute">{inv.department ?? '—'}</td>
                                             <td className="td text-ink-mute">{inv.office ?? '—'}</td>
-                                            <td className="td text-ink-mute">{inv.rep_name ?? '—'}</td>
+                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{inv.rep_name ? <><RepAvatar name={inv.rep_name} size="sm" />{inv.rep_name}</> : '—'}</span></td>
                                             <td className="td">
                                                 <span className={cn('badge', INVOICE_STATUS_COLORS[key])}>
                                                     {INVOICE_STATUS_LABELS[key] ?? key}
@@ -919,7 +920,7 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                   * for these users; it replaces a text node with its own and
                   * then stops tracking it, so a node that rendered "0,00 $"
                   * during the load kept showing "$0.00" after the real total
-                  * arrived — reopening the modal looked like it "fixed" the
+                  * arrived - reopening the modal looked like it "fixed" the
                   * number because that built a fresh node. Not rendering a
                   * placeholder number means there is nothing wrong to freeze;
                   * translate="no" means it is never swapped in the first place.
@@ -939,7 +940,7 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                             filename={`factures_${(account.account_name ?? 'compte').replace(/[^\w-]+/g, '_').slice(0, 40)}`}
                             disabled={invoices.length === 0}
                         />
-                        {/* Label small and muted, amount large and dark — at the
+                        {/* Label small and muted, amount large and dark - at the
                           * same weight and size the two ran together. */}
                         <span className="flex items-baseline gap-2" translate="no">
                             <span className="text-2xs font-semibold uppercase tracking-eyebrow text-ink-mute">

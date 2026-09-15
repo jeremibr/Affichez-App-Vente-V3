@@ -1,9 +1,9 @@
 /**
- * Per-rep commission rate store — backed by Supabase `rep_comm_rates` table.
+ * Per-rep commission rate store - backed by Supabase `rep_comm_rates` table.
  */
 import { supabase } from '../lib/supabase';
 
-const DEFAULT_RATE = 0; // 0% — explicit rate must be set in admin Paye settings
+const DEFAULT_RATE = 0; // 0% - explicit rate must be set in admin Paye settings
 
 /** Fetch the commission rate for a single rep from the DB. */
 export async function fetchCommRate(repName: string): Promise<number> {

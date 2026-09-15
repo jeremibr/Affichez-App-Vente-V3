@@ -7,7 +7,7 @@ import Layout from './components/Layout';
 
 import Login from './pages/Login';
 
-// Leads module — hidden from the UI while the Comptes module replaces it.
+// Leads module - hidden from the UI while the Comptes module replaces it.
 // The pages and every get_zoho_lead* RPC behind them are left intact: the
 // account view is the same data at a different grain, and until it is trusted
 // this is the only way back to a number someone has already quoted.
@@ -19,7 +19,7 @@ import Login from './pages/Login';
  *
  * The app used to ship as a single 820 KB bundle, so a rep opening their own
  * portal first downloaded Settings, both payroll screens and every admin page
- * — none of which they can even reach. Now the first paint carries the shell
+ * - none of which they can even reach. Now the first paint carries the shell
  * and the one route being visited.
  *
  * Layout imports these same modules for its hover prefetch (see
@@ -67,7 +67,7 @@ function AppRoutes() {
         <Suspense fallback={<RouteFallback />}>
         <Routes>
             <Route path="/" element={<Layout />}>
-                {/* ─── Devis module — accessible to all authenticated users ─── */}
+                {/* ─── Devis module - accessible to all authenticated users ─── */}
                 <Route index element={<Dashboard />} />
                 <Route path="weekly" element={<WeeklyDetail />} />
                 <Route path="quarterly" element={<QuarterlyAverages />} />
@@ -82,15 +82,15 @@ function AppRoutes() {
                     </>
                 )}
 
-                {/* ─── Leads module — superseded by Comptes, routes disabled ─── */}
+                {/* ─── Leads module - superseded by Comptes, routes disabled ─── */}
                 {/* <Route path="leads" element={<LeadsDashboard />} /> */}
                 {/* <Route path="leads/detail" element={<LeadsDetail />} /> */}
 
-                {/* ─── Comptes module — Zoho CRM Accounts, the grain that replaced leads ─── */}
+                {/* ─── Comptes module - Zoho CRM Accounts, the grain that replaced leads ─── */}
                 <Route path="comptes" element={<AccountsDashboard />} />
                 <Route path="comptes/detail" element={<AccountsDetail />} />
 
-                {/* ─── Mon Portail — personal view for every rep ─── */}
+                {/* ─── Mon Portail - personal view for every rep ─── */}
                 <Route path="portail" element={<PortailObjectifs />} />
                 <Route path="portail/devis" element={<PortailDevis />} />
                 <Route path="portail/factures" element={<PortailFactures />} />
@@ -106,13 +106,13 @@ function AppRoutes() {
                         <Route path="paye/settings" element={<PayeRepSettings />} />
                         <Route path="objectifs/equipe" element={<ObjectifsEquipe />} />
 
-                        {/* "Créé par" — admin-only on purpose. These numbers overlap
+                        {/* "Créé par" - admin-only on purpose. These numbers overlap
                             the rep figures by design and would be misread as a second
                             leaderboard. Dominic, who asked for it: "c'est vraiment
                             juste pour moi, c'est même pas pour personne." */}
                         <Route path="createurs" element={<Createurs />} />
 
-                        {/* ─── Tâches CRM module (owner-only) — dashboard + weekly tabs ─── */}
+                        {/* ─── Tâches CRM module (owner-only) - dashboard + weekly tabs ─── */}
                         <Route path="taches" element={<TasksDashboard />} />
                     </>
                 )}

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
-   Copied verbatim from branding/reference/Accented.tsx — the brand kit owns
+   Copied verbatim from branding/reference/Accented.tsx - the brand kit owns
    this component; change it there, not here.
 
    Renders the brand's one serif accent word. Mark it with asterisks in the copy
@@ -13,7 +13,7 @@ interface AccentedProps {
 }
 
 /**
- * Sets the `*marked*` part of a display heading in the brand's accent face —
+ * Sets the `*marked*` part of a display heading in the brand's accent face -
  * Inria Serif italic inside an Inter heading, the way affichez.ca writes
  * "Agence *marketing* 360".
  *

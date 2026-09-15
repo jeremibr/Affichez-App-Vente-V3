@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import type { ZoneB_DetailRow, ZoneA_DeptTotal } from '../types/database';
 
 // The brand palette, as RGB triples because jsPDF takes no hex. These mirror
-// branding/tokens/tokens.css — change them there first, then here.
+// branding/tokens/tokens.css - change them there first, then here.
 const BRAND_ORANGE: [number, number, number] = [245, 87, 14];    // --color-primary
 const BLACK: [number, number, number] = [0, 0, 0];               // --color-ink
 const INK_SECONDARY: [number, number, number] = [61, 61, 59];    // --color-ink-secondary
@@ -57,7 +57,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         doc.rect(0, footerY - 2, pageW, 10, 'F');
         doc.setFontSize(7);
         doc.setTextColor(...INK_MUTE);
-        doc.text(`Affichez — Rapport hebdomadaire du ${fmtDate(data.weekStart)} au ${fmtDate(data.weekEnd)}`, margin, footerY + 2);
+        doc.text(`Affichez · Rapport hebdomadaire du ${fmtDate(data.weekStart)} au ${fmtDate(data.weekEnd)}`, margin, footerY + 2);
         doc.text(`Généré le ${new Date().toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageW - margin, footerY + 2, { align: 'right' });
     };
 
@@ -86,7 +86,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     doc.text('Rapport Hebdomadaire', pageW - margin, 12, { align: 'right' });
     doc.setFontSize(10);
     doc.setTextColor(...BRAND_ORANGE);
-    doc.text(`${fmtDate(data.weekStart)} — ${fmtDate(data.weekEnd)}`, pageW - margin, 20, { align: 'right' });
+    doc.text(`${fmtDate(data.weekStart)} au ${fmtDate(data.weekEnd)}`, pageW - margin, 20, { align: 'right' });
 
     y = 36;
 
@@ -323,14 +323,14 @@ function drawKpiCard(
  * The wordmark, rasterised from its own SVG at export time.
  *
  * jsPDF can only place a raster, and the brand ships the logo as a vector with
- * a viewBox but no intrinsic width or height — hand that straight to an
+ * a viewBox but no intrinsic width or height - hand that straight to an
  * <img> and the browser falls back to 300x150, which squashes a 4.83:1 mark.
  * So the size is set explicitly here and the SVG is drawn onto a canvas at 3x
  * the largest size the PDF uses, which keeps it crisp when the report is
  * printed rather than read on screen.
  *
  * Doing it this way means the PNG in the report and the logo in the sidebar
- * are the same file — there is no second copy to forget to update.
+ * are the same file - there is no second copy to forget to update.
  */
 const WORDMARK_RATIO = 3516.375 / 727.446;   // the brand SVG's own viewBox
 

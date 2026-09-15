@@ -1,5 +1,5 @@
 /* =============================================================================
-   Affichez — Ventes : application stylesheet
+   Affichez - Ventes : application stylesheet
 
    The brand is affichez.ca and it lives in `frontend/branding/`. This file
    loads it and adds only what an internal, data-dense dashboard needs on top.
@@ -7,9 +7,9 @@
 
    Load order matters:
      1. Tailwind 4
-     2. tokens.css       — every brand value, as :root custom properties
-     3. tailwind-v4.css  — turns those into utilities + the brand base layer
-     4. this file        — app-level additions, then the component helpers
+     2. tokens.css       - every brand value, as :root custom properties
+     3. tailwind-v4.css  - turns those into utilities + the brand base layer
+     4. this file        - app-level additions, then the component helpers
    ============================================================================= */
 
 @import "tailwindcss";
@@ -37,16 +37,16 @@
 
    Two things the brand kit deliberately does not answer, because they are
    product problems rather than brand ones. Anything else must come from
-   branding/tokens/tokens.css — a hex in a component is a bug.
+   branding/tokens/tokens.css - a hex in a component is a bug.
    -------------------------------------------------------------------------- */
 :root {
   /* A fourth step below --color-ink-mute, on the same warm neutral axis.
      2.8:1 on white: placeholders, disabled labels, inert icons and empty-cell
-     dashes ONLY. Never content — if a person has to read it, it is ink-mute. */
+     dashes ONLY. Never content - if a person has to read it, it is ink-mute. */
   --color-ink-faint: #9a9a96;
 
   /* ---------------------------------------------------------------------------
-     The DATA palette — categorical, and deliberately NOT brand colour.
+     The DATA palette - categorical, and deliberately NOT brand colour.
 
      Tag/TagCell colours ~45 distinct labels (sources, services, departments) by
      hashing the label, so the same service is the same colour on every row.
@@ -62,14 +62,14 @@
      the palette's weakest pair by a long way: two near-white fills separated
      only by the ink, which at 11px across a table is no separation at all.
      Measured as a fill-weighted Lab distance it scored 12.0 where every other
-     pair scored 20.7 or better. Moving it to a solid lavender fill — same hue,
-     deeper weight, exactly the rule above — takes the pair to the ceiling the
+     pair scored 20.7 or better. Moving it to a solid lavender fill - same hue,
+     deeper weight, exactly the rule above - takes the pair to the ceiling the
      rest of the palette sits at, and keeps violet/indigo and violet/fuchsia
      clear (26.4 and 26.6).
 
      Tone 8 used to be a deep ORANGE. On 2026-09-14 it became a deep gold: the
      brand made #F5570E the action colour, and a deep-orange badge in a table
-     read as a button. Same slot, same weight, same warm half of the wheel —
+     read as a button. Same slot, same weight, same warm half of the wheel -
      just far enough away to stop competing. See src/components/TagCell.tsx for
      why the slot was replaced rather than removed.
      ------------------------------------------------------------------------ */
@@ -91,7 +91,7 @@
   --color-data-5-edge: #fecdd3;
 
   /* Deep */
-  --color-data-4: #c4b5fd;       /* violet — deep, so it cannot twin data-2 */
+  --color-data-4: #c4b5fd;       /* violet - deep, so it cannot twin data-2 */
   --color-data-4-ink: #4c1d95;
   --color-data-4-edge: #a78bfa;
 
@@ -103,7 +103,7 @@
   --color-data-7-ink: #365314;
   --color-data-7-edge: #a3e635;
 
-  --color-data-8: #fcd34d;       /* gold — the slot the deep orange left */
+  --color-data-8: #fcd34d;       /* gold - the slot the deep orange left */
   --color-data-8-ink: #78350f;
   --color-data-8-edge: #f59e0b;
 
@@ -157,7 +157,7 @@
    Base
    -------------------------------------------------------------------------- */
 @layer base {
-  /* The site's page ground. App chrome — sidebar, headers, cards — stays white
+  /* The site's page ground. App chrome - sidebar, headers, cards - stays white
      on top of it, which is how affichez.ca stacks a white header over a sand
      hero. Set on the body so overscroll shows sand, not white. */
   body {
@@ -189,13 +189,13 @@
    Component helpers
 
    `.eyebrow`, `.label-caps`, `.accent-serif` and `.tnum` come from the brand
-   kit — see branding/tokens/tailwind-v4.css. What follows is this app's own
+   kit - see branding/tokens/tailwind-v4.css. What follows is this app's own
    furniture.
    -------------------------------------------------------------------------- */
 @layer components {
 
   /* A white card on the sand ground. `shadow-card` is a 1px hairline plus a
-     whisper of shadow, so the card needs no border of its own — adding one
+     whisper of shadow, so the card needs no border of its own - adding one
      doubles the rule. */
   .card {
     @apply bg-white rounded-xl shadow-card;
@@ -206,7 +206,7 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
-  /* Table furniture — the brand's small-caps label, as a cell. */
+  /* Table furniture - the brand's small-caps label, as a cell. */
   .th {
     @apply px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase whitespace-nowrap;
     letter-spacing: var(--tracking-eyebrow);
@@ -229,7 +229,7 @@
   }
 
   /* ---------------------------------------------------------------------------
-     Buttons — 10px-radius rectangles in Inter 600, never pills.
+     Buttons - 10px-radius rectangles in Inter 600, never pills.
 
      Orange is the one main action on a screen; everything beside it is
      black-on-white so the orange keeps its meaning.
@@ -237,7 +237,7 @@
      `.btn-xs` is an app-level addition to the brand's three sizes. The guide's
      smallest button is 36px, which is right for a page but wrong for the action
      that sits inside a table row next to 13px text. It keeps the radius, the
-     weight and the colours — only the box is smaller.
+     weight and the colours - only the box is smaller.
      ------------------------------------------------------------------------ */
   .btn {
     @apply inline-flex items-center justify-center gap-2 whitespace-nowrap
@@ -256,7 +256,7 @@
   .btn-dark      { @apply bg-ink text-white hover:bg-ink/85; }
   .btn-ghost     { @apply bg-transparent text-ink hover:bg-sand; }
   /* The guide's sixth variant, `danger` (crimson fill), is not defined here
-     because nothing in this app is a destructive confirmation yet — the delete
+     because nothing in this app is a destructive confirmation yet - the delete
      controls are icon buttons that turn crimson on hover. Add it from
      branding/reference/Button.tsx the day a confirm dialog needs it. */
 
@@ -269,7 +269,7 @@
 
   /* A menu arriving under its trigger.
      `Select` asked for this with `animate-in fade-in slide-in-from-top-2`,
-     which belongs to the `tailwindcss-animate` plugin — never installed, so the
+     which belongs to the `tailwindcss-animate` plugin - never installed, so the
      dropdown has never actually animated. Six lines of CSS beats a dependency.
      The reduced-motion guard in the brand kit's base layer collapses it to
      0.01ms, so the menu still arrives at its final state. */

@@ -1,0 +1,160 @@
+{
+  "source": "Affichez_Internal_Backend/drizzle/0015_report_representatives.sql (+0016)",
+  "generated": "2026-09-15",
+  "count": 9,
+  "representatives": [
+    {
+      "slug": "dominic-letendre",
+      "fullName": "Dominic Letendre",
+      "email": "dletendre@affichez.ca",
+      "phone": "418 265-6248",
+      "phoneE164": "+14182656248",
+      "sortOrder": 10,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/dominic-letendre.webp",
+        "png": "photos/png/dominic-letendre.png",
+        "svg": "photos/svg/dominic-letendre.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "francis-adam",
+      "fullName": "Francis Adam",
+      "email": "fadam@affichez.ca",
+      "phone": "418 655-3212",
+      "phoneE164": "+14186553212",
+      "sortOrder": 20,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/francis-adam.webp",
+        "png": "photos/png/francis-adam.png",
+        "svg": "photos/svg/francis-adam.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "guillaume-montambeault",
+      "fullName": "Guillaume Montambeault",
+      "email": "gmontambeault@affichez.ca",
+      "phone": "581 849-5297",
+      "phoneE164": "+15818495297",
+      "sortOrder": 30,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/guillaume-montambeault.webp",
+        "png": "photos/png/guillaume-montambeault.png",
+        "svg": "photos/svg/guillaume-montambeault.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "kim-foster-cunningham",
+      "fullName": "Kim Foster Cunningham",
+      "email": "kim@affichez.ca",
+      "phone": "581 999-6811",
+      "phoneE164": "+15819996811",
+      "sortOrder": 40,
+      "isDefault": true,
+      "photo": {
+        "webp": "photos/webp/kim-foster-cunningham.webp",
+        "png": "photos/png/kim-foster-cunningham.png",
+        "svg": "photos/svg/kim-foster-cunningham.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "morgane-owczarzak",
+      "fullName": "Morgane Owczarzak",
+      "email": "morgane@affichez.ca",
+      "phone": "450 848-0124",
+      "phoneE164": "+14508480124",
+      "sortOrder": 50,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/morgane-owczarzak.webp",
+        "png": "photos/png/morgane-owczarzak.png",
+        "svg": "photos/svg/morgane-owczarzak.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": true
+      }
+    },
+    {
+      "slug": "nadya-rocheleau",
+      "fullName": "Nadya Rocheleau",
+      "email": "nrocheleau@affichez.ca",
+      "phone": "450 517-2726",
+      "phoneE164": "+14505172726",
+      "sortOrder": 60,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/nadya-rocheleau.webp",
+        "png": "photos/png/nadya-rocheleau.png",
+        "svg": "photos/svg/nadya-rocheleau.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "paul-ayoub",
+      "fullName": "Paul Ayoub",
+      "email": "paul@affichez.ca",
+      "phone": "450 820-7966",
+      "phoneE164": "+14508207966",
+      "sortOrder": 70,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/paul-ayoub.webp",
+        "png": "photos/png/paul-ayoub.png",
+        "svg": "photos/svg/paul-ayoub.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "richard-courville",
+      "fullName": "Richard Courville",
+      "email": "rcourville@affichez.ca",
+      "phone": "438 526-8527",
+      "phoneE164": "+14385268527",
+      "sortOrder": 80,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/richard-courville.webp",
+        "png": "photos/png/richard-courville.png",
+        "svg": "photos/svg/richard-courville.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    },
+    {
+      "slug": "sylvain-desrosiers",
+      "fullName": "Sylvain Desrosiers",
+      "email": "sylvain@affichez.ca",
+      "phone": "581 703-6431",
+      "phoneE164": "+15817036431",
+      "sortOrder": 90,
+      "isDefault": false,
+      "photo": {
+        "webp": "photos/webp/sylvain-desrosiers.webp",
+        "png": "photos/png/sylvain-desrosiers.png",
+        "svg": "photos/svg/sylvain-desrosiers.svg",
+        "width": 768,
+        "height": 768,
+        "hasTransparency": false
+      }
+    }
+  ]
+}

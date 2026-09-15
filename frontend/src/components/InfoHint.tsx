@@ -9,13 +9,13 @@ interface Props {
     className?: string;
 }
 
-/** Panel width in px — used to decide which side it hangs from. */
+/** Panel width in px - used to decide which side it hangs from. */
 const PANEL_W = 256;
 
 /**
  * A small "what is this number?" marker next to a KPI or a table heading.
  *
- * Opens on hover and on focus, and stays open on click — several of these
+ * Opens on hover and on focus, and stays open on click - several of these
  * explanations run to a few lines, which is longer than a hover tooltip is
  * comfortable to read, and a touch screen has no hover at all.
  *
@@ -23,13 +23,13 @@ const PANEL_W = 256;
  * WHY THE PANEL IS RENDERED IN A PORTAL
  *
  * It used to be a normal absolutely-positioned child, and it kept getting cut
- * off — three separate reports. Absolute positioning cannot escape an ancestor,
+ * off - three separate reports. Absolute positioning cannot escape an ancestor,
  * and these markers sit inside two things that trap it:
  *
  *   - table headings, whose `.th` is `white-space: nowrap` (so the text could
  *     not even wrap inside its own box and ran off the screen), and
  *   - the breakdown cards, which are `overflow-hidden` to clip their rounded-xs
- *     corners — and clipped the panel along with them.
+ *     corners - and clipped the panel along with them.
  *
  * A portal to <body> with fixed positioning has no ancestor to be clipped by, no
  * inherited text rules, and no stacking-context surprises. The position is
@@ -82,7 +82,7 @@ export function InfoHint({ text, className }: Props) {
      * Where to put the panel, measured from the marker at open time.
      *
      * Right-aligned by default so a marker near the right edge stays on screen,
-     * flipped when there is not room to the left — and finally clamped, so it
+     * flipped when there is not room to the left - and finally clamped, so it
      * cannot leave the viewport in either direction whatever the layout does.
      */
     const measure = () => {
@@ -120,7 +120,7 @@ export function InfoHint({ text, className }: Props) {
                     role="tooltip"
                     style={{ top: pos.top, left: pos.left, width: PANEL_W }}
                     // normal-case / tracking-normal / whitespace-normal undo what a
-                    // table heading would otherwise impose — though inside the
+                    // table heading would otherwise impose - though inside the
                     // portal nothing inherits them any more, they are kept so the
                     // panel is immune to wherever it is mounted next.
                     className="fixed z-[100] rounded-lg border border-hairline bg-white p-3

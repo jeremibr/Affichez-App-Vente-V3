@@ -45,7 +45,7 @@ export default function QuarterlyAverages() {
         const venteInterneRows: YoYRow[] = [];
         for (const [quarter, rows] of byQuarter) {
             // current_avg / previous_avg are weekly revenue rates (additive across reps),
-            // so the group total is their sum — NOT a deal-count-weighted average.
+            // so the group total is their sum - NOT a deal-count-weighted average.
             const totalCount   = rows.reduce((s, r) => s + Number(r.deal_count), 0);
             const current_avg  = rows.reduce((s, r) => s + Number(r.current_avg), 0);
             const previous_avg = rows.reduce((s, r) => s + Number(r.previous_avg), 0);

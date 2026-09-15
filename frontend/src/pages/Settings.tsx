@@ -455,7 +455,7 @@ function SyncCard({ title, description, endpoint, actionLabel }: { title: string
                     {lastSync && (
                         <p className="text-xs text-ink-mute mt-2 font-medium">
                             Dernière sync : <span className="text-ink-secondary">{formatRelative(lastSync.received_at)}</span>
-                            {' '}— <span className="font-mono text-2xs text-ink-mute">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
+                            {' '}· <span className="font-mono text-2xs text-ink-mute">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
                         </p>
                     )}
                 </div>
@@ -723,11 +723,11 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                     className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:text-ink-mute"
                                 >
                                     <option value="">
-                                        {zohoUsersLoading ? 'Chargement des utilisateurs Zoho…' : '— Sélectionner un utilisateur Zoho —'}
+                                        {zohoUsersLoading ? 'Chargement des utilisateurs Zoho…' : 'Sélectionner un utilisateur Zoho…'}
                                     </option>
                                     {zohoUsers.map(u => (
                                         <option key={u.email} value={u.email}>
-                                            {u.name} — {u.email}
+                                            {u.name} · {u.email}
                                         </option>
                                     ))}
                                 </select>
@@ -764,7 +764,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                     onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
                                     className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 >
-                                    <option value="">— Aucun —</option>
+                                    <option value="">Aucun</option>
                                     {repOptions.map(r => <option key={r} value={r}>{r}</option>)}
                                 </select>
                             </div>
@@ -993,7 +993,7 @@ function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'succe
                 )}
             </div>
             <p className="text-xs text-ink-mute px-1">
-                Les modifications sont immédiates — les filtres SQL excluent ces clients de tous les calculs en temps réel.
+                Les modifications sont immédiates : les filtres SQL excluent ces clients de tous les calculs en temps réel.
             </p>
         </div>
     );

@@ -146,7 +146,7 @@ export function MonthlyDetail({
     // Commission is based on net revenue (avoirs reduce the commission base)
     const totalCommission = totalNet * commRate;
 
-    // Department breakdown — include avoirs so dept totals are net
+    // Department breakdown - include avoirs so dept totals are net
     const deptMap = new Map<string, DeptSummary>();
     for (const dept of DEPARTMENTS) {
         deptMap.set(dept, { department: dept, total: 0, commission: 0, count: 0 });
@@ -155,7 +155,7 @@ export function MonthlyDetail({
         const avoir = isAvoir(r);
         const key = r.department ?? '';
         const cur = deptMap.get(key) ?? { department: key, total: 0, commission: 0, count: 0 };
-        cur.total += r.amount; // avoirs are negative — naturally subtract
+        cur.total += r.amount; // avoirs are negative - naturally subtract
         if (!avoir) { cur.commission += r.amount * commRate; cur.count++; }
         deptMap.set(key, cur);
     }
@@ -315,7 +315,7 @@ export function MonthlyDetail({
                 <div className="bg-white rounded-xl shadow-card overflow-hidden">
                     <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
                         <h4 className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">
-                            Détail — {rows.length} transaction{rows.length > 1 ? 's' : ''}
+                            Détail · {rows.length} transaction{rows.length > 1 ? 's' : ''}
                         </h4>
                         {avoirRows.length > 0 && (
                             <span className="text-2xs font-bold text-tone-critical bg-tone-critical-soft px-2 py-0.5 rounded-full">
@@ -395,7 +395,7 @@ export function MonthlyDetail({
                             <tfoot>
                                 <tr className="border-t-2 border-hairline-strong bg-sand/80">
                                     <td className="px-5 py-2.5 text-xs font-semibold text-ink-mute uppercase tracking-wide">
-                                        Total — {rows.length} lignes
+                                        Total · {rows.length} lignes
                                     </td>
                                     <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">
                                         {formatCurrencyCAD(totalNet)}

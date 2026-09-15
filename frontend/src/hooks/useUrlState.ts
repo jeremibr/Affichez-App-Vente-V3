@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom';
  *
  * Needed because react-router's `setSearchParams` closes over the params of the
  * render that produced it, so two calls in one event handler both start from
- * that same snapshot and each fires its own navigate() — the second silently
+ * that same snapshot and each fires its own navigate() - the second silently
  * discards the first. Every filter on the Leads detail page also reset `page`,
  * which meant the filter itself was the change being thrown away: the dropdown
  * snapped straight back and nothing could be selected at all.

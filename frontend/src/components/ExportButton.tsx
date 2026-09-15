@@ -4,7 +4,7 @@ import { downloadCsv, type CsvColumn } from '../lib/csv';
 import { cn } from '../lib/utils';
 
 /**
- * "Exporter CSV" — the same button on every table.
+ * "Exporter CSV" - the same button on every table.
  *
  * `rows` may be a function returning a promise, because the two cases are not
  * the same: a breakdown table already holds everything it shows, while a

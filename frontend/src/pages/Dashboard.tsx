@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { RepAvatar } from '../components/RepAvatar';
 
 interface DashboardKPIs {
     ytd_total: number;
@@ -85,7 +86,7 @@ export default function Dashboard() {
      *
      * It used to be scraped out of the leaderboard this page had just loaded.
      * That was harmless only while the leaderboard ignored the rep filter; now
-     * that it honours it, the scrape would feed the filter its own output —
+     * that it honours it, the scrape would feed the filter its own output -
      * pick "Interne", the leaderboard comes back holding only internal names,
      * allReps then equals the internal group, and the next render computes
      * allReps-minus-team = the same set for a different reason. One unfiltered
@@ -94,7 +95,7 @@ export default function Dashboard() {
     const [allReps, setAllReps] = useState<string[]>([]);
 
     /**
-     * The rep filter. See useRepFilter — the dropdown lists the current sales
+     * The rep filter. See useRepFilter - the dropdown lists the current sales
      * team by name plus two groups, and everyone else (former staff, internal
      * billing) sits behind "Interne" instead of adding 20 rows nobody scrolls.
      *
@@ -122,7 +123,7 @@ export default function Dashboard() {
             if (cancelled || !data) return;
             const names = (data as LeaderboardEntry[]).map(r => r.rep_name).filter(Boolean);
             // 'Vente interne' is dropped by excluded_reps, so it never comes back
-            // here — but it is a real biller and belongs in the Interne group.
+            // here - but it is a real biller and belongs in the Interne group.
             setAllReps([...new Set([...names, 'Vente interne'])].sort());
         })();
         return () => { cancelled = true; };
@@ -183,7 +184,7 @@ export default function Dashboard() {
     // Re-fetch whenever filters change
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // Realtime subscription — set up once, always calls the latest fetchData via ref
+    // Realtime subscription - set up once, always calls the latest fetchData via ref
     useEffect(() => {
         const sub = supabase
             .channel('db-changes')
@@ -308,8 +309,9 @@ export default function Dashboard() {
                                             )}>
                                                 {idx + 1}
                                             </span>
-                                            <div>
-                                                <p className="text-sm font-semibold text-ink-secondary">{rep.rep_name}</p>
+                                            <RepAvatar name={rep.rep_name} size="md" />
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-ink-secondary truncate">{rep.rep_name}</p>
                                                 <p className="text-2xs text-ink-mute uppercase font-semibold">{rep.office}</p>
                                             </div>
                                         </div>
@@ -358,7 +360,7 @@ export default function Dashboard() {
                     {/* Main Performance Table */}
                     <div className="space-y-6">
                         <SommaireTable
-                            title={selectedDept === 'Toutes' ? "Performance Globale" : `Performance — ${selectedDept}`}
+                            title={selectedDept === 'Toutes' ? "Performance Globale" : `Performance · ${selectedDept}`}
                             data={selectedDept === 'Toutes' ? grandTotalData : deptData.filter(x => x.department === selectedDept)}
                             prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
                             year={year}
@@ -392,7 +394,11 @@ export default function Dashboard() {
                                         idx === 0 ? "bg-ink text-white" : idx === 1 ? "bg-stone text-ink-secondary" : idx === 2 ? "bg-sand text-ink-mute" : "bg-sand text-ink-faint"
                                     )}>{idx + 1}</span>
                                 </td>
-                                <td className="px-4 py-2.5 font-semibold text-ink-secondary">{rep.rep_name}</td>
+                                <td className="px-4 py-2.5 font-semibold text-ink-secondary">
+                                    <span className="flex items-center gap-2">
+                                        <RepAvatar name={rep.rep_name} size="sm" />{rep.rep_name}
+                                    </span>
+                                </td>
                                 <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{rep.office}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{rep.deal_count}</td>

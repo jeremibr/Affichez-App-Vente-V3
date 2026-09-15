@@ -19,7 +19,7 @@ import { formatCurrencyCAD, cn } from '../../lib/utils';
  * dependency, and the app currently ships no chart library at all.
  *
  * Revenue per account is the plotted line, not total revenue, and that is
- * deliberate — a month with twice the accounts will always show more total
+ * deliberate - a month with twice the accounts will always show more total
  * revenue, which tells you about volume rather than quality. The bars carry the
  * volume so both are readable at once.
  */
@@ -57,7 +57,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
     const maxRpa = Math.max(1, ...data.map(d => Math.max(d.rpa, d.prevRpa)));
 
     // Plot geometry. viewBox units scaled by CSS, so the chart is sharp at any
-    // width without a resize observer — and `preserveAspectRatio="none"` below
+    // width without a resize observer - and `preserveAspectRatio="none"` below
     // lets it stretch to the full card instead of sitting in a 720px box with
     // empty space either side, which is how it first shipped.
     //
@@ -79,9 +79,9 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold text-ink">
-                    Évolution mensuelle{year !== 'Toutes' && ` — ${year}`}
+                    Évolution mensuelle{year !== 'Toutes' && ` · ${year}`}
                 </h3>
-                <InfoHint text={`Les barres montrent le nombre de comptes créés chaque mois. La ligne montre le revenu par compte sur ${windowLabel} — c'est elle qui dit si un mois a ramené de bons clients ou seulement beaucoup de clients. La ligne pâle est l'année précédente.`} />
+                <InfoHint text={`Les barres montrent le nombre de comptes créés chaque mois. La ligne montre le revenu par compte sur ${windowLabel} : c'est elle qui dit si un mois a ramené de bons clients ou seulement beaucoup de clients. La ligne pâle est l'année précédente.`} />
                 <div className="ml-auto flex items-center gap-3">
                     <Legend year={year} previousYear={hasPrevious ? previousYear : null} />
                     <ExportButton rows={data} columns={MONTHLY_CSV} filename="comptes_par_mois" disabled={data.every(d => d.accounts === 0)} />
@@ -93,7 +93,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                      className="w-full h-[240px]" role="img"
                      aria-label="Comptes créés et revenu par compte, mois par mois">
                     {/* Three gridlines and their values. Without them the line has
-                        no scale at all — you can see that August beat July, but not
+                        no scale at all - you can see that August beat July, but not
                         by $40 or $400. */}
                     {[0, 0.5, 1].map(f => (
                         <g key={f}>
@@ -120,7 +120,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                     })}
 
                     {/* Last year: dashed, grey, hollow square markers, thin. Two
-                        orange-ish lines of the same weight were the complaint —
+                        orange-ish lines of the same weight were the complaint -
                         colour alone was not enough to tell them apart, so they now
                         differ in colour AND dash AND marker shape. */}
                     {hasPrevious && (
@@ -180,7 +180,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                                 {/* Last year's revenue per account, with this
                                   * year's change under it. The top line is
                                   * deliberately the 2025 VALUE and not the
-                                  * gap — the percentage already says how far
+                                  * gap - the percentage already says how far
                                   * apart the two are, so printing the
                                   * difference as well said the same thing
                                   * twice and left the number being compared
@@ -216,7 +216,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
 
 /**
  * Named years rather than "An dernier", and swatches that actually show the
- * difference — a solid bar with a dot against a dashed one with a square. The
+ * difference - a solid bar with a dot against a dashed one with a square. The
  * legend has to be readable on its own, because it is what the reader consults
  * when the two lines cross.
  */
@@ -233,7 +233,7 @@ function Legend({ year, previousYear }: { year: number | 'Toutes'; previousYear:
                     <line x1="0" y1="4" x2="22" y2="4" className="stroke-primary" strokeWidth={2.5} />
                     <circle cx="11" cy="4" r="3" className="fill-primary stroke-white" strokeWidth={1.5} />
                 </svg>
-                {thisLabel} — $ / compte
+                {thisLabel} · $ / compte
             </span>
             {previousYear !== null && (
                 <span className="flex items-center gap-1.5">

@@ -2,7 +2,7 @@
  * CSV export, shared by every table in the app.
  *
  * Asked for directly in the 2026-09-04 meeting: "je veux tout le temps qu'on
- * puisse télécharger les rapports partout" — the point is not the file, it is
+ * puisse télécharger les rapports partout" - the point is not the file, it is
  * that Dominic can pivot the numbers himself instead of asking for a new view
  * every time a question changes shape.
  *
@@ -23,7 +23,7 @@
 export type CsvValue = string | number | boolean | null | undefined;
 
 export type CsvColumn<T> = {
-    /** Column heading, in French — this file is read by people, not by code. */
+    /** Column heading, in French - this file is read by people, not by code. */
     header: string;
     value: (row: T) => CsvValue;
 };
@@ -31,7 +31,7 @@ export type CsvColumn<T> = {
 /**
  * RFC 4180 quoting, adapted to a semicolon delimiter.
  *
- * A field is quoted only when it has to be — a delimiter, a quote, or a newline
+ * A field is quoted only when it has to be - a delimiter, a quote, or a newline
  * in it. Quoting everything would be valid CSV, but it also turns every number
  * into text as far as Excel is concerned, which defeats the point of exporting.
  */
@@ -60,7 +60,7 @@ function escapeCell(v: CsvValue): string {
  * Columns derived from the first row's keys.
  *
  * For tables whose shape is defined by an RPC and mirrored straight onto the
- * screen — the header is then the column name, which is not pretty but is
+ * screen - the header is then the column name, which is not pretty but is
  * honest, and it means a new field added to the query is exported without
  * anybody having to remember to add it here.
  *

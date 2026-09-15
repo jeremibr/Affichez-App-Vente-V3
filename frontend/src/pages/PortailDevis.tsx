@@ -113,7 +113,7 @@ export default function PortailDevis({ propRepName }: Props) {
                         <ClipboardList className="w-5 h-5 text-data-2-ink" />
                         Mes Devis
                     </h2>
-                    <p className="text-sm text-ink-mute mt-0.5">Performance et indicateurs — {repName || 'Représentant'}</p>
+                    <p className="text-sm text-ink-mute mt-0.5">Performance et indicateurs · {repName || 'Représentant'}</p>
                 </div>
 
                 {/* Tab switcher */}
@@ -221,7 +221,7 @@ export default function PortailDevis({ propRepName }: Props) {
 
                     {/* Sommaire */}
                     <SommaireTable
-                        title={`Performance mensuelle — ${repName}`}
+                        title={`Performance mensuelle · ${repName}`}
                         data={grandTotal}
                         prevYearData={prevGrandTotal}
                         year={year}
@@ -248,7 +248,7 @@ export default function PortailDevis({ propRepName }: Props) {
                 <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
                 <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
-                        <h3 className="text-sm font-semibold text-ink">Tous mes clients — Devis</h3>
+                        <h3 className="text-sm font-semibold text-ink">Tous mes clients · Devis</h3>
                         <button onClick={() => setShowClients(false)} className="p-1.5 rounded-md text-ink-mute hover:bg-stone transition-all"><X className="w-4 h-4" /></button>
                     </div>
                     <div className="overflow-y-auto">

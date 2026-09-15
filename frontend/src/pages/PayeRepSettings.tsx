@@ -2,9 +2,9 @@ import { Users } from 'lucide-react';
 import { useUrlState } from '../hooks/useUrlState';
 import { useRepList } from '../hooks/useRepList';
 import { useAuth } from '../contexts/AuthContext';
-import { cn } from '../lib/utils';
 import { Select } from '../components/Select';
 import PortailPaye from './PortailPaye';
+import { RepAvatar } from '../components/RepAvatar';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export default function PayeRepSettings() {
             {/* ─── Bordered container: hero + pay table ─── */}
             <div className="rounded-xl border border-primary/20 shadow-card overflow-visible">
 
-                {/* Hero — orange gradient, no overflow-hidden so dropdown shows */}
+                {/* Hero - orange gradient, no overflow-hidden so dropdown shows */}
                 <div className="bg-primary rounded-t-xl px-6 py-6 md:py-8">
                     <p className="text-2xs font-semibold text-white uppercase tracking-eyebrow mb-5">
                         Paramètres du représentant
@@ -37,14 +37,11 @@ export default function PayeRepSettings() {
 
                         {/* Avatar + name */}
                         <div className="flex items-center gap-4 flex-1 min-w-0">
-                            <div className={cn(
-                                "w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-semibold shrink-0 transition-all",
-                                selectedRep
-                                    ? "bg-white text-primary-press shadow-lg shadow-black/10"
-                                    : "bg-black/15 text-white"
-                            )}>
-                                {selectedRep ? selectedRep.charAt(0).toUpperCase() : <Users className="w-6 h-6" />}
-                            </div>
+                            {selectedRep
+                                ? <RepAvatar name={selectedRep} size="lg" square className="w-14 h-14 ring-2 ring-white/70 shadow-lg shadow-black/10" />
+                                : <div className="w-14 h-14 rounded-xl bg-black/15 text-white flex items-center justify-center shrink-0">
+                                      <Users className="w-6 h-6" />
+                                  </div>}
                             <div className="min-w-0">
                                 {selectedRep ? (
                                     <h1 className="text-2xl md:text-3xl font-semibold text-white tracking-tight truncate">

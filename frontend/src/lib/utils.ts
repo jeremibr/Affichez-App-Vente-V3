@@ -76,7 +76,7 @@ export function formatPercentage(value: number): string {
 // ─── Phone Formatter ───
 // Zoho stores whatever the rep typed, so the same column holds '4502883775',
 // '514 606-0878', '(450) 288-3775' and '+1 450 288 3775'. Render every North
-// American number the one way — '514 606-0878' — and hand anything else back
+// American number the one way - '514 606-0878' - and hand anything else back
 // exactly as entered: an international or malformed number squeezed into a
 // 10-digit shape is worse than an unformatted one.
 
@@ -142,7 +142,7 @@ export const SERVICE_MAX_CHARS = 32;
  *
  * `truncated` matters as much as `hiddenCount`: a single name too long for the
  * column is elided just as surely as a second service is, and the caller has to
- * put BOTH cases in the tooltip or the value becomes unrecoverable — the reader
+ * put BOTH cases in the tooltip or the value becomes unrecoverable - the reader
  * sees "Développement d'application W…" and has nowhere to find the rest.
  */
 export function clipServices(

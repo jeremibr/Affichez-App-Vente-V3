@@ -45,7 +45,7 @@ export default function FQuarterlyAverages() {
         const venteInterneRows: YoYRow[] = [];
         for (const [quarter, rows] of byQuarter) {
             // current_avg / previous_avg are weekly revenue rates (additive across reps),
-            // so the group total is their sum — NOT a deal-count-weighted average.
+            // so the group total is their sum - NOT a deal-count-weighted average.
             const totalCount   = rows.reduce((s, r) => s + Number(r.deal_count), 0);
             const current_avg  = rows.reduce((s, r) => s + Number(r.current_avg), 0);
             const previous_avg = rows.reduce((s, r) => s + Number(r.previous_avg), 0);
@@ -111,7 +111,7 @@ export default function FQuarterlyAverages() {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-semibold text-ink tracking-tight">
-                        Factures — Moyennes Trimestrielles
+                        Factures · Moyennes Trimestrielles
                         {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-ink-mute">({authRepName})</span>}
                     </h1>
                     <p className="text-sm text-ink-mute mt-0.5">Analyse comparative des factures moyennes par trimestre.</p>

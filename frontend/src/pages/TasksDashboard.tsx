@@ -18,6 +18,7 @@ import { useSort } from '../hooks/useSort';
 import { useRepList } from '../hooks/useRepList';
 import { ExportButton } from '../components/ExportButton';
 import { autoColumns } from '../lib/csv';
+import { RepAvatar } from '../components/RepAvatar';
 
 const STATUS_LABELS: Record<string, string> = Object.fromEntries(TASK_STATUSES.map(s => [s.value, s.label]));
 
@@ -53,7 +54,7 @@ function fmtShort(dateStr: string): string {
     return new Date(y, m - 1, d).toLocaleDateString('fr-CA', { day: 'numeric', month: 'short' });
 }
 function fmtWeekRange(start: string, end: string): string {
-    return `${fmtShort(start)} — ${fmtShort(end)}`;
+    return `${fmtShort(start)} au ${fmtShort(end)}`;
 }
 function addDaysStr(dateStr: string, days: number): string {
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -157,9 +158,9 @@ export default function TasksDashboard() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
-                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Tâches CRM — Activité des représentants</h1>
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Tâches CRM · Activité des représentants</h1>
                 <p className="text-xs md:text-sm text-ink-mute mt-0.5">
-                    Ce que chaque rep fait dans Zoho CRM. Créées / complétées / traitées sur la période — ouvertes et en retard en temps réel.
+                    Ce que chaque rep fait dans Zoho CRM. Créées / complétées / traitées sur la période. Ouvertes et en retard en temps réel.
                 </p>
             </div>
 
@@ -234,7 +235,7 @@ export default function TasksDashboard() {
                         <KPICard title="En retard"     value={String(kpis?.total_overdue ?? 0)}   subText="Échéance dépassée" icon={AlertTriangle} danger={(kpis?.total_overdue ?? 0) > 0} />
                     </div>
 
-                    {/* Rep leaderboard — the core comparison */}
+                    {/* Rep leaderboard - the core comparison */}
                     <div className="bg-white rounded-xl shadow-card overflow-hidden">
                         <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
                             <h3 className="text-sm font-semibold text-ink">Classement des représentants</h3>
@@ -268,7 +269,11 @@ export default function TasksDashboard() {
                                             const rate = Number(r.completion_rate) || 0;
                                             return (
                                                 <tr key={r.rep_name} className="hover:bg-sand/60 transition-colors">
-                                                    <td className="px-4 py-3 font-semibold text-ink-secondary whitespace-nowrap">{r.rep_name}</td>
+                                                    <td className="px-4 py-3 font-semibold text-ink-secondary whitespace-nowrap">
+                                                        <span className="flex items-center gap-2">
+                                                            <RepAvatar name={r.rep_name} size="sm" />{r.rep_name}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-4 py-3 text-right font-bold text-ink-secondary tabular-nums">{r.nb_created}</td>
                                                     <td className="px-4 py-3 text-right tabular-nums"><span className="font-bold text-tone-good-ink">{r.nb_completed}</span></td>
                                                     <td className="px-4 py-3">
@@ -351,7 +356,7 @@ function WeekOverWeekPanel({ rows }: { rows: TasksWoWRow[] }) {
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline">
                 <h3 className="text-sm font-semibold text-ink">Cette semaine vs semaine dernière</h3>
-                <p className="text-2xs text-ink-mute mt-0.5">Tâches complétées, par rep — qui accélère, qui ralentit</p>
+                <p className="text-2xs text-ink-mute mt-0.5">Tâches complétées, par rep : qui accélère, qui ralentit</p>
             </div>
             {rows.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucune activité récente</p>
@@ -372,7 +377,11 @@ function WeekOverWeekPanel({ rows }: { rows: TasksWoWRow[] }) {
                             const color = delta > 0 ? 'text-tone-good' : delta < 0 ? 'text-tone-critical' : 'text-ink-faint';
                             return (
                                 <tr key={r.rep_name} className="hover:bg-sand/60 transition-colors">
-                                    <td className="px-4 py-2.5 font-semibold text-ink-secondary">{r.rep_name}</td>
+                                    <td className="px-4 py-2.5 font-semibold text-ink-secondary">
+                                        <span className="flex items-center gap-2">
+                                            <RepAvatar name={r.rep_name} size="sm" />{r.rep_name}
+                                        </span>
+                                    </td>
                                     <td className="px-4 py-2.5 text-right text-ink-mute tabular-nums">{r.completed_last_week}</td>
                                     <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{r.completed_this_week}</td>
                                     <td className="px-4 py-2.5 text-right">
@@ -399,7 +408,7 @@ function StatusPanel({ rows }: { rows: TasksByStatusRow[] }) {
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline">
                 <h3 className="text-sm font-semibold text-ink">Tâches ouvertes par statut</h3>
-                <p className="text-2xs text-ink-mute mt-0.5">Composition du backlog — beaucoup de « Non commencé » = tâches créées mais pas travaillées</p>
+                <p className="text-2xs text-ink-mute mt-0.5">Composition du backlog : beaucoup de « Non commencé » = tâches créées mais pas travaillées</p>
             </div>
             {rows.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucune tâche ouverte</p>

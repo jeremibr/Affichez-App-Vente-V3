@@ -23,7 +23,7 @@ export default function PortailFacturesMensuel({ propRepName }: Props) {
             <div>
                 <h2 className="text-xl font-semibold text-ink tracking-tight flex items-center gap-2">
                     <FileText className="w-5 h-5 text-data-3-ink" />
-                    Mes Factures — Détail Mensuel
+                    Mes Factures · Détail Mensuel
                 </h2>
                 <p className="text-sm text-ink-mute mt-0.5">
                     Facturation mois par mois · {repName || 'Représentant'}

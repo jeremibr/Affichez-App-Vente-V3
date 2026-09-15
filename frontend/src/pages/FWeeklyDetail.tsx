@@ -22,7 +22,7 @@ function fmtShort(dateStr: string): string {
 }
 
 function fmtWeekRange(start: string, end: string): string {
-    return `${fmtShort(start)} — ${fmtShort(end)}`;
+    return `${fmtShort(start)} au ${fmtShort(end)}`;
 }
 
 export default function FWeeklyDetail() {
@@ -136,7 +136,7 @@ export default function FWeeklyDetail() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Factures — Détail Hebdo</h1>
+                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Factures · Détail Hebdo</h1>
                     <p className="text-xs md:text-sm text-ink-mute mt-0.5">Vue équipe complète</p>
                 </div>
                 <div className="rounded-md border border-primary/40">

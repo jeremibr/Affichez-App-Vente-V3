@@ -4,10 +4,10 @@
  * A click is preceded by roughly 200-400 ms of hovering, which is dead time the
  * browser can spend on the two things that make the next screen wait:
  *
- *   1. **the route's JavaScript chunk** — since routes became lazy in App.tsx,
+ *   1. **the route's JavaScript chunk** - since routes became lazy in App.tsx,
  *      visiting a screen for the first time costs a network fetch before React
  *      can render anything at all;
- *   2. **the first query it will run** — the filter options and week lists,
+ *   2. **the first query it will run** - the filter options and week lists,
  *      which are the same for everybody and the slowest queries in the app.
  *
  * Both land in a cache that the page then hits instead of the network:
@@ -17,7 +17,7 @@
  *
  * Everything here is best-effort. It fires on hover and focus, never on render,
  * so it costs nothing on a screen nobody is heading to, and a failure is
- * swallowed — this is work the user did not ask for and must never surface as
+ * swallowed - this is work the user did not ask for and must never surface as
  * an error.
  */
 import { prefetchRpc } from './rpcCache';
@@ -50,7 +50,7 @@ const ROUTE_CHUNKS: Record<string, () => Promise<unknown>> = {
 /**
  * The first query each screen fires, where it is worth paying for early.
  *
- * Only queries whose arguments are knowable before the page mounts are listed —
+ * Only queries whose arguments are knowable before the page mounts are listed -
  * the ones driven by filter state are not, and guessing would just warm an
  * entry nobody reads. These are all cached for ten minutes (rpcCache's
  * LONG_TTL), because they are lists of values that only change when a Zoho sync

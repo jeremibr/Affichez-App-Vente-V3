@@ -41,7 +41,7 @@ export default function Login() {
     };
 
     return (
-        // Sand ground, white card. Not the tempting black/white split — the
+        // Sand ground, white card. Not the tempting black/white split - the
         // brand runs black edge to edge or not at all.
         <div className="min-h-screen bg-sand flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
@@ -78,7 +78,7 @@ export default function Login() {
                 </div>
 
                 <p className="text-center text-xs text-ink-faint mt-6">
-                    {new Date().getFullYear()} Affichez — Usage interne seulement
+                    {new Date().getFullYear()} Affichez · Usage interne seulement
                 </p>
             </div>
         </div>

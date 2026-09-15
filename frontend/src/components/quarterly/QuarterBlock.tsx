@@ -5,6 +5,7 @@ import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
 import { ExportButton } from '../ExportButton';
 import type { CsvColumn } from '../../lib/csv';
+import { RepAvatar } from '../../components/RepAvatar';
 
 const QUARTER_CSV: CsvColumn<YoYRow>[] = [
     { header: 'Trimestre',          value: r => r.quarter },
@@ -28,7 +29,7 @@ export function QuarterBlock({
     currentYear: number;
     dealLabel?: string;
     // When provided (whole-team view), the "Total équipe" last-year figure uses the
-    // true company total for the year — including reps who left or had a dry quarter —
+    // true company total for the year - including reps who left or had a dry quarter -
     // instead of only summing the reps shown this year. See get_quarterly_yoy_totals.
     previousTotalOverride?: number;
 }) {
@@ -122,7 +123,7 @@ export function QuarterBlock({
                                 const res = Number(row.resultat);
                                 return (
                                     <tr key={idx} className="hover:bg-sand/60 transition-colors group">
-                                        <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-ink-secondary whitespace-nowrap sticky left-0 bg-white z-10">{row.rep_name}</td>
+                                        <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-ink-secondary whitespace-nowrap sticky left-0 bg-white z-10"><span className="inline-flex items-center gap-2"><RepAvatar name={row.rep_name} size="sm" />{row.rep_name}</span></td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
                                             <span className="text-sm font-bold text-ink-secondary tabular-nums">{row.deal_count}</span>
                                             <span className="text-2xs text-ink-mute ml-1">{Number(row.deal_count) > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>

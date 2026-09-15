@@ -7,6 +7,7 @@ import { INTERNAL_REP_NAMES } from '../lib/constants';
 import PortailDevis from './PortailDevis';
 import PortailFactures from './PortailFactures';
 import PortailPaye from './PortailPaye';
+import { RepAvatar } from '../components/RepAvatar';
 
 type Tab = 'devis' | 'factures' | 'paye';
 
@@ -41,9 +42,11 @@ function RepPicker({ reps, selected, onChange }: {
                 onClick={() => setOpen(v => !v)}
                 className="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-hairline-strong rounded-md text-sm font-semibold text-ink-secondary hover:border-primary hover:text-primary-press transition-all shadow-xs min-w-[200px]"
             >
-                <div className="w-7 h-7 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
-                    {selected ? selected.charAt(0) : <User className="w-3.5 h-3.5" />}
-                </div>
+                {selected
+                    ? <RepAvatar name={selected} size="md" />
+                    : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center shrink-0">
+                          <User className="w-3.5 h-3.5" />
+                      </div>}
                 <span className="flex-1 text-left">{selected || 'Choisir un représentant'}</span>
                 <ChevronDown className={cn("w-4 h-4 text-ink-mute transition-transform", open && "rotate-180")} />
             </button>
@@ -67,12 +70,7 @@ function RepPicker({ reps, selected, onChange }: {
                                         : "text-ink-secondary hover:bg-sand font-medium"
                                 )}
                             >
-                                <div className={cn(
-                                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                                    rep === selected ? "bg-primary/20 text-primary-press" : "bg-stone text-ink-secondary"
-                                )}>
-                                    {rep.charAt(0)}
-                                </div>
+                                <RepAvatar name={rep} size="md" />
                                 {rep}
                             </button>
                         ))}
@@ -132,9 +130,7 @@ export default function AdminReps() {
                     {/* Rep identity + picker */}
                     <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-primary-wash text-primary-press flex items-center justify-center text-lg font-bold border border-primary/20 shrink-0">
-                                {selectedRep ? selectedRep.charAt(0) : '?'}
-                            </div>
+                            <RepAvatar name={selectedRep} size="lg" square />
                             <div>
                                 <h1 className="text-xl font-semibold text-ink tracking-tight">
                                     {selectedRep || '—'}
@@ -152,7 +148,7 @@ export default function AdminReps() {
                         )}
                     </div>
 
-                    {/* Tab bar — same visual as module nav but inline */}
+                    {/* Tab bar - same visual as module nav but inline */}
                     <div className="flex items-center gap-1">
                         {TABS.map(tab => {
                             const Icon = tab.icon;

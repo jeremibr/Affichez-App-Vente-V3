@@ -1,14 +1,14 @@
 import { cn } from '../lib/utils';
 
 /**
- * The Affichez wordmark — lowercase, with the z drawn as a square arrow ↗.
+ * The Affichez wordmark - lowercase, with the z drawn as a square arrow ↗.
  *
  * Always the real file from `public/brand/`, never redrawn and never recoloured
  * in CSS: the white variant is the same artwork in a different fill, not a
  * filter over the orange one.
  *
  * The artwork is 3516.375 × 727.446 (≈ 4.83 : 1). Set a height and let the
- * width follow — `w-auto` is what stops it being squashed into a container.
+ * width follow - `w-auto` is what stops it being squashed into a container.
  * The brand's practical heights: 22 in a dense toolbar, 24 in a sidebar, 28–30
  * in page chrome and on auth screens, 32 on a footer band. Clear space is at
  * least half the logo's height on every side.
@@ -36,7 +36,7 @@ export function Logo({
 }
 
 /**
- * The mark on its own — the ↗ z — for anywhere the wordmark cannot fit.
+ * The mark on its own - the ↗ z - for anywhere the wordmark cannot fit.
  */
 export function LogoMark({ size = 24, className }: { size?: number; className?: string }) {
     return (

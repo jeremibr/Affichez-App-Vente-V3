@@ -2,7 +2,7 @@ import { FilterX } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 /**
- * "Réinitialiser" — puts every filter on the page back to its default.
+ * "Réinitialiser" - puts every filter on the page back to its default.
  *
  * Two things about it that are not obvious:
  *
@@ -18,7 +18,7 @@ import { cn } from '../lib/utils';
  * The caller owns the reset, because it has to happen in ONE navigation: each URL
  * setter closes over the address bar as it was when that render produced it, so
  * clearing nine params with nine calls would leave eight of them behind. Every
- * caller passes a single setter carrying the rest as companions — the same rule
+ * caller passes a single setter carrying the rest as companions - the same rule
  * the filters themselves follow. See UrlStateCompanions in hooks/useUrlState.
  */
 export function ClearFiltersButton({ activeCount, onClear, className }: {
@@ -36,7 +36,7 @@ export function ClearFiltersButton({ activeCount, onClear, className }: {
             title={active
                 ? `Remettre les ${activeCount} filtre${activeCount > 1 ? 's' : ''} actif${activeCount > 1 ? 's' : ''} à leur valeur par défaut`
                 : 'Aucun filtre actif'}
-            // `btn-sm` is 36px — the same height as the Select triggers beside
+            // `btn-sm` is 36px - the same height as the Select triggers beside
             // it. The hand-set 38px it used to carry left it 2px proud of them.
             className={cn(
                 'btn btn-sm text-xs gap-1.5',

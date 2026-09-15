@@ -14,6 +14,7 @@ import { useRepList } from '../hooks/useRepList';
 import { Select } from './Select';
 import { Logo } from './Logo';
 import { prefetchRoute } from '../lib/prefetch';
+import { RepAvatar } from './RepAvatar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -130,7 +131,7 @@ function SectionHeader({ label, icon: Icon, activeColor, items, open, active, on
 
 export default function Layout() {
     const location = useLocation();
-    const { user, signOut, isAdmin, canAccessFactures } = useAuth();
+    const { user, signOut, isAdmin, canAccessFactures, repName } = useAuth();
     const { viewAsRep, setViewAsRep } = useAdminView();
     const repList = useRepList();
 
@@ -170,7 +171,7 @@ export default function Layout() {
                     { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
                     { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
                 ] : []),
-                // Leads — hidden while the Comptes module replaces it. Routes are
+                // Leads - hidden while the Comptes module replaces it. Routes are
                 // commented out in App.tsx; leaving these visible would 404.
                 // { name: 'Leads',           href: '',                    icon: UserPlus,        isLabel: true },
                 // { name: 'Tableau de bord', href: '/leads',              icon: LayoutDashboard, end: true },
@@ -255,7 +256,7 @@ export default function Layout() {
             {/* Bottom: Admin + rep switcher + user */}
             <div className="shrink-0 border-t border-hairline px-3 py-3 space-y-0.5">
 
-                {/* Admin section — hidden when viewing as rep */}
+                {/* Admin section - hidden when viewing as rep */}
                 {isAdmin && !viewAsRep && (
                     <SectionHeader
                         label="Administration"
@@ -270,9 +271,14 @@ export default function Layout() {
 
                 {/* User row */}
                 <div className="flex items-center gap-3 px-3 py-2 mt-1 rounded-md hover:bg-sand transition-colors">
-                    <div className="w-7 h-7 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
-                        {displayName.charAt(0)}
-                    </div>
+                    {/* The signed-in person's own face. repName comes from
+                      * allowed_users, so an admin with no rep row falls through
+                      * to the initial of their email handle, as before. */}
+                    {repName
+                        ? <RepAvatar name={repName} size="md" />
+                        : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
+                              {displayName.charAt(0)}
+                          </div>}
                     <div className="min-w-0 flex-1">
                         <p className="text-xs font-semibold text-ink-secondary truncate">{displayName}</p>
                         <p className="text-2xs text-ink-mute truncate">{user?.email}</p>
@@ -335,7 +341,7 @@ export default function Layout() {
                             onChange={v => setViewAsRep(v || null)}
                             options={[
                                 { value: '', label: 'Admin (ma vue)' },
-                                ...repList.map(r => ({ value: r, label: r })),
+                                ...repList.map(r => ({ value: r, label: r, icon: <RepAvatar name={r} size="sm" /> })),
                             ]}
                             variant={viewAsRep ? 'accent' : 'default'}
                             className="w-40 md:w-48 min-w-0"

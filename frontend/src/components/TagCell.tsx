@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '../lib/utils';
+import { dataToneIndex } from '../lib/dataTone';
 
 /**
  * A table cell that shows a list of short values as badges.
@@ -28,7 +29,7 @@ import { cn } from '../lib/utils';
  * were indistinguishable in the Source column. There simply are not eight
  * pastels a person can tell apart at 10px.
  *
- * So neighbouring hues are separated by weight as well as by hue — where two
+ * So neighbouring hues are separated by weight as well as by hue - where two
  * hues sit close on the wheel, one of them is always the deeper fill. Light
  * blue against deep violet, light amber against deep gold, deep fuchsia
  * against deep indigo: different at a glance, not on inspection.
@@ -39,12 +40,12 @@ import { cn } from '../lib/utils';
  *
  * Tone 7 used to be a deep ORANGE. The 2026 brand made #F5570E the action
  * colour, and a deep-orange badge sitting in a table read as a button. It was
- * swapped for a deep gold on 2026-09-14 — the same slot, the same weight, the
+ * swapped for a deep gold on 2026-09-14 - the same slot, the same weight, the
  * same warm half of the wheel, just far enough from the brand orange to stop
  * competing with it.
  *
  * Tone 3 (violet) was a PALE fill until 2026-09-14, which made it a near-white
- * twin of tone 1 (blue) — Cold-call and Meta Ads sitting one above the other in
+ * twin of tone 1 (blue) - Cold-call and Meta Ads sitting one above the other in
  * the Source column with nothing but the ink between them. It is now a solid
  * lavender. Same hue, same slot, deeper weight: exactly the rule above. The
  * numbers are in src/index.css.
@@ -53,7 +54,7 @@ import { cn } from '../lib/utils';
  * constants below, because they were tuned against the real distribution of
  * labels in this database. Dropping a tone would have re-shuffled every label
  * onto a new colour and there is no way to re-run that search from the code
- * alone — the picklists live in Zoho. So every label still lands on the slot it
+ * alone - the picklists live in Zoho. So every label still lands on the slot it
  * always did; two of those slots simply look different now.
  */
 const TONES = [
@@ -61,12 +62,12 @@ const TONES = [
     'bg-data-1 text-data-1-ink ring-data-1-edge',        // 0  green
     'bg-data-2 text-data-2-ink ring-data-2-edge',        // 1  blue
     'bg-data-3 text-data-3-ink ring-data-3-edge',        // 2  amber
-    'bg-data-4 text-data-4-ink ring-data-4-edge',        // 3  violet — a DEEP
+    'bg-data-4 text-data-4-ink ring-data-4-edge',        // 3  violet - a DEEP
                                                         //    fill despite its
                                                         //    place in this run
     'bg-data-5 text-data-5-ink ring-data-5-edge',        // 4  rose
     // Saturated. A pale badge and a deep one are never mistaken for each other
-    // even when the hues are neighbours — which is what the first attempt at
+    // even when the hues are neighbours - which is what the first attempt at
     // this palette, eight pale tones, got wrong.
     'bg-data-6 text-data-6-ink ring-data-6-edge',        // 5  cyan
     'bg-data-7 text-data-7-ink ring-data-7-edge',        // 6  lime
@@ -80,36 +81,17 @@ const TONES = [
  * every page, because a list that re-colours itself when it is re-sorted is
  * worse than no colour at all.
  *
- * The key is normalised, so Zoho's two spellings of "Distribution Publicitaire"
- * are one colour rather than two.
- *
- * The two constants are not arbitrary. Ten tones against ~45 distinct labels
- * means collisions cannot be ruled out — fourteen sources into ten tones forces
- * at least four. So the pair was chosen by search: the one that spreads the
- * labels this app actually holds (the 14 commonest sources, the 8 services, the
- * 7 invoice departments) across the most tones, weighted by how many accounts
- * carry each label. The eight commonest sources and all eight services come out
- * on distinct tones; what still shares one is the tail — Client PLOGG/BUCCO
- * with Meta Ads, Facebook with Publicité/Recherche Google, and two more under
- * 100 accounts each. Re-run scratchpad/tune_tone_hash.py if the picklists move.
+ * The hash itself lives in lib/dataTone, shared with the rep avatars, so a
+ * service and a rep with no photo are coloured by one rule rather than two
+ * copies of it that can drift apart.
  */
-const TONE_HASH_MULTIPLIER = 54677;
-const TONE_HASH_SEED = 251886;
-
-function toneKey(label: string): string {
-    return label.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
 function toneFor(label: string): string {
-    const k = toneKey(label);
-    let h = TONE_HASH_SEED;
-    for (let i = 0; i < k.length; i++) h = (h * TONE_HASH_MULTIPLIER + k.charCodeAt(i)) | 0;
-    return TONES[Math.abs(h) % TONES.length];
+    return TONES[dataToneIndex(label)];
 }
 
 export function Tag({ label, muted, full, className }: {
     label: string;
-    /** Rendered grey — used when the value was borrowed rather than recorded. */
+    /** Rendered grey - used when the value was borrowed rather than recorded. */
     muted?: boolean;
     /** Show the whole label, wrapping if it must. For the overflow panel, where
      *  there is room and the entire point is reading the names in full. */

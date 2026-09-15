@@ -14,6 +14,7 @@ import { useRepFilter, REP_DEFAULT, REP_ALL } from '../hooks/useRepFilter';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useAuth } from '../contexts/AuthContext';
+import { RepAvatar } from '../components/RepAvatar';
 
 interface InvDashboardKPIs {
     ytd_total: number;
@@ -81,7 +82,7 @@ export default function FDashboard() {
      * which fed the filter its own output: choosing "Équipe entière" narrowed the
      * leaderboard to the team, allReps then held only the team, "Interne"
      * computed allReps-minus-team = nothing, and an empty group falls back to no
-     * filter — so Interne silently showed EVERYONE, with a higher total than the
+     * filter - so Interne silently showed EVERYONE, with a higher total than the
      * team it was supposed to be a subset of.
      *
      * One unfiltered read per year breaks the loop.
@@ -92,13 +93,13 @@ export default function FDashboard() {
      * The rep filter, rebuilt 2026-09-08.
      *
      * THE BUG being fixed: 'Tous' and 'Vente Interne' BOTH resolved to
-     * repParam = null, so they sent an identical query — switching between them
+     * repParam = null, so they sent an identical query - switching between them
      * changed nothing on screen. repParam was also the effect dependency, so
      * nothing even refetched.
      *
      * The dropdown now offers groups: Équipe entière (the reps in the View
      * dropdown, and the default) and Interne (everybody else). p_rep cannot
-     * express a group — it holds one name — so p_reps carries the list.
+     * express a group - it holds one name - so p_reps carries the list.
      *
      * Both are sent because they do different jobs on these functions: p_rep
      * filters rows AND selects that rep's own objective from rep_objectives,
@@ -120,7 +121,7 @@ export default function FDashboard() {
             const names = (data as LeaderboardEntry[])
                 .map(r => r.rep_name).filter(Boolean);
             // 'Vente interne' is dropped from the RPC by excluded_reps, so it
-            // would never appear here — but it is a real biller and belongs in
+            // would never appear here - but it is a real biller and belongs in
             // the Interne group, so it is added back by name.
             const withInternal = [...new Set([...names, 'Vente interne'])].sort();
             setAllReps(withInternal);
@@ -168,7 +169,7 @@ export default function FDashboard() {
         const isInternal = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
 
         // Split internal reps: those already included in RPC results vs the one excluded at DB level
-        // Only 'Vente interne' is in excluded_reps — the other 4 are already in RPC numbers
+        // Only 'Vente interne' is in excluded_reps - the other 4 are already in RPC numbers
         const internalFromLeader: LeaderboardEntry[] = (leaderData || []).filter(
             (r: LeaderboardEntry) => isInternal(r.rep_name)
         );
@@ -179,10 +180,10 @@ export default function FDashboard() {
         setTopClients(clientData || []);
 
         // Kept for the unfiltered view only. With a group or a single rep the
-        // RPCs now reach every name themselves — p_reps stands the excluded_reps
-        // guard down — so running this as well would double-count Vente interne.
+        // RPCs now reach every name themselves - p_reps stands the excluded_reps
+        // guard down - so running this as well would double-count Vente interne.
         if (repParam === null && repsParam === null) {
-            // Supplementary query ONLY for 'Vente interne' — the one rep actually excluded from RPC results
+            // Supplementary query ONLY for 'Vente interne' - the one rep actually excluded from RPC results
             // (Simon, Magasin, Charles, Pier-Alexandre are already in the RPC numbers; fetching them again would double-count)
             const buildIntQuery = (y: number) => {
                 let q = supabase
@@ -293,7 +294,7 @@ export default function FDashboard() {
                 setKpis(null);
             }
 
-            // Leaderboard — combine Vente interne (from supplementary) with the other 4 internal reps (from leaderboard)
+            // Leaderboard - combine Vente interne (from supplementary) with the other 4 internal reps (from leaderboard)
             const suppTotal   = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
             const suppCount   = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
             const leaderTotal = internalFromLeader.reduce((s, r) => s + Number(r.total_amount), 0);
@@ -324,7 +325,7 @@ export default function FDashboard() {
     useEffect(() => { fetchData(); }, [fetchData]);
     useEffect(() => {
         // Debounce realtime reloads: batch upserts fire many events in quick
-        // succession — wait 3s of silence before re-fetching so the page doesn't
+        // succession - wait 3s of silence before re-fetching so the page doesn't
         // thrash while a sync is running.
         let timer: ReturnType<typeof setTimeout>;
         const sub = supabase.channel('inv-db-changes')
@@ -340,7 +341,7 @@ export default function FDashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    // Groups first, then every name — from the shared hook, so the Factures and
+    // Groups first, then every name - from the shared hook, so the Factures and
     // Comptes pages offer exactly the same choices.
     const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
@@ -350,7 +351,7 @@ export default function FDashboard() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
                 <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
-                    Factures — Tableau de Bord
+                    Factures · Tableau de Bord
                     {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-ink-mute">({authRepName})</span>}
                 </h1>
                 <p className="text-xs md:text-sm text-ink-mute mt-0.5">Performance de facturation et indicateurs clés</p>
@@ -441,8 +442,9 @@ export default function FDashboard() {
                                                     rep.rep_name === 'Vente Interne' ? "bg-hairline-strong text-ink-secondary" :
                                                     idx === 0 ? "bg-ink text-white" : "bg-stone text-ink-secondary"
                                                 )}>{rep.rep_name === 'Vente Interne' ? '—' : idx + 1}</span>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-ink-secondary">{rep.rep_name}</p>
+                                                <RepAvatar name={rep.rep_name} size="md" />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-ink-secondary truncate">{rep.rep_name}</p>
                                                     <p className="text-2xs text-ink-mute uppercase font-semibold">{rep.office}</p>
                                                 </div>
                                             </div>
@@ -491,7 +493,7 @@ export default function FDashboard() {
 
                     <div className="space-y-6">
                         <SommaireTable
-                            title={selectedDept === 'Toutes' ? "Performance Globale — Factures" : `Performance — ${selectedDept}`}
+                            title={selectedDept === 'Toutes' ? "Performance Globale · Factures" : `Performance · ${selectedDept}`}
                             data={selectedDept === 'Toutes' ? grandTotalData : deptData.filter(x => x.department === selectedDept)}
                             prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
                             year={year}
@@ -504,7 +506,7 @@ export default function FDashboard() {
         </div>
 
         {showLeaderboard && (
-            <Modal title="Leaderboard Reps — Factures" onClose={() => setShowLeaderboard(false)}>
+            <Modal title="Leaderboard Reps · Factures" onClose={() => setShowLeaderboard(false)}>
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-hairline bg-sand/50">
@@ -520,7 +522,11 @@ export default function FDashboard() {
                         {leaderboard.map((rep, idx) => (
                             <tr key={rep.rep_name} className="hover:bg-sand/60 transition-colors">
                                 <td className="px-4 py-2.5"><span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold", idx === 0 ? "bg-ink text-white" : idx === 1 ? "bg-stone text-ink-secondary" : idx === 2 ? "bg-sand text-ink-mute" : "bg-sand text-ink-faint")}>{idx + 1}</span></td>
-                                <td className="px-4 py-2.5 font-semibold text-ink-secondary">{rep.rep_name}</td>
+                                <td className="px-4 py-2.5 font-semibold text-ink-secondary">
+                                    <span className="flex items-center gap-2">
+                                        <RepAvatar name={rep.rep_name} size="sm" />{rep.rep_name}
+                                    </span>
+                                </td>
                                 <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{rep.office}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{rep.deal_count}</td>
@@ -533,7 +539,7 @@ export default function FDashboard() {
         )}
 
         {showClients && (
-            <Modal title="Tous les clients — Factures" onClose={() => setShowClients(false)}>
+            <Modal title="Tous les clients · Factures" onClose={() => setShowClients(false)}>
                 <table className="w-full text-sm">
                     <thead>
                         <tr className="border-b border-hairline bg-sand/50">
@@ -695,7 +701,7 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
                     <div>
                         <h2 className="text-lg font-semibold text-ink">Factures non attribuées</h2>
                         <p className="mt-0.5 text-sm text-ink-mute">
-                            Aucun compte Zoho CRM derrière le client — ces montants n’apparaissent sur aucune fiche lead
+                            Aucun compte Zoho CRM derrière le client : ces montants n’apparaissent sur aucune fiche lead
                         </p>
                     </div>
                     <button
