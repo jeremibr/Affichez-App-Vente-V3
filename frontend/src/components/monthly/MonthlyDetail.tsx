@@ -179,20 +179,20 @@ export function MonthlyDetail({
         <div className="space-y-4">
 
             {/* ─── Month navigation ─── */}
-            <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-3">
+            <div className="flex items-center justify-between bg-white rounded-xl shadow-card px-5 py-3">
                 <button
                     onClick={() => goTo(py, pm)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-ink-mute hover:text-ink hover:bg-sand text-sm font-medium transition-all"
                 >
                     <ChevronLeft className="w-4 h-4" />
                     {MONTH_SHORT[pm]} {py}
                 </button>
 
                 <div className="text-center">
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-base font-semibold text-ink">
                         {MONTH_FULL[month]} {year}
                     </h3>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-2xs text-ink-mute uppercase tracking-eyebrow mt-0.5">
                         {isFactures ? 'Détail des factures' : 'Détail des devis'}
                         {repName ? ` · ${repName}` : ''}
                     </p>
@@ -202,10 +202,10 @@ export function MonthlyDetail({
                     onClick={() => goTo(ny, nm)}
                     disabled={isFuture}
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                         isFuture
-                            ? "text-slate-200 cursor-not-allowed"
-                            : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                            ? "text-ink-faint cursor-not-allowed"
+                            : "text-ink-mute hover:text-ink hover:bg-sand"
                     )}
                 >
                     {MONTH_SHORT[nm]} {ny}
@@ -214,17 +214,17 @@ export function MonthlyDetail({
             </div>
 
             {loading ? (
-                <div className="flex items-center justify-center py-16 gap-3 bg-white rounded-2xl border border-slate-100">
-                    <Loader2 className="w-5 h-5 animate-spin text-brand-main" />
-                    <span className="text-sm text-slate-400">Chargement de {MONTH_FULL[month]}...</span>
+                <div className="flex items-center justify-center py-16 gap-3 bg-white rounded-xl border border-hairline">
+                    <Loader2 className="w-5 h-5 animate-spin text-primary-press" />
+                    <span className="text-sm text-ink-mute">Chargement de {MONTH_FULL[month]}...</span>
                 </div>
             ) : rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-2 bg-white rounded-2xl border border-slate-100">
+                <div className="flex flex-col items-center justify-center py-16 gap-2 bg-white rounded-xl border border-hairline">
                     {isFactures
-                        ? <FileText className="w-8 h-8 text-slate-200" />
-                        : <ClipboardList className="w-8 h-8 text-slate-200" />
+                        ? <FileText className="w-8 h-8 text-ink-faint" />
+                        : <ClipboardList className="w-8 h-8 text-ink-faint" />
                     }
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-ink-mute">
                         Aucune {isFactures ? 'facture' : 'vente'} en {MONTH_FULL[month]} {year}
                     </p>
                 </div>
@@ -237,60 +237,60 @@ export function MonthlyDetail({
                         label={isFactures ? 'Total Facturé' : 'Total Ventes'}
                         value={formatCurrencyCAD(totalNet)}
                         sub={`${regularRows.length} ${isFactures ? 'factures' : 'devis'}${avoirRows.length > 0 ? ` · ${avoirRows.length} avoir${avoirRows.length > 1 ? 's' : ''}` : ''}`}
-                        color="bg-blue-50 text-blue-500"
+                        color="bg-sand text-ink-mute"
                     />
                     <SummaryCard
                         icon={DollarSign}
                         label="Commission"
                         value={formatCurrencyCAD(totalCommission)}
                         sub={`Taux: ${Math.round(commRate * 100)}%`}
-                        color="bg-brand-main/10 text-brand-main"
+                        color="bg-primary-wash text-primary-press"
                     />
                 </div>
 
                 {/* ─── Department breakdown ─── */}
                 {!compact && deptSummaries.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                        <div className="px-5 py-3.5 border-b border-slate-100">
-                            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Par département</h4>
+                    <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                        <div className="px-5 py-3.5 border-b border-hairline">
+                            <h4 className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Par département</h4>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-slate-50 bg-slate-50/40">
-                                        <th className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Département</th>
-                                        <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ventes</th>
-                                        <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
-                                        <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Qty</th>
-                                        <th className="px-5 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">% du total</th>
+                                    <tr className="border-b border-hairline bg-sand/40">
+                                        <th className="px-5 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Département</th>
+                                        <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Ventes</th>
+                                        <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Commission</th>
+                                        <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Qty</th>
+                                        <th className="px-5 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">% du total</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-hairline">
                                     {deptSummaries.map(d => (
-                                        <tr key={d.department} className="hover:bg-slate-50/60 transition-colors">
+                                        <tr key={d.department} className="hover:bg-sand/60 transition-colors">
                                             <td className="px-5 py-2.5">
-                                                <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                                <span className="text-xs font-bold text-ink-secondary bg-stone px-2 py-0.5 rounded-full">
                                                     {d.department}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-2.5 text-right font-bold text-slate-800 tabular-nums">
+                                            <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">
                                                 {formatCurrencyCAD(d.total)}
                                             </td>
-                                            <td className="px-4 py-2.5 text-right font-bold text-brand-main tabular-nums">
+                                            <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">
                                                 {formatCurrencyCAD(d.commission)}
                                             </td>
-                                            <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">
+                                            <td className="px-4 py-2.5 text-right text-ink-mute tabular-nums">
                                                 {d.count}
                                             </td>
                                             <td className="px-5 py-2.5">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="w-20 h-1.5 bg-stone rounded-full overflow-hidden">
                                                         <div
-                                                            className="h-full bg-brand-main rounded-full"
+                                                            className="h-full bg-primary rounded-full"
                                                             style={{ width: `${totalNet > 0 ? Math.min((d.total / totalNet) * 100, 100) : 0}%` }}
                                                         />
                                                     </div>
-                                                    <span className="text-xs font-semibold text-slate-400 w-8 text-right tabular-nums">
+                                                    <span className="text-xs font-semibold text-ink-mute w-8 text-right tabular-nums">
                                                         {totalNet > 0 ? Math.round((d.total / totalNet) * 100) : 0}%
                                                     </span>
                                                 </div>
@@ -298,11 +298,11 @@ export function MonthlyDetail({
                                         </tr>
                                     ))}
                                     {/* Total row */}
-                                    <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                        <td className="px-5 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">Total</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(totalNet)}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-brand-main tabular-nums">{formatCurrencyCAD(totalCommission)}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-600 tabular-nums">{regularRows.length}</td>
+                                    <tr className="border-t-2 border-hairline-strong bg-sand/80">
+                                        <td className="px-5 py-2.5 text-xs font-semibold text-ink-secondary uppercase tracking-wide">Total</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(totalNet)}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(totalCommission)}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink-secondary tabular-nums">{regularRows.length}</td>
                                         <td className="px-5 py-2.5" />
                                     </tr>
                                 </tbody>
@@ -312,13 +312,13 @@ export function MonthlyDetail({
                 )}
 
                 {/* ─── Line items ─── */}
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                    <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
+                        <h4 className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                             Détail — {rows.length} transaction{rows.length > 1 ? 's' : ''}
                         </h4>
                         {avoirRows.length > 0 && (
-                            <span className="text-[10px] font-bold text-red-400 bg-red-50 px-2 py-0.5 rounded-full">
+                            <span className="text-2xs font-bold text-tone-critical bg-tone-critical-soft px-2 py-0.5 rounded-full">
                                 {avoirRows.length} avoir{avoirRows.length > 1 ? 's' : ''}
                             </span>
                         )}
@@ -326,18 +326,18 @@ export function MonthlyDetail({
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-50 bg-slate-50/40">
-                                    <th className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Client</th>
-                                    <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Montant HT</th>
-                                    <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <tr className="border-b border-hairline bg-sand/40">
+                                    <th className="px-5 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Client</th>
+                                    <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Montant HT</th>
+                                    <th className="px-4 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                                         {isFactures ? '# Facture' : '# Devis'}
                                     </th>
-                                    <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                                    <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Département</th>
-                                    <th className="px-5 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
+                                    <th className="px-4 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Date</th>
+                                    <th className="px-4 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Département</th>
+                                    <th className="px-5 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Commission</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {rows.map(r => {
                                     const avoir = isAvoir(r);
                                     // Avoirs generate negative commission (amount is already negative)
@@ -356,35 +356,35 @@ export function MonthlyDetail({
                                             className={cn(
                                                 "transition-colors",
                                                 avoir
-                                                    ? "bg-red-50/40 hover:bg-red-50/70"
-                                                    : "hover:bg-slate-50/60"
+                                                    ? "bg-tone-critical-soft/40 hover:bg-tone-critical-soft/70"
+                                                    : "hover:bg-sand/60"
                                             )}
                                         >
                                             <td className="px-3 md:px-5 py-2 md:py-2.5 max-w-[120px] md:max-w-[200px]">
-                                                <p className={cn("font-semibold truncate text-sm", avoir ? "text-red-700" : "text-slate-800")} title={r.client_name}>
+                                                <p className={cn("font-semibold truncate text-sm", avoir ? "text-tone-critical-ink" : "text-ink")} title={r.client_name}>
                                                     {r.client_name}
                                                 </p>
                                                 {avoir && (
-                                                    <span className="text-[9px] font-bold text-red-400 uppercase tracking-wide">Avoir</span>
+                                                    <span className="text-2xs font-semibold text-tone-critical uppercase tracking-wide">Avoir</span>
                                                 )}
                                             </td>
-                                            <td className={cn("px-4 py-2.5 text-right font-bold tabular-nums", avoir ? "text-red-600" : "text-slate-900")}>
+                                            <td className={cn("px-4 py-2.5 text-right font-bold tabular-nums", avoir ? "text-tone-critical-ink" : "text-ink")}>
                                                 {formatCurrencyCAD(r.amount)}
                                             </td>
                                             <td className="px-4 py-2.5">
-                                                <span className={cn("text-xs font-mono font-semibold", avoir ? "text-red-500" : "text-slate-500")}>
+                                                <span className={cn("text-xs font-mono font-semibold", avoir ? "text-tone-critical" : "text-ink-mute")}>
                                                     {getRef(r)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-2.5 text-xs text-slate-500 tabular-nums">
+                                            <td className="px-4 py-2.5 text-xs text-ink-mute tabular-nums">
                                                 {formattedDate}
                                             </td>
                                             <td className="px-4 py-2.5">
-                                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                                <span className="text-2xs font-bold text-ink-secondary bg-stone px-1.5 py-0.5 rounded-full whitespace-nowrap">
                                                     {r.department}
                                                 </span>
                                             </td>
-                                            <td className={cn("px-5 py-2.5 text-right font-bold tabular-nums", avoir ? "text-red-500" : "text-brand-main")}>
+                                            <td className={cn("px-5 py-2.5 text-right font-bold tabular-nums", avoir ? "text-tone-critical" : "text-ink")}>
                                                 {formatCurrencyCAD(comm)}
                                             </td>
                                         </tr>
@@ -393,15 +393,15 @@ export function MonthlyDetail({
                             </tbody>
                             {/* Footer */}
                             <tfoot>
-                                <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                    <td className="px-5 py-2.5 text-xs font-bold text-slate-500 uppercase tracking-wide">
+                                <tr className="border-t-2 border-hairline-strong bg-sand/80">
+                                    <td className="px-5 py-2.5 text-xs font-semibold text-ink-mute uppercase tracking-wide">
                                         Total — {rows.length} lignes
                                     </td>
-                                    <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">
+                                    <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">
                                         {formatCurrencyCAD(totalNet)}
                                     </td>
                                     <td colSpan={3} />
-                                    <td className="px-5 py-2.5 text-right font-bold text-brand-main tabular-nums">
+                                    <td className="px-5 py-2.5 text-right font-bold text-ink tabular-nums">
                                         {formatCurrencyCAD(totalCommission)}
                                     </td>
                                 </tr>
@@ -421,13 +421,13 @@ function SummaryCard({ icon: Icon, label, value, sub, color }: {
     icon: React.ElementType; label: string; value: string; sub: string; color: string;
 }) {
     return (
-        <div className="bg-white p-3 md:p-4 rounded-2xl border border-slate-100 shadow-card hover:shadow-card-hover transition-all">
-            <div className={cn("w-7 h-7 md:w-8 md:h-8 rounded-xl flex items-center justify-center mb-2 md:mb-3", color)}>
+        <div className="bg-white p-3 md:p-4 rounded-xl shadow-card hover:shadow-elevated transition-all">
+            <div className={cn("w-7 h-7 md:w-8 md:h-8 rounded-md flex items-center justify-center mb-2 md:mb-3", color)}>
                 <Icon className="w-3.5 h-3.5 md:w-4 md:h-4" />
             </div>
-            <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">{label}</p>
-            <p className="text-sm md:text-xl font-bold text-slate-900 mt-0.5 tabular-nums">{value}</p>
-            <p className="text-[9px] md:text-[10px] text-slate-400 mt-0.5 italic leading-tight">{sub}</p>
+            <p className="text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{label}</p>
+            <p className="text-sm md:text-xl font-bold text-ink mt-0.5 tabular-nums">{value}</p>
+            <p className="text-2xs text-ink-mute mt-0.5 italic leading-tight">{sub}</p>
         </div>
     );
 }

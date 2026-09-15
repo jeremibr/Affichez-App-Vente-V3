@@ -66,23 +66,23 @@ function RepPicker({ reps, selected, onChange }: {
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(v => !v)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 hover:border-brand-main hover:text-brand-main transition-all shadow-sm"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-hairline-strong rounded-md text-sm font-semibold text-ink-secondary hover:border-primary hover:text-primary-press transition-all shadow-xs"
             >
-                <div className="w-7 h-7 rounded-full bg-brand-main/10 text-brand-main flex items-center justify-center text-xs font-bold shrink-0">
+                <div className="w-7 h-7 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
                     {selected ? selected.charAt(0) : <User className="w-3.5 h-3.5" />}
                 </div>
                 {selected || 'Choisir un représentant'}
-                <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform ml-1", open && "rotate-180")} />
+                <ChevronDown className={cn("w-4 h-4 text-ink-mute transition-transform ml-1", open && "rotate-180")} />
             </button>
 
             {open && (
-                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/60 overflow-hidden z-30">
-                    <div className="px-3 py-2 border-b border-slate-100">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentants</p>
+                <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg border border-hairline-strong shadow-xl overflow-hidden z-30">
+                    <div className="px-3 py-2 border-b border-hairline">
+                        <p className="text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Représentants</p>
                     </div>
                     <div className="max-h-64 overflow-y-auto">
                         {reps.length === 0 ? (
-                            <p className="px-4 py-3 text-sm text-slate-400">Aucun représentant</p>
+                            <p className="px-4 py-3 text-sm text-ink-mute">Aucun représentant</p>
                         ) : (
                             reps.map(rep => (
                                 <button
@@ -91,13 +91,13 @@ function RepPicker({ reps, selected, onChange }: {
                                     className={cn(
                                         "w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors text-left",
                                         rep === selected
-                                            ? "bg-brand-main/5 text-brand-main font-semibold"
-                                            : "text-slate-700 hover:bg-slate-50 font-medium"
+                                            ? "bg-primary/5 text-primary-press font-semibold"
+                                            : "text-ink-secondary hover:bg-sand font-medium"
                                     )}
                                 >
                                     <div className={cn(
                                         "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                                        rep === selected ? "bg-brand-main/20 text-brand-main" : "bg-slate-100 text-slate-500"
+                                        rep === selected ? "bg-primary/20 text-primary-press" : "bg-stone text-ink-secondary"
                                     )}>
                                         {rep.charAt(0)}
                                     </div>
@@ -125,30 +125,30 @@ function KPICard({ title, value, subText, icon: Icon, trend, trendLabel, accent 
 }) {
     return (
         <div className={cn(
-            "p-3 md:p-5 rounded-2xl border flex flex-col justify-between hover:shadow-card-hover transition-all group",
+            "p-3 md:p-5 rounded-xl border flex flex-col justify-between hover:shadow-elevated transition-all group",
             accent
-                ? "bg-brand-main/5 border-brand-main/20 shadow-sm"
-                : "bg-white border-slate-100 shadow-card"
+                ? "bg-primary/5 border-primary/20 shadow-xs"
+                : "bg-white border-hairline shadow-card"
         )}>
             <div className="flex items-start justify-between mb-2 md:mb-4">
                 <div className={cn(
-                    "p-2 md:p-2.5 rounded-xl transition-colors",
+                    "p-2 md:p-2.5 rounded-md transition-colors",
                     accent
-                        ? "bg-brand-main/10 text-brand-main"
-                        : "bg-slate-50 text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50"
+                        ? "bg-primary-wash text-primary-press"
+                        : "bg-sand text-ink-mute group-hover:text-primary-press group-hover:bg-primary-wash"
                 )}>
                     <Icon className="w-5 h-5" />
                 </div>
                 {trend !== undefined && (
-                    <div className={cn("text-[11px] font-bold px-2 py-0.5 rounded-full", trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
+                    <div className={cn("text-2xs font-bold px-2 py-0.5 rounded-full", trend >= 100 ? "bg-tone-good-soft text-tone-good-ink" : "bg-tone-warn-soft text-tone-warn-ink")}>
                         {trend}% {trendLabel}
                     </div>
                 )}
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className={cn("text-base md:text-2xl font-bold mt-0.5 md:mt-1 tabular-nums", accent ? "text-brand-main" : "text-slate-900")}>{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className={cn("text-base md:text-2xl font-bold mt-0.5 md:mt-1 tabular-nums", accent ? "text-primary-press" : "text-ink")}>{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );
@@ -159,11 +159,11 @@ function KPICard({ title, value, subText, icon: Icon, trend, trendLabel, accent 
 function SectionHeader({ icon: Icon, label, color }: { icon: React.ElementType; label: string; color: string }) {
     return (
         <div className="flex items-center gap-3">
-            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", color)}>
+            <div className={cn("w-8 h-8 rounded-md flex items-center justify-center", color)}>
                 <Icon className="w-4 h-4" />
             </div>
-            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">{label}</h2>
-            <div className="flex-1 h-px bg-slate-100" />
+            <h2 className="text-sm font-semibold text-ink-mute uppercase tracking-eyebrow">{label}</h2>
+            <div className="flex-1 h-px bg-stone" />
         </div>
     );
 }
@@ -276,7 +276,7 @@ export default function RepDashboard() {
     if (!isAdmin) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-slate-400 text-sm">Accès réservé aux administrateurs.</p>
+                <p className="text-ink-mute text-sm">Accès réservé aux administrateurs.</p>
             </div>
         );
     }
@@ -289,14 +289,14 @@ export default function RepDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     {/* Rep avatar */}
-                    <div className="w-12 h-12 rounded-2xl bg-brand-main/10 text-brand-main flex items-center justify-center text-lg font-bold shrink-0 border border-brand-main/20">
+                    <div className="w-12 h-12 rounded-xl bg-primary-wash text-primary-press flex items-center justify-center text-lg font-bold shrink-0 border border-primary/20">
                         {selectedRep ? selectedRep.charAt(0) : '?'}
                     </div>
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                        <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                             {selectedRep || 'Choisir un représentant'}
                         </h1>
-                        <p className="text-xs md:text-sm text-slate-400 mt-0.5">Fiche représentant · Performance individuelle</p>
+                        <p className="text-xs md:text-sm text-ink-mute mt-0.5">Fiche représentant · Performance individuelle</p>
                     </div>
                 </div>
                 <RepPicker reps={allReps} selected={selectedRep} onChange={setSelectedRep} />
@@ -319,21 +319,21 @@ export default function RepDashboard() {
 
             {!selectedRep ? (
                 <div className="flex flex-col items-center justify-center py-24 gap-3">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center">
-                        <User className="w-8 h-8 text-slate-300" />
+                    <div className="w-16 h-16 rounded-xl bg-stone flex items-center justify-center">
+                        <User className="w-8 h-8 text-ink-faint" />
                     </div>
-                    <p className="text-slate-400 font-medium">Sélectionnez un représentant pour voir sa fiche</p>
+                    <p className="text-ink-mute font-medium">Sélectionnez un représentant pour voir sa fiche</p>
                 </div>
             ) : (
                 <>
                 {/* ─── DEVIS section ─── */}
                 <div className="space-y-5">
-                    <SectionHeader icon={ClipboardList} label="Devis" color="bg-blue-50 text-blue-500" />
+                    <SectionHeader icon={ClipboardList} label="Devis" color="bg-data-2 text-data-2-ink" />
 
                     {devisLoading ? (
                         <div className="flex items-center justify-center py-12 gap-2">
-                            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                            <span className="text-sm text-slate-400">Chargement des devis...</span>
+                            <Loader2 className="w-5 h-5 animate-spin text-ink-mute" />
+                            <span className="text-sm text-ink-mute">Chargement des devis...</span>
                         </div>
                     ) : (
                         <>
@@ -381,12 +381,12 @@ export default function RepDashboard() {
 
                 {/* ─── FACTURES section ─── */}
                 <div className="space-y-5">
-                    <SectionHeader icon={FileText} label="Factures" color="bg-amber-50 text-amber-500" />
+                    <SectionHeader icon={FileText} label="Factures" color="bg-data-3 text-data-3-ink" />
 
                     {invLoading ? (
                         <div className="flex items-center justify-center py-12 gap-2">
-                            <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                            <span className="text-sm text-slate-400">Chargement des factures...</span>
+                            <Loader2 className="w-5 h-5 animate-spin text-ink-mute" />
+                            <span className="text-sm text-ink-mute">Chargement des factures...</span>
                         </div>
                     ) : (
                         <>
@@ -415,34 +415,34 @@ export default function RepDashboard() {
                         </div>
 
                         {/* Top clients for this rep */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                    <Trophy className="w-4 h-4 text-amber-500" />
+                        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                            <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                                    <Trophy className="w-4 h-4 text-ink-mute" />
                                     Top clients — {selectedRep}
                                 </h3>
                                 {topClients.length > 5 && (
                                     <button
                                         onClick={() => setShowClients(true)}
-                                        className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors"
+                                        className="flex items-center gap-1 text-2xs font-bold text-primary-press hover:text-primary-deep transition-colors"
                                     >
                                         Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
                                     </button>
                                 )}
                             </div>
-                            <div className="divide-y divide-slate-50">
+                            <div className="divide-y divide-hairline">
                                 {topClients.length === 0 ? (
-                                    <p className="px-5 py-4 text-sm text-slate-400 text-center">Aucun client pour ce représentant</p>
+                                    <p className="px-5 py-4 text-sm text-ink-mute text-center">Aucun client pour ce représentant</p>
                                 ) : (
                                     topClients.slice(0, 5).map((c, idx) => (
-                                        <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                        <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <span className="w-5 h-5 text-[10px] font-bold text-slate-300 tabular-nums flex items-center justify-center shrink-0">{idx + 1}</span>
-                                                <p className="text-sm font-semibold text-slate-700 max-w-[240px] truncate" title={c.client_name}>{c.client_name}</p>
+                                                <span className="w-5 h-5 text-2xs font-bold text-ink-mute tabular-nums flex items-center justify-center shrink-0">{idx + 1}</span>
+                                                <p className="text-sm font-semibold text-ink-secondary max-w-[240px] truncate" title={c.client_name}>{c.client_name}</p>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(c.total_amount)}</p>
-                                                <p className="text-[10px] text-slate-400">{c.deal_count} factures</p>
+                                                <p className="text-sm font-bold text-ink">{formatCurrencyCAD(c.total_amount)}</p>
+                                                <p className="text-2xs text-ink-mute">{c.deal_count} factures</p>
                                             </div>
                                         </div>
                                     ))
@@ -468,31 +468,31 @@ export default function RepDashboard() {
         {/* ─── Top clients modal ─── */}
         {showClients && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowClients(false)}>
-                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                        <h3 className="text-sm font-bold text-slate-800">Tous les clients — {selectedRep}</h3>
-                        <button onClick={() => setShowClients(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
+                <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
+                        <h3 className="text-sm font-semibold text-ink">Tous les clients — {selectedRep}</h3>
+                        <button onClick={() => setShowClients(false)} className="p-1.5 rounded-md text-ink-mute hover:text-ink-secondary hover:bg-stone transition-all">
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     <div className="overflow-y-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50">
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Client</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Factures</th>
+                                <tr className="border-b border-hairline bg-sand/50">
+                                    <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">#</th>
+                                    <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Client</th>
+                                    <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total</th>
+                                    <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Factures</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {topClients.map((c, idx) => (
-                                    <tr key={c.client_name} className="hover:bg-slate-50/60 transition-colors">
-                                        <td className="px-4 py-2.5 text-xs font-bold text-slate-300 tabular-nums">{idx + 1}</td>
-                                        <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[260px] truncate" title={c.client_name}>{c.client_name}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{c.deal_count}</td>
+                                    <tr key={c.client_name} className="hover:bg-sand/60 transition-colors">
+                                        <td className="px-4 py-2.5 text-xs font-bold text-ink-mute tabular-nums">{idx + 1}</td>
+                                        <td className="px-4 py-2.5 font-semibold text-ink-secondary max-w-[260px] truncate" title={c.client_name}>{c.client_name}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{c.deal_count}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -508,12 +508,12 @@ export default function RepDashboard() {
 // Placeholder for quarterly view — shows the BarChart2 icon nicely
 export function RepPlaceholderCard({ label }: { label: string }) {
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-10 flex flex-col items-center gap-3 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
-                <BarChart2 className="w-6 h-6 text-slate-300" />
+        <div className="bg-white rounded-xl shadow-card p-10 flex flex-col items-center gap-3 text-center">
+            <div className="w-12 h-12 rounded-xl bg-stone flex items-center justify-center">
+                <BarChart2 className="w-6 h-6 text-ink-faint" />
             </div>
-            <p className="text-sm font-semibold text-slate-400">{label}</p>
-            <p className="text-xs text-slate-300">Disponible prochainement</p>
+            <p className="text-sm font-semibold text-ink-mute">{label}</p>
+            <p className="text-xs text-ink-faint">Disponible prochainement</p>
         </div>
     );
 }

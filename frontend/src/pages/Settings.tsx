@@ -44,23 +44,23 @@ export default function Settings() {
     return (
         <div className="p-4 md:p-8 max-w-screen-xl mx-auto">
             <div className="mb-6">
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Paramètres</h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Objectifs, trimestres, synchronisation et utilisateurs.</p>
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Paramètres</h1>
+                <p className="text-xs md:text-sm text-ink-mute mt-0.5">Objectifs, trimestres, synchronisation et utilisateurs.</p>
             </div>
 
             {message && (
-                <div className={cn("flex items-center gap-3 p-4 rounded-xl border mb-6 text-sm font-medium",
-                    message.type === 'success' ? "bg-emerald-50 border-emerald-100 text-emerald-800" : "bg-red-50 border-red-100 text-red-800")}>
+                <div className={cn("flex items-center gap-3 p-4 rounded-md border mb-6 text-sm font-medium",
+                    message.type === 'success' ? "bg-tone-good-soft border-tone-good/30 text-tone-good-ink" : "bg-tone-critical-soft border-tone-critical/30 text-tone-critical-ink")}>
                     {message.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
                     {message.text}
                 </div>
             )}
 
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 overflow-x-auto max-w-full">
+            <div className="flex gap-1 bg-stone p-1 rounded-md mb-6 overflow-x-auto max-w-full">
                 {visibleTabs.map(tab => (
                     <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                        className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                            activeTab === tab.id ? "bg-white text-slate-900 shadow-card" : "text-slate-500 hover:text-slate-700")}>
+                        className={cn("flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                            activeTab === tab.id ? "bg-white text-ink shadow-card" : "text-ink-mute hover:text-ink-secondary")}>
                         <tab.icon className="w-4 h-4" />
                         {tab.label}
                     </button>
@@ -121,42 +121,42 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
         <div className="space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-base font-semibold text-slate-800">Objectifs Factures par département</h2>
+                    <h2 className="text-base font-semibold text-ink">Objectifs Factures par département</h2>
                     <Select value={String(year)} onChange={(val) => setYear(Number(val))} options={yearOptions} variant="accent" className="w-24" />
                 </div>
                 <button onClick={saveAll} disabled={saving}
-                    className="flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-50">
+                    className="btn btn-md btn-primary">
                     {saving ? <RefreshCcw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     Enregistrer
                 </button>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-card overflow-x-auto">
                 <table className="w-full text-sm min-w-[900px]">
                     <thead>
-                        <tr className="border-b border-slate-100">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest sticky left-0 bg-white">Mois</th>
+                        <tr className="border-b border-hairline">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow sticky left-0 bg-white">Mois</th>
                             {DEPARTMENTS.map(dept => (
-                                <th key={dept} className="px-4 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                <th key={dept} className="px-4 py-3 text-center text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                     {dept.length > 15 ? dept.substring(0, 13) + '…' : dept}
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {loading ? (
-                            <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400 italic text-sm">Chargement...</td></tr>
+                            <tr><td colSpan={7} className="px-5 py-10 text-center text-ink-mute italic text-sm">Chargement...</td></tr>
                         ) : MONTHS.map((month) => {
                             const monthNum = month.value;
                             return (
-                                <tr key={month.value} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-5 py-2.5 font-semibold text-slate-700 sticky left-0 bg-white whitespace-nowrap">{month.label}</td>
+                                <tr key={month.value} className="hover:bg-sand/60 transition-colors">
+                                    <td className="px-5 py-2.5 font-semibold text-ink-secondary sticky left-0 bg-white whitespace-nowrap">{month.label}</td>
                                     {DEPARTMENTS.map(dept => {
                                         const obj = objectives.find(o => o.month === monthNum && o.department === dept);
                                         return (
                                             <td key={dept} className="px-3 py-2">
                                                 <input type="number"
-                                                    className="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:bg-white transition-all"
+                                                    className="w-full bg-sand border-0 rounded-md px-3 py-2 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-all"
                                                     value={obj?.target_amount || ''}
                                                     placeholder="0"
                                                     onChange={e => handleUpdate(monthNum, dept, e.target.value)} />
@@ -169,7 +169,7 @@ function ObjectivesManager({ setMessage }: { setMessage: (m: { type: 'success' |
                     </tbody>
                 </table>
             </div>
-            <p className="text-xs text-slate-400 px-1">* Montants avant taxes. Sauvegardez après chaque modification.</p>
+            <p className="text-xs text-ink-mute px-1">* Montants avant taxes. Sauvegardez après chaque modification.</p>
         </div>
     );
 }
@@ -186,21 +186,21 @@ function QuartersViewer() {
 
     return (
         <div className="space-y-4 max-w-3xl">
-            <h2 className="text-base font-semibold text-slate-800">Calendrier Fiscal (13 semaines / trimestre)</h2>
+            <h2 className="text-base font-semibold text-ink">Calendrier Fiscal (13 semaines / trimestre)</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {loading ? (
-                    <div className="col-span-2 py-10 text-center text-slate-400 italic text-sm">Chargement...</div>
+                    <div className="col-span-2 py-10 text-center text-ink-mute italic text-sm">Chargement...</div>
                 ) : quarters.map(q => (
-                    <div key={q.id} className="bg-white border border-slate-100 shadow-card rounded-2xl p-5 flex items-center justify-between hover:border-brand-main/20 transition-colors">
+                    <div key={q.id} className="bg-white shadow-card rounded-xl p-5 flex items-center justify-between hover:border-primary/20 transition-colors">
                         <div>
-                            <div className="text-xs font-bold text-brand-main uppercase tracking-widest mb-0.5">Trimestre #{q.quarter}</div>
-                            <div className="font-bold text-slate-800">Année {q.year}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">{q.num_weeks} semaines</div>
+                            <div className="text-xs font-semibold text-primary-press uppercase tracking-eyebrow mb-0.5">Trimestre #{q.quarter}</div>
+                            <div className="font-bold text-ink">Année {q.year}</div>
+                            <div className="text-xs text-ink-mute mt-0.5">{q.num_weeks} semaines</div>
                         </div>
                         <div className="text-right">
-                            <div className="text-sm font-medium text-slate-700">{formatShortDate(q.start_date)}</div>
-                            <ChevronRight className="w-4 h-4 text-slate-300 mx-auto my-0.5" />
-                            <div className="text-sm font-medium text-slate-700">{formatShortDate(q.end_date)}</div>
+                            <div className="text-sm font-medium text-ink-secondary">{formatShortDate(q.start_date)}</div>
+                            <ChevronRight className="w-4 h-4 text-ink-faint mx-auto my-0.5" />
+                            <div className="text-sm font-medium text-ink-secondary">{formatShortDate(q.end_date)}</div>
                         </div>
                     </div>
                 ))}
@@ -239,10 +239,10 @@ function SyncManager() {
                 card is the alarm that did not exist when ÉVÈNEMENT went missing
                 for sixteen months. */}
             <UnmappedDepartmentsCard />
-            <div className="flex items-start gap-3 px-4 py-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-slate-500">
-                <Calendar className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-3 px-4 py-3 bg-sand rounded-md border border-hairline text-xs text-ink-mute">
+                <Calendar className="w-4 h-4 text-ink-mute shrink-0 mt-0.5" />
                 <span>
-                    Synchronisation automatique planifiée via pg_cron : <strong className="text-slate-700">Devis et Factures aux 5 min</strong>, <strong className="text-slate-700">Tâches CRM aux 20 min</strong>, <strong className="text-slate-700">Liaison factures aux 30 min</strong>, <strong className="text-slate-700">Créateurs des devis aux 3 min</strong>.
+                    Synchronisation automatique planifiée via pg_cron : <strong className="text-ink-secondary">Devis et Factures aux 5 min</strong>, <strong className="text-ink-secondary">Tâches CRM aux 20 min</strong>, <strong className="text-ink-secondary">Liaison factures aux 30 min</strong>, <strong className="text-ink-secondary">Créateurs des devis aux 3 min</strong>.
                 </span>
             </div>
         </div>
@@ -310,31 +310,29 @@ function LinkageCard() {
         : 0;
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6 space-y-4">
+        <div className="bg-white rounded-xl shadow-card p-6 space-y-4">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                        <Link2 className="w-4 h-4 text-brand-main" />
+                    <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+                        <Link2 className="w-4 h-4 text-primary-press" />
                         Liaison Factures &rarr; Comptes CRM
                     </h2>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-ink-mute mt-1">
                         Associe chaque client Zoho Books \u00e0 son compte Zoho CRM, ce qui permet
                         d&rsquo;afficher les factures sur la fiche d&rsquo;un lead ou d&rsquo;un contact.
                         Chaque ex\u00e9cution traite une tranche&nbsp;: relancer jusqu&rsquo;\u00e0 ce
                         qu&rsquo;il ne reste rien.
                     </p>
                     {lastRun && (
-                        <p className="text-xs text-slate-500 mt-2 font-medium">
-                            Dernier passage&nbsp;: <span className="text-slate-700">{lastRun}</span>
+                        <p className="text-xs text-ink-mute mt-2 font-medium">
+                            Dernier passage&nbsp;: <span className="text-ink-secondary">{lastRun}</span>
                         </p>
                     )}
                 </div>
                 <button
                     onClick={runLink}
                     disabled={running}
-                    className="flex shrink-0 items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl
-                               text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90
-                               transition-all disabled:opacity-60"
+                    className="btn btn-md btn-primary shrink-0"
                 >
                     {running
                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Liaison...</>
@@ -343,10 +341,10 @@ function LinkageCard() {
             </div>
 
             {status && (
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="pt-4 border-t border-hairline space-y-3">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone">
                         <div
-                            className="h-full rounded-full bg-brand-main transition-all"
+                            className="h-full rounded-full bg-primary transition-all"
                             style={{ width: `${coverage}%` }}
                         />
                     </div>
@@ -364,7 +362,7 @@ function LinkageCard() {
             )}
 
             {error && (
-                <div className="flex items-center gap-2 text-sm text-rose-600">
+                <div className="flex items-center gap-2 text-sm text-tone-critical-ink">
                     <AlertCircle className="w-4 h-4" />{error}
                 </div>
             )}
@@ -377,13 +375,13 @@ function Stat({ label, value, muted, highlight, danger }: {
 }) {
     return (
         <span className="flex items-baseline gap-1.5">
-            <span className="text-slate-400">{label}</span>
+            <span className="text-ink-mute">{label}</span>
             <span className={cn(
                 'font-bold tabular-nums',
-                danger ? 'text-rose-600'
-                    : highlight ? 'text-brand-main'
-                    : muted ? 'text-slate-400'
-                    : 'text-slate-700',
+                danger ? 'text-tone-critical-ink'
+                    : highlight ? 'text-primary-press'
+                    : muted ? 'text-ink-mute'
+                    : 'text-ink-secondary',
             )}>{value}</span>
         </span>
     );
@@ -443,27 +441,27 @@ function SyncCard({ title, description, endpoint, actionLabel }: { title: string
     };
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-6 space-y-4">
+        <div className="bg-white rounded-xl shadow-card p-6 space-y-4">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h2 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-brand-main" />{title}
+                    <h2 className="text-base font-semibold text-ink flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-ink-mute" />{title}
                     </h2>
-                    <p className="text-xs text-slate-400 mt-1">{description}</p>
+                    <p className="text-xs text-ink-mute mt-1">{description}</p>
                     {lastSync && (
-                        <p className="text-xs text-slate-500 mt-2 font-medium">
-                            Dernière sync : <span className="text-slate-700">{formatRelative(lastSync.received_at)}</span>
-                            {' '}— <span className="font-mono text-[11px] text-slate-400">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
+                        <p className="text-xs text-ink-mute mt-2 font-medium">
+                            Dernière sync : <span className="text-ink-secondary">{formatRelative(lastSync.received_at)}</span>
+                            {' '}— <span className="font-mono text-2xs text-ink-mute">{new Date(lastSync.received_at).toLocaleString('fr-CA')}</span>
                         </p>
                     )}
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                     <button onClick={handleSync} disabled={syncing || fullSyncing}
-                        className="flex items-center gap-2 bg-brand-main text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60">
+                        className="btn btn-md btn-primary">
                         {syncing ? <><Loader2 className="w-4 h-4 animate-spin" /> Sync...</> : <><RefreshCcw className="w-4 h-4" /> Synchroniser</>}
                     </button>
                     <button onClick={handleFullSync} disabled={syncing || fullSyncing}
-                        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-brand-main transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 text-xs text-ink-mute hover:text-primary-press transition-colors disabled:opacity-50"
                         title="Importe tout l'historique sans filtre de date (plus lent)">
                         {fullSyncing ? <><Loader2 className="w-3 h-3 animate-spin" /> Sync complète...</> : <><RefreshCcw className="w-3 h-3" /> Sync complète (historique)</>}
                     </button>
@@ -471,21 +469,21 @@ function SyncCard({ title, description, endpoint, actionLabel }: { title: string
             </div>
 
             {syncResult && (
-                <div className="pt-4 border-t border-slate-100 flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-emerald-600">
+                <div className="pt-4 border-t border-hairline flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-tone-good-ink">
                         <CheckCircle2 className="w-4 h-4" />{syncResult.upserted} upsertés
                     </div>
-                    {syncResult.deleted !== undefined && <><div className="text-slate-300">|</div><div className="text-sm font-semibold text-slate-500">{syncResult.deleted} supprimés</div></>}
-                    {syncResult.voided !== undefined && <><div className="text-slate-300">|</div><div className="text-sm font-semibold text-slate-500">{syncResult.voided} annulés</div></>}
-                    <div className="text-slate-300">|</div>
-                    <div className="text-xs text-slate-400 font-mono">{(syncResult.duration_ms / 1000).toFixed(1)}s</div>
+                    {syncResult.deleted !== undefined && <><div className="text-ink-faint">|</div><div className="text-sm font-semibold text-ink-mute">{syncResult.deleted} supprimés</div></>}
+                    {syncResult.voided !== undefined && <><div className="text-ink-faint">|</div><div className="text-sm font-semibold text-ink-mute">{syncResult.voided} annulés</div></>}
+                    <div className="text-ink-faint">|</div>
+                    <div className="text-xs text-ink-mute font-mono">{(syncResult.duration_ms / 1000).toFixed(1)}s</div>
                     {syncResult.errors.length > 0 && (
-                        <div className="w-full text-xs text-red-600 bg-red-50 rounded-lg p-2">{syncResult.errors.join(' · ')}</div>
+                        <div className="w-full text-xs text-tone-critical-ink bg-tone-critical-soft rounded-md p-2">{syncResult.errors.join(' · ')}</div>
                     )}
                 </div>
             )}
             {syncError && (
-                <div className="pt-4 border-t border-slate-100 flex items-center gap-2 text-sm text-red-600">
+                <div className="pt-4 border-t border-hairline flex items-center gap-2 text-sm text-tone-critical-ink">
                     <AlertCircle className="w-4 h-4 shrink-0" />{syncError}
                 </div>
             )}
@@ -493,33 +491,33 @@ function SyncCard({ title, description, endpoint, actionLabel }: { title: string
             {/* Recent history */}
             <div className="pt-2">
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Historique récent</h3>
-                    <button onClick={fetchSyncLogs} className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><RefreshCcw className="w-3 h-3" /></button>
+                    <h3 className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Historique récent</h3>
+                    <button onClick={fetchSyncLogs} className="p-1 text-ink-mute hover:text-ink-secondary hover:bg-stone rounded-md transition-colors"><RefreshCcw className="w-3 h-3" /></button>
                 </div>
-                <div className="bg-slate-50 rounded-xl overflow-hidden">
+                <div className="bg-sand rounded-md overflow-hidden">
                     <table className="w-full text-xs">
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-hairline">
                             {logsLoading ? (
-                                <tr><td className="px-4 py-3 text-center text-slate-400 italic">Chargement...</td></tr>
+                                <tr><td className="px-4 py-3 text-center text-ink-mute italic">Chargement...</td></tr>
                             ) : recentLogs.length === 0 ? (
-                                <tr><td className="px-4 py-3 text-center text-slate-400 italic">Aucune synchronisation.</td></tr>
+                                <tr><td className="px-4 py-3 text-center text-ink-mute italic">Aucune synchronisation.</td></tr>
                             ) : recentLogs.map(log => (
-                                <tr key={log.id} className="hover:bg-slate-100/60">
-                                    <td className="px-4 py-2.5 text-slate-400">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
+                                <tr key={log.id} className="hover:bg-stone/60">
+                                    <td className="px-4 py-2.5 text-ink-mute">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
                                     <td className="px-4 py-2.5">
-                                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase",
-                                            log.action.includes('full') ? "bg-purple-100 text-purple-600" :
-                                            log.action.includes('manual') ? "bg-brand-main/10 text-brand-main" :
-                                            "bg-slate-200 text-slate-500")}>
+                                        <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold uppercase",
+                                            log.action.includes('full') ? "bg-data-4 text-data-4-ink" :
+                                            log.action.includes('manual') ? "bg-primary-wash text-primary-press" :
+                                            "bg-hairline-strong text-ink-secondary")}>
                                             {log.action.includes('full') ? 'Complète' : log.action.includes('manual') ? 'Manuel' : 'Auto'}
                                         </span>
                                     </td>
                                     <td className="px-4 py-2.5">
-                                        <span className={cn("flex items-center gap-1 font-semibold", log.status_code === 200 ? "text-emerald-600" : "text-red-500")}>
+                                        <span className={cn("flex items-center gap-1 font-semibold", log.status_code === 200 ? "text-tone-good-ink" : "text-tone-critical")}>
                                             {log.status_code === 200 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}{log.status_code}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2.5 text-slate-400 max-w-[200px] truncate">{log.error_message || '—'}</td>
+                                    <td className="px-4 py-2.5 text-ink-mute max-w-[200px] truncate">{log.error_message || '—'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -546,35 +544,35 @@ function WebhookLogs() {
     return (
         <div className="space-y-4 max-w-4xl">
             <div className="flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-800">Historique Webhook (20 derniers)</h2>
-                <button onClick={fetchLogs} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"><RefreshCcw className="w-4 h-4" /></button>
+                <h2 className="text-base font-semibold text-ink">Historique Webhook (20 derniers)</h2>
+                <button onClick={fetchLogs} className="p-2 text-ink-mute hover:text-ink-secondary hover:bg-stone rounded-md transition-colors"><RefreshCcw className="w-4 h-4" /></button>
             </div>
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Date</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Événement</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Status</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Réf.</th>
+                        <tr className="border-b border-hairline">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Date</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Événement</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Status</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Réf.</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {loading ? (
-                            <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 italic text-sm">Chargement...</td></tr>
+                            <tr><td colSpan={4} className="px-5 py-10 text-center text-ink-mute italic text-sm">Chargement...</td></tr>
                         ) : logs.length === 0 ? (
-                            <tr><td colSpan={4} className="px-5 py-10 text-center text-slate-400 italic text-sm">Aucun log trouvé.</td></tr>
+                            <tr><td colSpan={4} className="px-5 py-10 text-center text-ink-mute italic text-sm">Aucun log trouvé.</td></tr>
                         ) : logs.map(log => (
-                            <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
-                                <td className="px-5 py-3 text-slate-400 text-xs">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
+                            <tr key={log.id} className="hover:bg-sand/60 transition-colors">
+                                <td className="px-5 py-3 text-ink-mute text-xs">{new Date(log.received_at).toLocaleString('fr-CA')}</td>
                                 <td className="px-5 py-3">
                                     <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold",
-                                        log.action === 'upserted' ? "bg-emerald-50 text-emerald-700" : log.action === 'deleted' ? "bg-red-50 text-red-700" : "bg-slate-100 text-slate-600")}>
+                                        log.action === 'upserted' ? "bg-tone-good-soft text-tone-good-ink" : log.action === 'deleted' ? "bg-tone-critical-soft text-tone-critical-ink" : "bg-stone text-ink-secondary")}>
                                         {log.action}
                                     </span>
                                 </td>
-                                <td className="px-5 py-3 font-mono text-xs text-slate-500">{log.status_code}</td>
-                                <td className="px-5 py-3 font-medium text-slate-700">{log.zoho_id || '—'}</td>
+                                <td className="px-5 py-3 font-mono text-xs text-ink-mute">{log.status_code}</td>
+                                <td className="px-5 py-3 font-medium text-ink-secondary">{log.zoho_id || '—'}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -656,11 +654,11 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
         <div className="space-y-6 max-w-4xl">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-base font-semibold text-slate-800">Gestion des utilisateurs</h2>
-                    <p className="text-xs text-slate-400 mt-0.5">Contrôlez qui peut se connecter et accéder au module Factures.</p>
+                    <h2 className="text-base font-semibold text-ink">Gestion des utilisateurs</h2>
+                    <p className="text-xs text-ink-mute mt-0.5">Contrôlez qui peut se connecter et accéder au module Factures.</p>
                 </div>
                 <button onClick={() => { setForm({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' }); setShowForm(true); }}
-                    className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all">
+                    className="btn btn-md btn-primary">
                     <Plus className="w-4 h-4" /> Ajouter
                 </button>
             </div>
@@ -669,39 +667,39 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             {showForm && (() => {
                 const isEditing = !!(form.email && users.find(u => u.email === form.email));
                 return (
-                <div className="bg-white border border-brand-main/20 rounded-2xl p-5 shadow-card space-y-4">
-                    <h3 className="text-sm font-bold text-slate-800">
+                <div className="bg-white border border-primary/20 rounded-xl p-5 shadow-card space-y-4">
+                    <h3 className="text-sm font-semibold text-ink">
                         {isEditing ? 'Modifier' : 'Ajouter'} un utilisateur
                     </h3>
 
                     {/* User identity row */}
                     {isEditing ? (
                         /* Editing: email is locked, show as display */
-                        <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3">
-                            <div className="w-8 h-8 rounded-full bg-brand-main/10 text-brand-main flex items-center justify-center text-sm font-bold shrink-0">
+                        <div className="flex items-center gap-3 bg-sand rounded-md px-4 py-3">
+                            <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-sm font-bold shrink-0">
                                 {(form.name || form.email).charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-800 truncate">{form.name || '—'}</p>
-                                <p className="text-xs text-slate-400 truncate">{form.email}</p>
+                                <p className="text-sm font-semibold text-ink truncate">{form.name || '—'}</p>
+                                <p className="text-xs text-ink-mute truncate">{form.email}</p>
                             </div>
                         </div>
                     ) : (
                         /* Adding: Zoho user picker */
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                            <label className="block text-xs font-semibold text-ink-mute mb-1.5">
                                 Utilisateur Zoho *
                             </label>
                             {zohoUsersError ? (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700 space-y-2">
+                                <div className="bg-tone-warn-soft border border-tone-warn/40 rounded-md px-3 py-2.5 text-xs text-tone-warn-ink space-y-2">
                                     <p className="font-semibold">Impossible de charger les utilisateurs Zoho.</p>
-                                    <p>Vérifiez que la fonction <code className="font-mono bg-amber-100 px-1 rounded">get-zoho-users</code> est déployée et que le token Zoho a le scope <code className="font-mono bg-amber-100 px-1 rounded">ZohoBooks.settings.READ</code>.</p>
+                                    <p>Vérifiez que la fonction <code className="font-mono bg-tone-warn/20 px-1 rounded-xs">get-zoho-users</code> est déployée et que le token Zoho a le scope <code className="font-mono bg-tone-warn/20 px-1 rounded-xs">ZohoBooks.settings.READ</code>.</p>
                                     <p>En attendant, entrez le courriel manuellement :</p>
                                     <input
                                         type="email"
                                         value={form.email}
                                         onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                                        className="w-full bg-white rounded-lg px-3 py-2 text-sm border border-amber-200 focus:outline-none focus:ring-2 focus:ring-brand-main/30"
+                                        className="w-full bg-white rounded-md px-3 py-2 text-sm border border-tone-warn/40 focus:outline-none focus:ring-2 focus:ring-primary/30"
                                         placeholder="jean@affichez.ca"
                                     />
                                 </div>
@@ -718,7 +716,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                         }
                                     }}
                                     disabled={zohoUsersLoading}
-                                    className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30 disabled:text-slate-400"
+                                    className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:text-ink-mute"
                                 >
                                     <option value="">
                                         {zohoUsersLoading ? 'Chargement des utilisateurs Zoho…' : '— Sélectionner un utilisateur Zoho —'}
@@ -732,9 +730,9 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                             )}
                             {form.email && !zohoUsersError && (
                                 <div className="flex items-center gap-2 mt-2 pl-1">
-                                    <span className="text-xs text-slate-400 truncate">{form.email}</span>
+                                    <span className="text-xs text-ink-mute truncate">{form.email}</span>
                                     {form.rep_name && (
-                                        <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
+                                        <span className="flex items-center gap-1 text-2xs font-semibold text-tone-good-ink bg-tone-good-soft border border-tone-good/30 px-2 py-0.5 rounded-full shrink-0">
                                             <CheckCircle2 className="w-3 h-3" /> Associé : {form.rep_name}
                                         </span>
                                     )}
@@ -746,9 +744,9 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                     {/* Permissions grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1">Rôle</label>
+                            <label className="block text-xs font-semibold text-ink-mute mb-1">Rôle</label>
                             <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                                className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30">
+                                className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30">
                                 <option value="member">Membre</option>
                                 <option value="admin">Admin</option>
                             </select>
@@ -756,11 +754,11 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                         {/* Rep name: auto-matched on add, manually editable on edit */}
                         {isEditing && (
                             <div>
-                                <label className="block text-xs font-semibold text-slate-500 mb-1">Représentant Zoho</label>
+                                <label className="block text-xs font-semibold text-ink-mute mb-1">Représentant Zoho</label>
                                 <select
                                     value={form.rep_name ?? ''}
                                     onChange={e => setForm(f => ({ ...f, rep_name: e.target.value }))}
-                                    className="w-full bg-slate-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-main/30"
+                                    className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                 >
                                     <option value="">— Aucun —</option>
                                     {repOptions.map(r => <option key={r} value={r}>{r}</option>)}
@@ -771,70 +769,70 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                     <div className="flex items-center gap-3">
                         <input type="checkbox" id="factures-access" checked={form.can_access_factures}
                             onChange={e => setForm(f => ({ ...f, can_access_factures: e.target.checked }))}
-                            className="w-4 h-4 accent-brand-main rounded" />
-                        <label htmlFor="factures-access" className="text-sm font-medium text-slate-700 cursor-pointer">Accès au module Factures</label>
+                            className="w-4 h-4 accent-primary rounded-xs" />
+                        <label htmlFor="factures-access" className="text-sm font-medium text-ink-secondary cursor-pointer">Accès au module Factures</label>
                     </div>
                     <div className="flex items-center gap-3">
                         <button onClick={handleSave} disabled={saving || !form.email.trim()}
-                            className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-brand-main/90 transition-all disabled:opacity-50">
+                            className="btn btn-md btn-primary">
                             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer
                         </button>
-                        <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all">Annuler</button>
+                        <button onClick={() => setShowForm(false)} className="btn btn-md btn-ghost text-ink-mute">Annuler</button>
                     </div>
                 </div>
                 );
             })()}
 
             {/* Users Table */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Courriel</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Nom</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Rôle</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest">Factures</th>
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest">Rep Zoho</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-slate-400 uppercase tracking-widest">Actions</th>
+                        <tr className="border-b border-hairline bg-sand/50">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Courriel</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Nom</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rôle</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Factures</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rep Zoho</th>
+                            <th className="px-5 py-3 text-center text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {loading ? (
-                            <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400 italic">Chargement...</td></tr>
+                            <tr><td colSpan={6} className="px-5 py-10 text-center text-ink-mute italic">Chargement...</td></tr>
                         ) : users.length === 0 ? (
-                            <tr><td colSpan={6} className="px-5 py-10 text-center text-slate-400 italic">Aucun utilisateur enregistré.</td></tr>
+                            <tr><td colSpan={6} className="px-5 py-10 text-center text-ink-mute italic">Aucun utilisateur enregistré.</td></tr>
                         ) : users.map(user => (
-                            <tr key={user.email} className="hover:bg-slate-50/60 transition-colors">
-                                <td className="px-5 py-3 text-slate-700 font-medium">{user.email}</td>
-                                <td className="px-5 py-3 text-slate-500">{user.name || '—'}</td>
+                            <tr key={user.email} className="hover:bg-sand/60 transition-colors">
+                                <td className="px-5 py-3 text-ink-secondary font-medium">{user.email}</td>
+                                <td className="px-5 py-3 text-ink-mute">{user.name || '—'}</td>
                                 <td className="px-5 py-3">
-                                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide",
-                                        user.role === 'admin' ? "bg-brand-main/10 text-brand-main" : "bg-slate-100 text-slate-500")}>
+                                    <span className={cn("px-2 py-0.5 rounded-full text-2xs font-semibold uppercase tracking-wide",
+                                        user.role === 'admin' ? "bg-primary-wash text-primary-press" : "bg-stone text-ink-secondary")}>
                                         {user.role}
                                     </span>
                                 </td>
                                 <td className="px-5 py-3 text-center">
                                     {user.can_access_factures
-                                        ? <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />
-                                        : <span className="text-slate-300 text-xs">—</span>}
+                                        ? <CheckCircle2 className="w-4 h-4 text-tone-good mx-auto" />
+                                        : <span className="text-ink-faint text-xs">—</span>}
                                 </td>
                                 <td className="px-5 py-3">
                                     {user.rep_name
                                         ? repOptions.some(r => r.toLowerCase() === user.rep_name!.toLowerCase())
-                                            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
+                                            ? <span className="flex items-center gap-1.5 text-xs font-semibold text-tone-good-ink">
                                                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />{user.rep_name}
                                               </span>
-                                            : <span className="text-xs text-amber-600 font-medium">{user.rep_name}</span>
-                                        : <span className="text-slate-300 text-xs">—</span>}
+                                            : <span className="text-xs text-tone-warn-ink font-medium">{user.rep_name}</span>
+                                        : <span className="text-ink-faint text-xs">—</span>}
                                 </td>
                                 <td className="px-5 py-3 text-center">
                                     <div className="flex items-center justify-center gap-1">
                                         <button onClick={() => handleEdit(user)}
-                                            className="p-1.5 text-slate-400 hover:text-brand-main hover:bg-amber-50 rounded-lg transition-all text-xs font-bold">
+                                            className="p-1.5 text-ink-mute hover:text-primary-press hover:bg-primary-wash rounded-md transition-all text-xs font-bold">
                                             Éditer
                                         </button>
                                         <button onClick={() => handleDelete(user.email)}
-                                            className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                            className="p-1.5 text-ink-faint hover:text-tone-critical hover:bg-tone-critical-soft rounded-md transition-all">
                                             <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                     </div>
@@ -844,7 +842,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                     </tbody>
                 </table>
             </div>
-            <p className="text-xs text-slate-400 px-1">
+            <p className="text-xs text-ink-mute px-1">
                 Les utilisateurs pré-configurés ici obtiennent automatiquement leur rôle et accès lors de leur première connexion via Zoho. Les membres avec Accès Factures ne voient que leurs propres données.
             </p>
         </div>
@@ -908,44 +906,44 @@ function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'succe
     return (
         <div className="space-y-6 max-w-2xl">
             <div>
-                <h2 className="text-base font-semibold text-slate-800">Clients exclus</h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h2 className="text-base font-semibold text-ink">Clients exclus</h2>
+                <p className="text-xs text-ink-mute mt-0.5">
                     Les clients exclus n'apparaissent dans aucun tableau de bord, ni dans les KPIs des modules Devis et Factures.
                 </p>
             </div>
 
             {/* Search & Add */}
             <div className="relative">
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2.5 focus-within:ring-2 focus-within:ring-brand-main/30 focus-within:border-brand-main/40 transition-all">
+                <div className="flex items-center gap-2 bg-white border border-hairline-strong rounded-md px-3 py-2.5 focus-within:ring-2 focus-within:ring-primary/30 focus-within:border-primary/40 transition-all">
                     {searching
-                        ? <Loader2 className="w-4 h-4 text-slate-400 shrink-0 animate-spin" />
-                        : <Search className="w-4 h-4 text-slate-400 shrink-0" />}
+                        ? <Loader2 className="w-4 h-4 text-ink-mute shrink-0 animate-spin" />
+                        : <Search className="w-4 h-4 text-ink-mute shrink-0" />}
                     <input
                         type="text"
                         value={searchQuery}
                         onChange={e => handleSearchChange(e.target.value)}
                         onFocus={() => searchResults.length > 0 && setShowDropdown(true)}
                         placeholder="Rechercher un client à exclure…"
-                        className="flex-1 text-sm bg-transparent outline-none placeholder:text-slate-400"
+                        className="flex-1 text-sm bg-transparent outline-none placeholder:text-ink-mute"
                     />
                     {searchQuery && (
                         <button onClick={() => { setSearchQuery(''); setSearchResults([]); setShowDropdown(false); }}
-                            className="p-0.5 text-slate-300 hover:text-slate-500 transition-colors">
+                            className="p-0.5 text-ink-faint hover:text-ink-mute transition-colors">
                             <X className="w-3.5 h-3.5" />
                         </button>
                     )}
                 </div>
 
                 {showDropdown && searchResults.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-64 overflow-y-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-hairline-strong rounded-lg shadow-lg z-20 max-h-64 overflow-y-auto">
                         {searchResults.map(name => (
                             <button
                                 key={name}
                                 onClick={() => handleAdd(name)}
-                                className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-slate-50 transition-colors first:rounded-t-xl last:rounded-b-xl group"
+                                className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-sand transition-colors first:rounded-t-xl last:rounded-b-xl group"
                             >
-                                <span className="text-slate-700 truncate">{name}</span>
-                                <span className="text-xs font-semibold text-brand-main opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                <span className="text-ink-secondary truncate">{name}</span>
+                                <span className="text-xs font-semibold text-primary-press opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
                                     + Exclure
                                 </span>
                             </button>
@@ -953,35 +951,35 @@ function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'succe
                     </div>
                 )}
                 {showDropdown && !searching && searchResults.length === 0 && searchQuery.trim().length >= 2 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 px-4 py-3 text-sm text-slate-400 italic">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-hairline-strong rounded-lg shadow-lg z-20 px-4 py-3 text-sm text-ink-mute italic">
                         Aucun client trouvé pour « {searchQuery} »
                     </div>
                 )}
             </div>
 
             {/* Excluded list */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                <div className="px-5 py-3 border-b border-hairline bg-sand/50">
+                    <span className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                         {loading ? '…' : excluded.length} client{excluded.length !== 1 ? 's' : ''} exclu{excluded.length !== 1 ? 's' : ''}
                     </span>
                 </div>
                 {loading ? (
-                    <div className="py-10 text-center text-slate-400 italic text-sm">Chargement…</div>
+                    <div className="py-10 text-center text-ink-mute italic text-sm">Chargement…</div>
                 ) : excluded.length === 0 ? (
-                    <div className="py-10 text-center text-slate-400 italic text-sm">Aucun client exclu pour l'instant.</div>
+                    <div className="py-10 text-center text-ink-mute italic text-sm">Aucun client exclu pour l'instant.</div>
                 ) : (
-                    <ul className="divide-y divide-slate-50">
+                    <ul className="divide-y divide-hairline">
                         {excluded.map(ec => (
-                            <li key={ec.id} className="flex items-center justify-between px-5 py-3 hover:bg-slate-50/60 transition-colors group">
+                            <li key={ec.id} className="flex items-center justify-between px-5 py-3 hover:bg-sand/60 transition-colors group">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <Ban className="w-3.5 h-3.5 text-red-300 shrink-0" />
-                                    <span className="text-sm font-medium text-slate-700 truncate">{ec.client_name}</span>
+                                    <Ban className="w-3.5 h-3.5 text-tone-critical shrink-0" />
+                                    <span className="text-sm font-medium text-ink-secondary truncate">{ec.client_name}</span>
                                 </div>
                                 <button
                                     onClick={() => handleRemove(ec.id, ec.client_name)}
                                     title="Réintégrer ce client"
-                                    className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                                    className="p-1.5 text-ink-faint hover:text-tone-critical hover:bg-tone-critical-soft rounded-md transition-all opacity-0 group-hover:opacity-100 shrink-0"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -990,7 +988,7 @@ function ExcludedClientsManager({ setMessage }: { setMessage: (m: { type: 'succe
                     </ul>
                 )}
             </div>
-            <p className="text-xs text-slate-400 px-1">
+            <p className="text-xs text-ink-mute px-1">
                 Les modifications sont immédiates — les filtres SQL excluent ces clients de tous les calculs en temps réel.
             </p>
         </div>

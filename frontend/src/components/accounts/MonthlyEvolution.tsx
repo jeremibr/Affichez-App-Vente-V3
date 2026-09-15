@@ -83,9 +83,9 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
     const hasPrevious = previousYear !== null && previous.some(r => r.nb_accounts > 0);
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">
+        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-hairline flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-ink">
                     Évolution mensuelle{year !== 'Toutes' && ` — ${year}`}
                 </h3>
                 <InfoHint text={`Les barres montrent le nombre de comptes créés chaque mois. La ligne montre le revenu par compte sur ${windowLabel} — c'est elle qui dit si un mois a ramené de bons clients ou seulement beaucoup de clients. La ligne pâle est l'année précédente.`} />
@@ -106,9 +106,9 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                         <g key={f}>
                             <line x1={PAD_L} x2={W - PAD_R}
                                   y1={PAD_T + plotH * (1 - f)} y2={PAD_T + plotH * (1 - f)}
-                                  className="stroke-slate-100" strokeWidth={1} />
+                                  className="stroke-hairline" strokeWidth={1} />
                             <text x={PAD_L - 6} y={PAD_T + plotH * (1 - f) + 3} textAnchor="end"
-                                  className="fill-slate-300" style={{ fontSize: 9 }}>
+                                  className="fill-ink-faint" style={{ fontSize: 9 }}>
                                 {Math.round(maxRpa * f).toLocaleString('fr-CA')}
                             </text>
                         </g>
@@ -121,7 +121,7 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                                 key={d.month}
                                 x={x(i) - step * 0.28} y={PAD_T + plotH - h}
                                 width={step * 0.56} height={Math.max(0, h)}
-                                rx={2} className="fill-slate-100"
+                                rx={2} className="fill-hairline"
                             />
                         );
                     })}
@@ -133,27 +133,27 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
                     {hasPrevious && (
                         <>
                             <path d={linePath('prevRpa')} fill="none"
-                                  className="stroke-slate-400" strokeWidth={1.5}
+                                  className="stroke-ink-mute" strokeWidth={1.5}
                                   strokeDasharray="5 4" strokeLinejoin="round" />
                             {data.map((d, i) => (
                                 <rect key={d.month} x={x(i) - 2.5} y={y(d.prevRpa) - 2.5}
                                       width={5} height={5}
-                                      className="fill-white stroke-slate-400" strokeWidth={1.25} />
+                                      className="fill-white stroke-ink-mute" strokeWidth={1.25} />
                             ))}
                         </>
                     )}
 
                     {/* This year: solid, brand orange, filled round markers, thicker. */}
                     <path d={linePath('rpa')} fill="none"
-                          className="stroke-brand-main" strokeWidth={2.5} strokeLinejoin="round" />
+                          className="stroke-primary" strokeWidth={2.5} strokeLinejoin="round" />
                     {data.map((d, i) => (
                         <circle key={d.month} cx={x(i)} cy={y(d.rpa)} r={3.5}
-                                className="fill-brand-main stroke-white" strokeWidth={1.5} />
+                                className="fill-primary stroke-white" strokeWidth={1.5} />
                     ))}
 
                     {data.map((d, i) => (
                         <text key={d.month} x={x(i)} y={H - 8} textAnchor="middle"
-                              className="fill-slate-400" style={{ fontSize: 10 }}>
+                              className="fill-ink-mute" style={{ fontSize: 10 }}>
                             {d.label}
                         </text>
                     ))}
@@ -163,39 +163,39 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
             <div className="overflow-x-auto px-5 pb-5 pt-2">
                 <table className="w-full text-sm" translate="no">
                     <thead>
-                        <tr className="border-b border-slate-100">
-                            <th className="py-2 pr-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
-                            <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Comptes</th>
-                            <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturés</th>
-                            <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revenus</th>
-                            <th className="py-2 px-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">/ compte</th>
+                        <tr className="border-b border-hairline">
+                            <th className="py-2 pr-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Mois</th>
+                            <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Comptes</th>
+                            <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Facturés</th>
+                            <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Revenus</th>
+                            <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">/ compte</th>
                             {hasPrevious && (
-                                <th className="py-2 pl-2 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                <th className="py-2 pl-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                                     vs {previousYear}
                                 </th>
                             )}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {data.map(d => (
-                            <tr key={d.month} className={cn('hover:bg-slate-50/60', d.accounts === 0 && 'opacity-40')}>
-                                <td className="py-1.5 pr-3 font-semibold text-slate-600 text-xs">{d.label}</td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-slate-700">{d.accounts}</td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-slate-500">{d.invoiced}</td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-slate-700 text-xs">{formatCurrencyCAD(d.amount)}</td>
-                                <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-brand-dark text-xs">{formatCurrencyCAD(d.rpa)}</td>
+                            <tr key={d.month} className={cn('hover:bg-sand/60', d.accounts === 0 && 'opacity-40')}>
+                                <td className="py-1.5 pr-3 font-semibold text-ink-secondary text-xs">{d.label}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary">{d.accounts}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-ink-mute">{d.invoiced}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">{formatCurrencyCAD(d.amount)}</td>
+                                <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-ink text-xs">{formatCurrencyCAD(d.rpa)}</td>
                                 {hasPrevious && (
                                     <td className="py-1.5 pl-2 text-right tabular-nums">
                                         {d.delta === null || d.deltaAmount === null ? (
-                                            <span className="text-slate-300 text-xs">—</span>
+                                            <span className="text-ink-faint text-xs">—</span>
                                         ) : (
                                             <div className="flex flex-col items-end gap-0.5 leading-tight">
                                                 <span className={cn('text-xs font-semibold whitespace-nowrap',
-                                                    d.deltaAmount >= 0 ? 'text-emerald-600' : 'text-rose-500')}>
+                                                    d.deltaAmount >= 0 ? 'text-tone-good-ink' : 'text-tone-critical')}>
                                                     {d.deltaAmount >= 0 ? '+' : ''}{formatCurrencyCAD(d.deltaAmount)}
                                                 </span>
-                                                <span className={cn('text-[10px] font-bold',
-                                                    d.delta >= 0 ? 'text-emerald-400' : 'text-rose-400')}>
+                                                <span className={cn('text-2xs font-bold',
+                                                    d.delta >= 0 ? 'text-tone-good' : 'text-tone-critical')}>
                                                     {d.delta >= 0 ? '+' : ''}{d.delta.toFixed(0)} %
                                                 </span>
                                             </div>
@@ -220,25 +220,25 @@ export function MonthlyEvolution({ current, previous, year, previousYear, window
 function Legend({ year, previousYear }: { year: number | 'Toutes'; previousYear: number | null }) {
     const thisLabel = year === 'Toutes' ? 'Revenu / compte' : `${year}`;
     return (
-        <div className="flex items-center gap-3 text-[10px] font-semibold text-slate-400" translate="no">
+        <div className="flex items-center gap-3 text-2xs font-semibold text-ink-mute" translate="no">
             <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2 rounded-sm bg-slate-100 ring-1 ring-inset ring-slate-200" />
+                <span className="h-2.5 w-2 rounded-xs bg-stone ring-1 ring-inset ring-hairline-strong" />
                 Comptes créés
             </span>
-            <span className="flex items-center gap-1.5 text-brand-main">
+            <span className="flex items-center gap-1.5 text-primary-press">
                 <svg width="22" height="8" aria-hidden>
-                    <line x1="0" y1="4" x2="22" y2="4" className="stroke-brand-main" strokeWidth={2.5} />
-                    <circle cx="11" cy="4" r="3" className="fill-brand-main stroke-white" strokeWidth={1.5} />
+                    <line x1="0" y1="4" x2="22" y2="4" className="stroke-primary" strokeWidth={2.5} />
+                    <circle cx="11" cy="4" r="3" className="fill-primary stroke-white" strokeWidth={1.5} />
                 </svg>
                 {thisLabel} — $ / compte
             </span>
             {previousYear !== null && (
                 <span className="flex items-center gap-1.5">
                     <svg width="22" height="8" aria-hidden>
-                        <line x1="0" y1="4" x2="22" y2="4" className="stroke-slate-400"
+                        <line x1="0" y1="4" x2="22" y2="4" className="stroke-ink-mute"
                               strokeWidth={1.5} strokeDasharray="5 4" />
                         <rect x="8.5" y="1.5" width="5" height="5"
-                              className="fill-white stroke-slate-400" strokeWidth={1.25} />
+                              className="fill-white stroke-ink-mute" strokeWidth={1.25} />
                     </svg>
                     {previousYear}
                 </span>

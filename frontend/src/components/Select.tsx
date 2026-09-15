@@ -103,18 +103,18 @@ export function Select({
                 disabled={disabled}
                 onClick={() => !disabled && setOpen(o => !o)}
                 className={cn(
-                    "flex items-center gap-2 w-full pl-3 pr-2.5 py-2 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-brand-main/25 select-none",
+                    "flex items-center gap-2 w-full pl-3 pr-2.5 py-2 rounded-md text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary/25 select-none",
                     disabled && "opacity-40 cursor-not-allowed",
                     isAccent
-                        ? "bg-amber-50 text-brand-main hover:bg-amber-100"
-                        : "bg-slate-50 text-slate-700 hover:bg-slate-100",
-                    open && (isAccent ? "bg-amber-100 ring-2 ring-brand-main/25" : "bg-slate-100 ring-2 ring-slate-200")
+                        ? "bg-primary-wash text-primary-press hover:bg-primary-subdued"
+                        : "bg-sand text-ink-secondary hover:bg-stone",
+                    open && (isAccent ? "bg-primary-subdued ring-2 ring-primary/25" : "bg-stone ring-2 ring-hairline-strong")
                 )}
             >
                 <span className="flex-1 text-left truncate">{selected?.label ?? '—'}</span>
                 <ChevronDown className={cn(
                     "w-3.5 h-3.5 shrink-0 transition-transform duration-150",
-                    isAccent ? "text-brand-main" : "text-slate-400",
+                    isAccent ? "text-primary-press" : "text-ink-mute",
                     open && "rotate-180"
                 )} />
             </button>
@@ -122,12 +122,12 @@ export function Select({
             {/* Dropdown */}
             {open && (
                 <div className={cn(
-                    "absolute z-50 top-full mt-1.5 left-0 min-w-full bg-white rounded-xl border border-slate-100 shadow-xl shadow-slate-900/10 overflow-hidden",
-                    "animate-in fade-in slide-in-from-top-2 duration-100"
+                    "absolute z-50 top-full mt-1.5 left-0 min-w-full bg-white rounded-lg border border-hairline shadow-xl overflow-hidden",
+                    "menu-in"
                 )}>
                     {showSearch && (
-                        <div className="relative border-b border-slate-100 p-2">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
+                        <div className="relative border-b border-hairline p-2">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-faint" />
                             <input
                                 ref={searchRef}
                                 value={query}
@@ -142,15 +142,15 @@ export function Select({
                                         handleSelect(filtered[0].value);
                                     }
                                 }}
-                                className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-slate-50 text-sm
-                                           placeholder:text-slate-300 focus:outline-none
-                                           focus:ring-2 focus:ring-brand-main/25"
+                                className="w-full pl-7 pr-2 py-1.5 rounded-md bg-sand text-sm
+                                           placeholder:text-ink-faint focus:outline-none
+                                           focus:ring-2 focus:ring-primary/25"
                             />
                         </div>
                     )}
                     <div className="py-1 max-h-64 overflow-y-auto">
                         {filtered.length === 0 && (
-                            <p className="px-3 py-4 text-center text-xs text-slate-400">Aucun résultat</p>
+                            <p className="px-3 py-4 text-center text-xs text-ink-mute">Aucun résultat</p>
                         )}
                         {filtered.map(opt => {
                             const isSelected = opt.value === value;
@@ -162,12 +162,12 @@ export function Select({
                                     className={cn(
                                         "w-full flex items-center justify-between gap-3 px-3 py-2 text-sm transition-colors text-left",
                                         isSelected
-                                            ? "bg-brand-main/5 text-brand-main font-semibold"
-                                            : "text-slate-700 hover:bg-slate-50 font-medium"
+                                            ? "bg-primary/5 text-primary-press font-semibold"
+                                            : "text-ink-secondary hover:bg-sand font-medium"
                                     )}
                                 >
                                     <span translate="no">{opt.label}</span>
-                                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-brand-main" />}
+                                    {isSelected && <Check className="w-3.5 h-3.5 shrink-0 text-primary-press" />}
                                 </button>
                             );
                         })}

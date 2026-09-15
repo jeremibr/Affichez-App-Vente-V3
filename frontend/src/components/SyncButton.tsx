@@ -70,19 +70,19 @@ export function SyncButton({
     return (
         <div className="flex items-center gap-3 shrink-0">
             {lastSyncTime && (
-                <span className="text-xs text-slate-400 hidden sm:block">
+                <span className="text-xs text-ink-mute hidden sm:block">
                     Sync {formatRelative(lastSyncTime)}
                 </span>
             )}
             {badge && (
-                <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                <span className="text-xs font-semibold text-tone-good-ink bg-tone-good-soft border border-tone-good/30 px-2.5 py-1 rounded-full">
                     +{badge.upserted} / -{badge.deleted}
                 </span>
             )}
             <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="flex items-center gap-2 bg-brand-main text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-sm shadow-brand-main/30 hover:bg-brand-main/90 transition-all disabled:opacity-60"
+                className="btn btn-md btn-primary"
             >
                 {syncing
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Sync...</>

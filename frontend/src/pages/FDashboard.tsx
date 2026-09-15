@@ -348,11 +348,11 @@ export default function FDashboard() {
         <>
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                     Factures — Tableau de Bord
-                    {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-slate-400">({authRepName})</span>}
+                    {!isAdmin && authRepName && <span className="ml-2 text-base font-normal text-ink-mute">({authRepName})</span>}
                 </h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-0.5">Performance de facturation et indicateurs clés</p>
+                <p className="text-xs md:text-sm text-ink-mute mt-0.5">Performance de facturation et indicateurs clés</p>
             </div>
 
             <FilterBar>
@@ -380,8 +380,8 @@ export default function FDashboard() {
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                    <p className="text-sm text-slate-400 font-medium">Analyse des factures en cours...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                    <p className="text-sm text-ink-mute font-medium">Analyse des factures en cours...</p>
                 </div>
             ) : (
                 <>
@@ -411,43 +411,43 @@ export default function FDashboard() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                         {/* Leaderboard */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                    <Trophy className="w-4 h-4 text-amber-500" /> Leaderboard Reps
+                        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                            <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                                    <Trophy className="w-4 h-4 text-ink-mute" /> Leaderboard Reps
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     <ExportButton rows={leaderboard} columns={LEADERBOARD_CSV}
                                                   filename="leaderboard_reps_factures" disabled={leaderboard.length === 0} label="CSV" />
                                     {leaderboard.length > 5 && (
-                                        <button onClick={() => setShowLeaderboard(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                        <button onClick={() => setShowLeaderboard(true)} className="flex items-center gap-1 text-2xs font-bold text-primary-press hover:text-primary-deep transition-colors">
                                             Voir tout ({leaderboard.length}) <ChevronRight className="w-3 h-3" />
                                         </button>
                                     )}
                                 </div>
                             </div>
-                            <div className="divide-y divide-slate-50">
+                            <div className="divide-y divide-hairline">
                                 {(() => {
                                     const top5 = leaderboard.slice(0, 5);
                                     const venteInterne = leaderboard.find(r => r.rep_name === 'Vente Interne');
                                     const inTop5 = top5.some(r => r.rep_name === 'Vente Interne');
                                     const display = inTop5 || !venteInterne ? top5 : [...top5, venteInterne];
                                     return display.map((rep, idx) => (
-                                        <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                        <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                             <div className="flex items-center gap-3">
                                                 <span className={cn(
-                                                    "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold",
-                                                    rep.rep_name === 'Vente Interne' ? "bg-slate-200 text-slate-500" :
-                                                    idx === 0 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-400"
+                                                    "w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold",
+                                                    rep.rep_name === 'Vente Interne' ? "bg-hairline-strong text-ink-secondary" :
+                                                    idx === 0 ? "bg-ink text-white" : "bg-stone text-ink-secondary"
                                                 )}>{rep.rep_name === 'Vente Interne' ? '—' : idx + 1}</span>
                                                 <div>
-                                                    <p className="text-sm font-semibold text-slate-700">{rep.rep_name}</p>
-                                                    <p className="text-[10px] text-slate-400 uppercase font-bold">{rep.office}</p>
+                                                    <p className="text-sm font-semibold text-ink-secondary">{rep.rep_name}</p>
+                                                    <p className="text-2xs text-ink-mute uppercase font-semibold">{rep.office}</p>
                                                 </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(rep.total_amount)}</p>
-                                                <p className="text-sm font-bold text-slate-500 tabular-nums">{rep.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
+                                                <p className="text-sm font-bold text-ink">{formatCurrencyCAD(rep.total_amount)}</p>
+                                                <p className="text-sm font-bold text-ink-mute tabular-nums">{rep.deal_count} <span className="text-2xs font-normal text-ink-mute">factures</span></p>
                                             </div>
                                         </div>
                                     ));
@@ -456,31 +456,31 @@ export default function FDashboard() {
                         </div>
 
                         {/* Top Clients */}
-                        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                    <User className="w-4 h-4 text-blue-500" /> Top 5 Clients
+                        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                            <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                                    <User className="w-4 h-4 text-ink-mute" /> Top 5 Clients
                                 </h3>
                                 <div className="flex items-center gap-2">
                                     <ExportButton rows={topClients} columns={CLIENT_CSV}
                                                   filename="top_clients_factures" disabled={topClients.length === 0} label="CSV" />
                                     {topClients.length > 5 && (
-                                        <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                        <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-2xs font-bold text-primary-press hover:text-primary-deep transition-colors">
                                             Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
                                         </button>
                                     )}
                                 </div>
                             </div>
-                            <div className="divide-y divide-slate-50">
+                            <div className="divide-y divide-hairline">
                                 {topClients.slice(0, 5).map((c) => (
-                                    <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                    <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                         <div className="max-w-[200px]">
-                                            <p className="text-sm font-semibold text-slate-700 truncate" title={c.client_name}>{c.client_name}</p>
-                                            <p className="text-[10px] text-slate-400 uppercase font-bold">{c.office}</p>
+                                            <p className="text-sm font-semibold text-ink-secondary truncate" title={c.client_name}>{c.client_name}</p>
+                                            <p className="text-2xs text-ink-mute uppercase font-semibold">{c.office}</p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(c.total_amount)}</p>
-                                            <p className="text-sm font-bold text-slate-500 tabular-nums">{c.deal_count} <span className="text-[10px] font-normal text-slate-400">factures</span></p>
+                                            <p className="text-sm font-bold text-ink">{formatCurrencyCAD(c.total_amount)}</p>
+                                            <p className="text-sm font-bold text-ink-mute tabular-nums">{c.deal_count} <span className="text-2xs font-normal text-ink-mute">factures</span></p>
                                         </div>
                                     </div>
                                 ))}
@@ -506,24 +506,24 @@ export default function FDashboard() {
             <Modal title="Leaderboard Reps — Factures" onClose={() => setShowLeaderboard(false)}>
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentant</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Factures</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Moy./facture</th>
+                        <tr className="border-b border-hairline bg-sand/50">
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">#</th>
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Représentant</th>
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Siège</th>
+                            <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total</th>
+                            <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Factures</th>
+                            <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Moy./facture</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {leaderboard.map((rep, idx) => (
-                            <tr key={rep.rep_name} className="hover:bg-slate-50/60 transition-colors">
-                                <td className="px-4 py-2.5"><span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold", idx === 0 ? "bg-amber-100 text-amber-600" : idx === 1 ? "bg-slate-100 text-slate-500" : idx === 2 ? "bg-orange-50 text-orange-400" : "bg-slate-50 text-slate-300")}>{idx + 1}</span></td>
-                                <td className="px-4 py-2.5 font-semibold text-slate-700">{rep.rep_name}</td>
-                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">{rep.office}</td>
-                                <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
-                                <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{rep.deal_count}</td>
-                                <td className="px-4 py-2.5 text-right text-slate-400 tabular-nums text-xs">{formatCurrencyCAD(rep.avg_deal)}</td>
+                            <tr key={rep.rep_name} className="hover:bg-sand/60 transition-colors">
+                                <td className="px-4 py-2.5"><span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold", idx === 0 ? "bg-ink text-white" : idx === 1 ? "bg-stone text-ink-secondary" : idx === 2 ? "bg-sand text-ink-mute" : "bg-sand text-ink-faint")}>{idx + 1}</span></td>
+                                <td className="px-4 py-2.5 font-semibold text-ink-secondary">{rep.rep_name}</td>
+                                <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{rep.office}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{rep.deal_count}</td>
+                                <td className="px-4 py-2.5 text-right text-ink-mute tabular-nums text-xs">{formatCurrencyCAD(rep.avg_deal)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -535,22 +535,22 @@ export default function FDashboard() {
             <Modal title="Tous les clients — Factures" onClose={() => setShowClients(false)}>
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Client</th>
-                            <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
-                            <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Factures</th>
+                        <tr className="border-b border-hairline bg-sand/50">
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">#</th>
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Client</th>
+                            <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Siège</th>
+                            <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total</th>
+                            <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Factures</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {topClients.map((c, idx) => (
-                            <tr key={c.client_name} className="hover:bg-slate-50/60 transition-colors">
-                                <td className="px-4 py-2.5 text-xs font-bold text-slate-300 tabular-nums">{idx + 1}</td>
-                                <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[240px] truncate" title={c.client_name}>{c.client_name}</td>
-                                <td className="px-4 py-2.5 text-[10px] font-bold text-slate-400 uppercase">{c.office}</td>
-                                <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
-                                <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{c.deal_count}</td>
+                            <tr key={c.client_name} className="hover:bg-sand/60 transition-colors">
+                                <td className="px-4 py-2.5 text-xs font-bold text-ink-mute tabular-nums">{idx + 1}</td>
+                                <td className="px-4 py-2.5 font-semibold text-ink-secondary max-w-[240px] truncate" title={c.client_name}>{c.client_name}</td>
+                                <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{c.office}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
+                                <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{c.deal_count}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -564,11 +564,11 @@ export default function FDashboard() {
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
-                    <h3 className="text-sm font-bold text-slate-800">{title}</h3>
-                    <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all"><X className="w-4 h-4" /></button>
+            <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
+                    <h3 className="text-sm font-semibold text-ink">{title}</h3>
+                    <button onClick={onClose} className="p-1.5 rounded-md text-ink-mute hover:text-ink-secondary hover:bg-stone transition-all"><X className="w-4 h-4" /></button>
                 </div>
                 <div className="overflow-y-auto">{children}</div>
             </div>
@@ -590,15 +590,15 @@ function UnassignedCard({ data, onOpen }: {
     onOpen: () => void;
 }) {
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-4">
+        <div className="bg-white rounded-xl shadow-card px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-start gap-3">
-                    <div className="p-2 bg-slate-50 rounded-xl text-slate-400">
+                    <div className="p-2 bg-sand rounded-md text-ink-mute">
                         <Unlink className="w-4 h-4" />
                     </div>
                     <div>
                         <div className="flex items-center gap-1.5">
-                            <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest">
+                            <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                                 Factures non attribuées
                             </p>
                             <InfoHint text={
@@ -609,14 +609,14 @@ function UnassignedCard({ data, onOpen }: {
                                 "car elle n'aura jamais de compte CRM. Cliquez pour voir les factures concern\u00e9es."
                             } />
                         </div>
-                        <p className="mt-1 text-base md:text-xl font-bold text-slate-900 tabular-nums">
+                        <p className="mt-1 text-base md:text-xl font-bold text-ink tabular-nums">
                             {formatCurrencyCAD(data.unassigned_amount)}
-                            <span className="ml-2 text-xs font-semibold text-slate-400">
+                            <span className="ml-2 text-xs font-semibold text-ink-mute">
                                 {data.unassigned_count.toLocaleString('fr-CA')}{' '}
                                 {data.unassigned_count === 1 ? 'facture' : 'factures'}
                             </span>
                         </p>
-                        <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 font-medium italic">
+                        <p className="text-2xs text-ink-mute mt-0.5 font-medium italic">
                             {data.unassigned_share}&nbsp;% de la facturation externe
                             {data.internal_count > 0 && (
                                 <>
@@ -629,9 +629,9 @@ function UnassignedCard({ data, onOpen }: {
                 {data.unassigned_count > 0 && (
                     <button
                         onClick={onOpen}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2
-                                   text-xs font-semibold text-slate-600 transition-colors
-                                   hover:border-brand-main hover:bg-amber-50 hover:text-brand-main"
+                        className="inline-flex items-center gap-1.5 rounded-md border border-hairline-strong px-3 py-2
+                                   text-xs font-semibold text-ink-secondary transition-colors
+                                   hover:border-primary hover:bg-primary-wash hover:text-primary-press"
                     >
                         Voir les factures
                         <ChevronRight className="w-3.5 h-3.5" />
@@ -679,7 +679,7 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs"
             onClick={onClose}
             role="presentation"
         >
@@ -688,19 +688,19 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
                 aria-modal="true"
                 aria-label="Factures non attribuées"
                 onClick={e => e.stopPropagation()}
-                className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+                className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
             >
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-brand-dark">Factures non attribuées</h2>
-                        <p className="mt-0.5 text-sm text-slate-400">
+                        <h2 className="text-lg font-semibold text-ink">Factures non attribuées</h2>
+                        <p className="mt-0.5 text-sm text-ink-mute">
                             Aucun compte Zoho CRM derrière le client — ces montants n’apparaissent sur aucune fiche lead
                         </p>
                     </div>
                     <button
                         onClick={onClose}
                         aria-label="Fermer"
-                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-stone hover:text-ink-secondary"
                     >
                         <X className="h-5 w-5" />
                     </button>
@@ -708,10 +708,10 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary-press" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <div className="px-6 py-16 text-center text-sm text-slate-400">
+                    <div className="px-6 py-16 text-center text-sm text-ink-mute">
                         Toutes les factures de cette période sont attribuées.
                     </div>
                 ) : (
@@ -730,20 +730,20 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
                             </thead>
                             <tbody>
                                 {rows.map(inv => (
-                                    <tr key={inv.zoho_id} className={cn('transition-colors hover:bg-slate-50/70',
-                                                                        inv.is_avoir && 'bg-rose-50/30')}>
-                                        <td className="td font-medium text-brand-dark">{inv.invoice_number ?? '\u2014'}</td>
-                                        <td className="td text-slate-600">{inv.client_name}</td>
-                                        <td className="td whitespace-nowrap text-slate-500">
+                                    <tr key={inv.zoho_id} className={cn('transition-colors hover:bg-sand/70',
+                                                                        inv.is_avoir && 'bg-tone-critical-soft/30')}>
+                                        <td className="td font-medium text-ink">{inv.invoice_number ?? '\u2014'}</td>
+                                        <td className="td text-ink-secondary">{inv.client_name}</td>
+                                        <td className="td whitespace-nowrap text-ink-mute">
                                             {inv.invoice_date ? formatShortDate(new Date(inv.invoice_date)) : '\u2014'}
                                         </td>
-                                        <td className="td text-slate-500">{inv.office ?? '\u2014'}</td>
-                                        <td className="td text-slate-500">{inv.rep_name ?? '\u2014'}</td>
+                                        <td className="td text-ink-mute">{inv.office ?? '\u2014'}</td>
+                                        <td className="td text-ink-mute">{inv.rep_name ?? '\u2014'}</td>
                                         <td className="td">
-                                            <span className="badge bg-slate-100 text-slate-500">{inv.reason}</span>
+                                            <span className="badge bg-stone text-ink-secondary">{inv.reason}</span>
                                         </td>
                                         <td className={cn('td text-right font-semibold tabular-nums',
-                                                          inv.is_avoir ? 'text-rose-600' : 'text-brand-dark')}>
+                                                          inv.is_avoir ? 'text-tone-critical-ink' : 'text-ink')}>
                                             {formatCurrencyCAD(inv.amount)}
                                         </td>
                                     </tr>
@@ -753,12 +753,12 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
                     </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-3">
-                    <span className="text-sm text-slate-500" translate="no">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline bg-sand/60 px-6 py-3">
+                    <span className="text-sm text-ink-mute" translate="no">
                         {`${rows.length} facture${rows.length > 1 ? 's' : ''}`}
                         {rows.length === 500 && ' (500 premi\u00e8res)'}
                     </span>
-                    <span className="text-sm font-semibold text-brand-dark">
+                    <span className="text-sm font-semibold text-ink">
                         Total <span className="tabular-nums text-base">{formatCurrencyCAD(total)}</span>
                     </span>
                 </div>
@@ -769,21 +769,21 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
 
 function KPICard({ title, value, subText, icon: Icon, trend }: { title: string; value: string; subText: string; icon: React.ElementType; trend?: number }) {
     return (
-        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+        <div className="bg-white p-3 md:p-5 rounded-xl shadow-card flex flex-col justify-between hover:shadow-elevated transition-all group">
             <div className="flex items-start justify-between mb-2 md:mb-4">
-                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                <div className="p-2 md:p-2.5 bg-sand rounded-md text-ink-mute group-hover:text-primary-press group-hover:bg-primary-wash transition-colors">
                     <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 {trend !== undefined && (
-                    <div className={cn("text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 rounded-full", trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
+                    <div className={cn("text-2xs font-bold px-1.5 md:px-2 py-0.5 rounded-full", trend >= 100 ? "bg-tone-good-soft text-tone-good-ink" : "bg-tone-warn-soft text-tone-warn-ink")}>
                         {trend}%
                     </div>
                 )}
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className="text-base md:text-2xl font-bold text-slate-900 mt-0.5 md:mt-1 tabular-nums">{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className="text-base md:text-2xl font-bold text-ink mt-0.5 md:mt-1 tabular-nums">{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );

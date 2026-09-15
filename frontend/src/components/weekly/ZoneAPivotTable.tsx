@@ -28,11 +28,11 @@ export function ZoneAPivotTable({
     const { sortedData, sortConfig, handleSort } = useSort(repPivotRows);
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Sommaire par Représentant</h2>
+        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-ink-secondary uppercase tracking-label">Sommaire par Représentant</h2>
                 <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400" translate="no">{repPivotRows.length} reps</span>
+                    <span className="text-xs text-ink-mute" translate="no">{repPivotRows.length} reps</span>
                     {/* One column per department, built from the same list the table
                         renders, so the file matches the screen even if DEPARTMENTS
                         grows again (it did — EVENEMENT, 2026-09-07). */}
@@ -53,12 +53,12 @@ export function ZoneAPivotTable({
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-5 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                        <tr className="border-b border-hairline bg-sand/50">
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                 Représentant
                             </th>
                             <th
-                                className="px-4 py-3 text-right text-xs font-semibold text-brand-main uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-brand-main/5 transition-colors group"
+                                className="px-4 py-3 text-right text-xs font-semibold text-ink uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-primary/5 transition-colors group"
                                 onClick={() => handleSort('Total')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -68,7 +68,7 @@ export function ZoneAPivotTable({
                             {DEPARTMENTS.map((dept) => (
                                 <th
                                     key={dept}
-                                    className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                    className="px-4 py-3 text-right text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                     onClick={() => handleSort(dept)}
                                 >
                                     <div className="flex items-center justify-end gap-2">
@@ -78,25 +78,25 @@ export function ZoneAPivotTable({
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={DEPARTMENTS.length + 2} className="px-5 py-10 text-center text-sm text-slate-400 italic">
+                                <td colSpan={DEPARTMENTS.length + 2} className="px-5 py-10 text-center text-sm text-ink-mute italic">
                                     Aucune donnée pour cette semaine
                                 </td>
                             </tr>
                         ) : (
                             sortedData.map((row) => (
-                                <tr key={String(row.repName)} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-slate-800 whitespace-nowrap">{row.repName}</td>
-                                    <td className="px-4 py-3 text-right font-bold text-brand-main tabular-nums whitespace-nowrap">
+                                <tr key={String(row.repName)} className="hover:bg-sand/60 transition-colors">
+                                    <td className="px-5 py-3 font-medium text-ink whitespace-nowrap">{row.repName}</td>
+                                    <td className="px-4 py-3 text-right font-bold text-ink tabular-nums whitespace-nowrap">
                                         {formatCurrencyCAD(Number(row["Total"]))}
                                     </td>
                                     {DEPARTMENTS.map((dept) => (
-                                        <td key={dept} className="px-4 py-3 text-right text-slate-500 tabular-nums whitespace-nowrap">
+                                        <td key={dept} className="px-4 py-3 text-right text-ink-mute tabular-nums whitespace-nowrap">
                                             {Number(row[dept] || 0) > 0
                                                 ? formatCurrencyCAD(Number(row[dept]))
-                                                : <span className="text-slate-200">—</span>
+                                                : <span className="text-ink-faint">—</span>
                                             }
                                         </td>
                                     ))}
@@ -105,16 +105,16 @@ export function ZoneAPivotTable({
                         )}
                     </tbody>
                     <tfoot>
-                        <tr className="bg-brand-main text-white font-black">
-                            <td className="px-5 py-4 text-xs uppercase tracking-wider whitespace-nowrap">Total</td>
-                            <td className="px-4 py-4 text-right font-black tabular-nums whitespace-nowrap">
+                        <tr className="bg-ink text-white font-bold">
+                            <td className="px-5 py-4 text-xs uppercase tracking-label whitespace-nowrap">Total</td>
+                            <td className="px-4 py-4 text-right font-bold tabular-nums whitespace-nowrap">
                                 {formatCurrencyCAD(grandTotal)}
                             </td>
                             {DEPARTMENTS.map((dept) => {
                                 const dTotal = deptTotals.find(d => d.department === dept)?.total_amount || 0;
                                 return (
                                     <td key={dept} className="px-4 py-4 text-right text-white/80 tabular-nums whitespace-nowrap text-xs">
-                                        {Number(dTotal) > 0 ? formatCurrencyCAD(Number(dTotal)) : <span className="text-white/20">—</span>}
+                                        {Number(dTotal) > 0 ? formatCurrencyCAD(Number(dTotal)) : <span className="text-white/50">—</span>}
                                     </td>
                                 );
                             })}

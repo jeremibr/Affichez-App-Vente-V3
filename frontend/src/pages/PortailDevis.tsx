@@ -91,11 +91,11 @@ export default function PortailDevis({ propRepName }: Props) {
         return (
             <div className="p-4 md:p-8 max-w-screen-2xl mx-auto flex items-center justify-center min-h-[60vh]">
                 <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-                        <User className="w-7 h-7 text-slate-300" />
+                    <div className="w-14 h-14 rounded-xl bg-stone flex items-center justify-center mx-auto">
+                        <User className="w-7 h-7 text-ink-faint" />
                     </div>
-                    <h2 className="text-base font-semibold text-slate-700">Portail non configuré</h2>
-                    <p className="text-sm text-slate-400 max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
+                    <h2 className="text-base font-semibold text-ink-secondary">Portail non configuré</h2>
+                    <p className="text-sm text-ink-mute max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
                 </div>
             </div>
         );
@@ -108,22 +108,22 @@ export default function PortailDevis({ propRepName }: Props) {
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                        <ClipboardList className="w-5 h-5 text-blue-400" />
+                    <h2 className="text-xl font-semibold text-ink tracking-tight flex items-center gap-2">
+                        <ClipboardList className="w-5 h-5 text-data-2-ink" />
                         Mes Devis
                     </h2>
-                    <p className="text-sm text-slate-400 mt-0.5">Performance et indicateurs — {repName || 'Représentant'}</p>
+                    <p className="text-sm text-ink-mute mt-0.5">Performance et indicateurs — {repName || 'Représentant'}</p>
                 </div>
 
                 {/* Tab switcher */}
-                <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+                <div className="flex gap-1 bg-stone p-1 rounded-md">
                     <button
                         onClick={() => setTab('apercu')}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all",
+                            "px-4 py-1.5 rounded-md text-sm font-semibold transition-all",
                             tab === 'apercu'
-                                ? "bg-white shadow-sm text-slate-900"
-                                : "text-slate-500 hover:text-slate-700"
+                                ? "bg-white shadow-xs text-ink"
+                                : "text-ink-secondary hover:text-ink"
                         )}
                     >
                         Aperçu
@@ -131,10 +131,10 @@ export default function PortailDevis({ propRepName }: Props) {
                     <button
                         onClick={() => setTab('mensuel')}
                         className={cn(
-                            "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all",
+                            "px-4 py-1.5 rounded-md text-sm font-semibold transition-all",
                             tab === 'mensuel'
-                                ? "bg-white shadow-sm text-slate-900"
-                                : "text-slate-500 hover:text-slate-700"
+                                ? "bg-white shadow-xs text-ink"
+                                : "text-ink-secondary hover:text-ink"
                         )}
                     >
                         Mensuel
@@ -153,8 +153,8 @@ export default function PortailDevis({ propRepName }: Props) {
 
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-20 gap-3">
-                        <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                        <p className="text-sm text-slate-400">Chargement des devis...</p>
+                        <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                        <p className="text-sm text-ink-mute">Chargement des devis...</p>
                     </div>
                 ) : (
                     <>
@@ -189,29 +189,29 @@ export default function PortailDevis({ propRepName }: Props) {
                     </div>
 
                     {/* Top clients */}
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <User className="w-4 h-4 text-blue-400" /> Mes Clients
+                    <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                        <div className="px-5 py-4 border-b border-hairline flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+                                <User className="w-4 h-4 text-ink-mute" /> Mes Clients
                             </h3>
                             {topClients.length > 5 && (
-                                <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-[11px] font-bold text-brand-main hover:text-amber-600 transition-colors">
+                                <button onClick={() => setShowClients(true)} className="flex items-center gap-1 text-2xs font-bold text-primary-press hover:text-primary-deep transition-colors">
                                     Voir tout ({topClients.length}) <ChevronRight className="w-3 h-3" />
                                 </button>
                             )}
                         </div>
-                        <div className="divide-y divide-slate-50">
+                        <div className="divide-y divide-hairline">
                             {topClients.length === 0 ? (
-                                <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucun client pour cette période</p>
+                                <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucun client pour cette période</p>
                             ) : topClients.slice(0, 5).map((c, idx) => (
-                                <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                                <div key={c.client_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                     <div className="flex items-center gap-3">
-                                        <span className="w-5 h-5 text-[10px] font-bold text-slate-300 tabular-nums flex items-center justify-center shrink-0">{idx + 1}</span>
-                                        <p className="text-sm font-semibold text-slate-700 truncate max-w-[160px] md:max-w-[240px]" title={c.client_name}>{c.client_name}</p>
+                                        <span className="w-5 h-5 text-2xs font-bold text-ink-mute tabular-nums flex items-center justify-center shrink-0">{idx + 1}</span>
+                                        <p className="text-sm font-semibold text-ink-secondary truncate max-w-[160px] md:max-w-[240px]" title={c.client_name}>{c.client_name}</p>
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <p className="text-sm font-bold text-slate-900">{formatCurrencyCAD(c.total_amount)}</p>
-                                        <p className="text-[10px] text-slate-400">{c.deal_count} devis</p>
+                                        <p className="text-sm font-bold text-ink">{formatCurrencyCAD(c.total_amount)}</p>
+                                        <p className="text-2xs text-ink-mute">{c.deal_count} devis</p>
                                     </div>
                                 </div>
                             ))}
@@ -244,29 +244,29 @@ export default function PortailDevis({ propRepName }: Props) {
 
         {showClients && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowClients(false)}>
-                <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
-                <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                        <h3 className="text-sm font-bold text-slate-800">Tous mes clients — Devis</h3>
-                        <button onClick={() => setShowClients(false)} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-all"><X className="w-4 h-4" /></button>
+                <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
+                <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
+                        <h3 className="text-sm font-semibold text-ink">Tous mes clients — Devis</h3>
+                        <button onClick={() => setShowClients(false)} className="p-1.5 rounded-md text-ink-mute hover:bg-stone transition-all"><X className="w-4 h-4" /></button>
                     </div>
                     <div className="overflow-y-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/50">
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">#</th>
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Client</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</th>
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Devis</th>
+                                <tr className="border-b border-hairline bg-sand/50">
+                                    <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">#</th>
+                                    <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Client</th>
+                                    <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total</th>
+                                    <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Devis</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {topClients.map((c, idx) => (
-                                    <tr key={c.client_name} className="hover:bg-slate-50/60">
-                                        <td className="px-4 py-2.5 text-xs font-bold text-slate-300 tabular-nums">{idx + 1}</td>
-                                        <td className="px-4 py-2.5 font-semibold text-slate-700 max-w-[220px] truncate">{c.client_name}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-500 tabular-nums">{c.deal_count}</td>
+                                    <tr key={c.client_name} className="hover:bg-sand/60">
+                                        <td className="px-4 py-2.5 text-xs font-bold text-ink-mute tabular-nums">{idx + 1}</td>
+                                        <td className="px-4 py-2.5 font-semibold text-ink-secondary max-w-[220px] truncate">{c.client_name}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(c.total_amount)}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink-mute tabular-nums">{c.deal_count}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -285,25 +285,25 @@ function KPICard({ title, value, sub, icon: Icon, trend, accent = false }: {
 }) {
     return (
         <div className={cn(
-            "p-3 md:p-5 rounded-2xl border flex flex-col justify-between hover:shadow-card-hover transition-all group",
-            accent ? "bg-brand-main/5 border-brand-main/20" : "bg-white border-slate-100 shadow-card"
+            "p-3 md:p-5 rounded-xl border flex flex-col justify-between hover:shadow-elevated transition-all group",
+            accent ? "bg-primary/5 border-primary/20" : "bg-white border-hairline shadow-card"
         )}>
             <div className="flex items-start justify-between mb-2 md:mb-4">
-                <div className={cn("p-2 md:p-2.5 rounded-xl transition-colors",
-                    accent ? "bg-brand-main/10 text-brand-main" : "bg-slate-50 text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50")}>
+                <div className={cn("p-2 md:p-2.5 rounded-md transition-colors",
+                    accent ? "bg-primary-wash text-primary-press" : "bg-sand text-ink-mute group-hover:text-primary-press group-hover:bg-primary-wash")}>
                     <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 {trend !== undefined && (
-                    <span className={cn("text-[10px] md:text-[11px] font-bold px-1.5 md:px-2 py-0.5 rounded-full",
-                        trend >= 100 ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600")}>
+                    <span className={cn("text-2xs font-bold px-1.5 md:px-2 py-0.5 rounded-full",
+                        trend >= 100 ? "bg-tone-good-soft text-tone-good-ink" : "bg-tone-warn-soft text-tone-warn-ink")}>
                         {trend}%
                     </span>
                 )}
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className={cn("text-base md:text-2xl font-bold mt-0.5 md:mt-1 tabular-nums", accent ? "text-brand-main" : "text-slate-900")}>{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 italic leading-tight line-clamp-2">{sub}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className={cn("text-base md:text-2xl font-bold mt-0.5 md:mt-1 tabular-nums", accent ? "text-primary-press" : "text-ink")}>{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 italic leading-tight line-clamp-2">{sub}</p>
             </div>
         </div>
     );

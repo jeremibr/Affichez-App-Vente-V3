@@ -102,8 +102,8 @@ export default function QuarterlyAverages() {
             <div>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Moyennes Trimestrielles</h1>
-                        <p className="text-xs md:text-sm text-slate-400 mt-0.5">Analyse comparative des performances par trimestre.</p>
+                        <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Moyennes Trimestrielles</h1>
+                        <p className="text-xs md:text-sm text-ink-mute mt-0.5">Analyse comparative des performances par trimestre.</p>
                     </div>
                     {/* Exports every quarter at once, filters applied - the four
                         blocks on screen are one dataset split for reading. */}
@@ -129,8 +129,8 @@ export default function QuarterlyAverages() {
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                    <p className="text-sm text-slate-400 font-medium">Calcul des moyennes...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                    <p className="text-sm text-ink-mute font-medium">Calcul des moyennes...</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">

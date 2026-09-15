@@ -2,13 +2,16 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { ZoneB_DetailRow, ZoneA_DeptTotal } from '../types/database';
 
-const BRAND_ORANGE: [number, number, number] = [227, 136, 0];   // #e38800
-const BLACK: [number, number, number] = [0, 0, 0];
-const SLATE_700: [number, number, number] = [51, 65, 85];
-const SLATE_400: [number, number, number] = [148, 163, 184];
+// The brand palette, as RGB triples because jsPDF takes no hex. These mirror
+// branding/tokens/tokens.css — change them there first, then here.
+const BRAND_ORANGE: [number, number, number] = [245, 87, 14];    // --color-primary
+const BLACK: [number, number, number] = [0, 0, 0];               // --color-ink
+const INK_SECONDARY: [number, number, number] = [61, 61, 59];    // --color-ink-secondary
+const INK_MUTE: [number, number, number] = [107, 107, 104];      // --color-ink-mute
 const WHITE: [number, number, number] = [255, 255, 255];
-const LIGHT_BG: [number, number, number] = [243, 243, 243];     // #f3f3f3
-const TABLE_HEAD_BG: [number, number, number] = [235, 235, 235]; // slightly darker for contrast
+const LIGHT_BG: [number, number, number] = [243, 243, 241];      // --color-sand
+const TABLE_HEAD_BG: [number, number, number] = [231, 230, 226]; // --color-stone
+const HAIRLINE: [number, number, number] = [212, 211, 206];      // --color-hairline-strong
 
 
 function fmtCAD(n: number): string {
@@ -42,9 +45,9 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     let y = margin;
 
     // ─── Load logo ───
-    let logoImg: HTMLImageElement | null = null;
+    let logo: { dataUrl: string; ratio: number } | null = null;
     try {
-        logoImg = await loadImage('/logo-long.png');
+        logo = await loadWordmark();
     } catch { /* no logo, continue without */ }
 
     // ─── Helper: add page footer ───
@@ -53,7 +56,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         doc.setFillColor(...LIGHT_BG);
         doc.rect(0, footerY - 2, pageW, 10, 'F');
         doc.setFontSize(7);
-        doc.setTextColor(...SLATE_400);
+        doc.setTextColor(...INK_MUTE);
         doc.text(`Affichez — Rapport hebdomadaire du ${fmtDate(data.weekStart)} au ${fmtDate(data.weekEnd)}`, margin, footerY + 2);
         doc.text(`Généré le ${new Date().toLocaleDateString('fr-CA', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageW - margin, footerY + 2, { align: 'right' });
     };
@@ -65,15 +68,16 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     doc.setFillColor(...BRAND_ORANGE);
     doc.rect(0, 28, pageW, 1, 'F');
 
-    if (logoImg) {
+    if (logo) {
         const logoH = 12;
-        const logoW = logoH * (logoImg.width / logoImg.height);
-        doc.addImage(logoImg, 'PNG', margin, 8, logoW, logoH);
+        doc.addImage(logo.dataUrl, 'PNG', margin, 8, logoH * logo.ratio, logoH);
     } else {
+        // The 2026 wordmark is lowercase; helvetica is the closest face jsPDF
+        // ships, and this only ever runs if the PNG failed to load.
         doc.setFontSize(16);
         doc.setTextColor(...BRAND_ORANGE);
         doc.setFont('helvetica', 'bold');
-        doc.text('AFFICHEZ', margin, 18);
+        doc.text('affichez', margin, 18);
     }
 
     doc.setFontSize(14);
@@ -94,7 +98,7 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
     if (data.filters.rep !== 'Tous') activeFilters.push(`Rep: ${data.filters.rep}`);
     if (activeFilters.length > 0) {
         doc.setFontSize(7);
-        doc.setTextColor(...SLATE_400);
+        doc.setTextColor(...INK_MUTE);
         doc.text(`Filtres: ${activeFilters.join('  |  ')}`, margin, y);
         y += 6;
     }
@@ -152,14 +156,14 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         bodyStyles: {
             fontSize: 7,
             cellPadding: 2,
-            textColor: SLATE_700,
+            textColor: INK_SECONDARY,
         },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        alternateRowStyles: { fillColor: LIGHT_BG },
         columnStyles: {
-            0: { cellWidth: 10, halign: 'center', fontStyle: 'bold', textColor: SLATE_400 },
+            0: { cellWidth: 10, halign: 'center', fontStyle: 'bold', textColor: INK_MUTE },
             2: { halign: 'right', fontStyle: 'bold', textColor: BLACK },
             3: { halign: 'right', fontStyle: 'bold' },
-            4: { halign: 'right', textColor: SLATE_400 },
+            4: { halign: 'right', textColor: INK_MUTE },
         },
         didParseCell: (hookData) => {
             // Gold highlight for #1
@@ -191,9 +195,9 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
                 .map(d => [d.department, fmtCAD(d.total_amount), String(d.num_sales)]),
             foot: [['Total', fmtCAD(data.grandTotal), String(data.devisCount)]],
             headStyles: { fillColor: TABLE_HEAD_BG, textColor: BLACK, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
-            bodyStyles: { fontSize: 7, cellPadding: 2, textColor: SLATE_700 },
-            footStyles: { fillColor: BRAND_ORANGE, textColor: WHITE, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
+            bodyStyles: { fontSize: 7, cellPadding: 2, textColor: INK_SECONDARY },
+            footStyles: { fillColor: BLACK, textColor: WHITE, fontSize: 7, fontStyle: 'bold', cellPadding: 2 },
+            alternateRowStyles: { fillColor: LIGHT_BG },
             columnStyles: {
                 1: { halign: 'right', fontStyle: 'bold' },
                 2: { halign: 'right' },
@@ -253,21 +257,22 @@ export async function generateWeeklyPdf(data: WeeklyPdfData): Promise<void> {
         bodyStyles: {
             fontSize: 6.5,
             cellPadding: 1.8,
-            textColor: SLATE_700,
+            textColor: INK_SECONDARY,
         },
         footStyles: {
-            fillColor: BRAND_ORANGE,
+            // A total row is a band, and the brand's band colour is black.
+            fillColor: BLACK,
             textColor: WHITE,
             fontSize: 7,
             fontStyle: 'bold',
             cellPadding: 2,
         },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
+        alternateRowStyles: { fillColor: LIGHT_BG },
         columnStyles: {
             0: { cellWidth: 24 },
             1: { cellWidth: 60 },
             2: { halign: 'right', fontStyle: 'bold', textColor: BLACK },
-            3: { cellWidth: 28, fontSize: 5.5, textColor: SLATE_400 },
+            3: { cellWidth: 28, fontSize: 5.5, textColor: INK_MUTE },
             4: { cellWidth: 32 },
             5: { cellWidth: 32, fontSize: 5.5 },
             6: { cellWidth: 16, halign: 'center', fontSize: 5.5 },
@@ -295,17 +300,17 @@ function drawKpiCard(
         doc.setFillColor(...BRAND_ORANGE);
         doc.roundedRect(x, y, w, h, 3, 3, 'F');
         doc.setFontSize(7);
-        doc.setTextColor(255, 255, 255);
+        doc.setTextColor(...WHITE);
         doc.setFont('helvetica', 'bold');
         doc.text(label.toUpperCase(), x + 5, y + 7);
         doc.setFontSize(14);
         doc.text(value, x + 5, y + 17);
     } else {
-        doc.setFillColor(255, 255, 255);
-        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(...WHITE);
+        doc.setDrawColor(...HAIRLINE);
         doc.roundedRect(x, y, w, h, 3, 3, 'FD');
         doc.setFontSize(7);
-        doc.setTextColor(...SLATE_400);
+        doc.setTextColor(...INK_MUTE);
         doc.setFont('helvetica', 'bold');
         doc.text(label.toUpperCase(), x + 5, y + 7);
         doc.setFontSize(14);
@@ -314,11 +319,46 @@ function drawKpiCard(
     }
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
+/**
+ * The wordmark, rasterised from its own SVG at export time.
+ *
+ * jsPDF can only place a raster, and the brand ships the logo as a vector with
+ * a viewBox but no intrinsic width or height — hand that straight to an
+ * <img> and the browser falls back to 300x150, which squashes a 4.83:1 mark.
+ * So the size is set explicitly here and the SVG is drawn onto a canvas at 3x
+ * the largest size the PDF uses, which keeps it crisp when the report is
+ * printed rather than read on screen.
+ *
+ * Doing it this way means the PNG in the report and the logo in the sidebar
+ * are the same file — there is no second copy to forget to update.
+ */
+const WORDMARK_RATIO = 3516.375 / 727.446;   // the brand SVG's own viewBox
+
+async function loadWordmark(): Promise<{ dataUrl: string; ratio: number }> {
+    const svg = await fetch('/brand/affichez-logo.svg').then(r => {
+        if (!r.ok) throw new Error(`logo ${r.status}`);
+        return r.text();
     });
+    const height = 300;
+    const width = Math.round(height * WORDMARK_RATIO);
+    const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    try {
+        const img = new Image();
+        img.width = width;
+        img.height = height;
+        await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('logo decode failed'));
+            img.src = url;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('no 2d context');
+        ctx.drawImage(img, 0, 0, width, height);
+        return { dataUrl: canvas.toDataURL('image/png'), ratio: WORDMARK_RATIO };
+    } finally {
+        URL.revokeObjectURL(url);
+    }
 }

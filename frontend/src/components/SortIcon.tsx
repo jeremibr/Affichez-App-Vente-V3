@@ -9,7 +9,7 @@ interface SortIconProps {
 }
 
 export function SortIcon({ order, className }: SortIconProps) {
-    if (order === 'asc') return <ChevronUp className={cn("w-3 h-3 text-brand-main", className)} />;
-    if (order === 'desc') return <ChevronDown className={cn("w-3 h-3 text-brand-main", className)} />;
-    return <ChevronsUpDown className={cn("w-3 h-3 text-slate-300 group-hover:text-slate-400 transition-colors", className)} />;
+    if (order === 'asc') return <ChevronUp className={cn("w-3 h-3 text-primary-press", className)} />;
+    if (order === 'desc') return <ChevronDown className={cn("w-3 h-3 text-primary-press", className)} />;
+    return <ChevronsUpDown className={cn("w-3 h-3 text-ink-faint group-hover:text-ink-mute transition-colors", className)} />;
 }

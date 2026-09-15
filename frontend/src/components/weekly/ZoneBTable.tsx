@@ -43,22 +43,23 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
         module === 'factures' ? (item as InvDetailRow).invoice_number : (item as ZoneB_DetailRow).quote_number;
 
     const DEPT_COLORS: Record<string, string> = {
-        'MULTI-ANNONCEURS':       'bg-blue-50 text-blue-700 border-blue-100',
-        'PROMOTIONNEL':           'bg-purple-50 text-purple-700 border-purple-100',
-        'DIST. PUBLICITAIRE SOLO':'bg-orange-50 text-orange-700 border-orange-100',
-        'NUMERIQUE':              'bg-cyan-50 text-cyan-700 border-cyan-100',
-        'APPLICATION':            'bg-emerald-50 text-emerald-700 border-emerald-100',
-        'SERVICES IA':            'bg-rose-50 text-rose-700 border-rose-100',
+        'MULTI-ANNONCEURS':       'bg-data-2 text-data-2-ink border-data-2-edge',
+        'PROMOTIONNEL':           'bg-data-4 text-data-4-ink border-data-4-edge',
+        'DIST. PUBLICITAIRE SOLO':'bg-data-3 text-data-3-ink border-data-3-edge',
+        'NUMERIQUE':              'bg-data-6 text-data-6-ink border-data-6-edge',
+        'APPLICATION':            'bg-data-1 text-data-1-ink border-data-1-edge',
+        'SERVICES IA':            'bg-data-5 text-data-5-ink border-data-5-edge',
+        'EVENEMENT':              'bg-data-9 text-data-9-ink border-data-9-edge',
     };
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">
+        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-ink-secondary uppercase tracking-label">
                     {module === 'factures' ? 'Liste détaillée des factures' : 'Liste détaillée des devis'}
                 </h2>
                 <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 uppercase tracking-wider"
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-2xs font-semibold bg-stone text-ink-secondary uppercase tracking-label"
                           translate="no">
                         {lineItems.length} transactions
                     </span>
@@ -72,48 +73,48 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
             <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <tr className="border-b border-hairline bg-sand/50">
                             <th
-                                className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort(dateKey)}
                             >
                                 <div className="flex items-center gap-2">
                                     Date <SortIcon order={sortConfig.key === dateKey ? sortConfig.order : null} />
                                 </div>
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                 Statut
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                                 Client
                             </th>
                             <th
-                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-3 md:px-5 py-2.5 md:py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort('amount')}
                             >
                                 <div className="flex items-center justify-end gap-2">
                                     Montant <SortIcon order={sortConfig.key === 'amount' ? sortConfig.order : null} />
                                 </div>
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                 {module === 'factures' ? '# Facture' : '# Devis'}
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                 Représentant
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                 Département
                             </th>
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">Action</th>
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">Action</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {sortedData.length === 0 ? (
                             <tr>
                                 <td colSpan={8} className="px-5 py-20 text-center">
                                     <div className="flex flex-col items-center gap-2">
                                         <span className="text-2xl opacity-20">📂</span>
-                                        <p className="text-sm text-slate-400 font-medium">Aucun{module === 'factures' ? 'e facture' : ' devis'} trouvé{module === 'factures' ? 'e' : ''} pour ces critères.</p>
+                                        <p className="text-sm text-ink-mute font-medium">Aucun{module === 'factures' ? 'e facture' : ' devis'} trouvé{module === 'factures' ? 'e' : ''} pour ces critères.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -121,34 +122,34 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                             sortedData.map((item, idx) => {
                                 const isAvoir = module === 'factures' && (item as InvDetailRow).is_avoir;
                                 return (
-                                <tr key={`${getNumber(item)}-${idx}`} className={cn("hover:bg-slate-50/60 transition-colors group", isAvoir && "bg-rose-50/30")}>
-                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-slate-400 whitespace-nowrap text-[11px] font-medium">{formatShortDate(getDate(item))}</td>
+                                <tr key={`${getNumber(item)}-${idx}`} className={cn("hover:bg-sand/60 transition-colors group", isAvoir && "bg-tone-critical-soft/30")}>
+                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-ink-mute whitespace-nowrap text-2xs font-medium">{formatShortDate(getDate(item))}</td>
                                     <td className="px-3 md:px-5 py-2.5 md:py-3.5">
                                         {module === 'factures' ? (
                                             <InvStatusBadge status={(item as InvDetailRow).status} isAvoir={isAvoir} />
                                         ) : (
                                         <span className={cn(
-                                            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter",
+                                            "inline-flex items-center px-2 py-0.5 rounded-xs text-2xs font-semibold uppercase tracking-tighter",
                                             (item as ZoneB_DetailRow).status === 'invoiced'
-                                                ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                                                : "bg-amber-50 text-amber-600 border border-amber-100"
+                                                ? "bg-tone-good-soft text-tone-good-ink border border-tone-good/30"
+                                                : "bg-tone-warn-soft text-tone-warn-ink border border-tone-warn/30"
                                         )}>
                                             {(item as ZoneB_DetailRow).status === 'invoiced' ? 'Facturé' : 'Accepté'}
                                         </span>
                                         )}
                                     </td>
-                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 font-bold text-slate-800 max-w-[140px] md:max-w-[200px] truncate" title={item.client_name}>
+                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 font-bold text-ink max-w-[140px] md:max-w-[200px] truncate" title={item.client_name}>
                                         {item.client_name}
                                     </td>
-                                    <td className={cn("px-3 md:px-5 py-2.5 md:py-3.5 text-right font-black tabular-nums whitespace-nowrap transition-colors", isAvoir ? "text-rose-600" : "text-slate-900 group-hover:text-brand-main")}>
+                                    <td className={cn("px-3 md:px-5 py-2.5 md:py-3.5 text-right font-bold tabular-nums whitespace-nowrap transition-colors", isAvoir ? "text-tone-critical-ink" : "text-ink group-hover:text-primary-press")}>
                                         {formatCurrencyCAD(item.amount)}
                                     </td>
-                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 font-mono text-[10px] text-slate-400 whitespace-nowrap">{getNumber(item)}</td>
-                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-slate-600 whitespace-nowrap font-medium">{item.rep_name}</td>
+                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 font-mono text-2xs text-ink-mute whitespace-nowrap">{getNumber(item)}</td>
+                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-ink-secondary whitespace-nowrap font-medium">{item.rep_name}</td>
                                     <td className="px-3 md:px-5 py-2.5 md:py-3.5">
                                         <span className={cn(
-                                            "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap border",
-                                            DEPT_COLORS[item.department] ?? 'bg-slate-100 text-slate-500 border-slate-200/50'
+                                            "inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-bold whitespace-nowrap border",
+                                            DEPT_COLORS[item.department] ?? 'bg-stone text-ink-secondary border-hairline-strong/50'
                                         )}>
                                             {item.department}
                                         </span>
@@ -158,7 +159,7 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                                             href={getZohoUrl(item)}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center justify-center p-1.5 rounded-lg text-slate-300 hover:text-brand-main hover:bg-amber-50 transition-all"
+                                            className="inline-flex items-center justify-center p-1.5 rounded-md text-ink-faint hover:text-primary-press hover:bg-primary-wash transition-all"
                                             title="Voir dans Zoho Books"
                                         >
                                             <ExternalLink className="w-4 h-4" />
@@ -171,9 +172,9 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                     </tbody>
                     {sortedData.length > 0 && (
                         <tfoot>
-                            <tr className="bg-brand-main text-white font-black">
-                                <td colSpan={3} className="px-3 md:px-5 py-3 md:py-4 text-[11px] uppercase tracking-widest">Total hebdo.</td>
-                                <td className="px-3 md:px-5 py-3 md:py-4 text-right font-black tabular-nums whitespace-nowrap">
+                            <tr className="bg-ink text-white font-bold">
+                                <td colSpan={3} className="px-3 md:px-5 py-3 md:py-4 text-2xs uppercase tracking-eyebrow">Total hebdo.</td>
+                                <td className="px-3 md:px-5 py-3 md:py-4 text-right font-bold tabular-nums whitespace-nowrap">
                                     {formatCurrencyCAD(totalAmount)}
                                 </td>
                                 <td colSpan={4} className="px-3 md:px-5 py-3 md:py-4"></td>
@@ -187,12 +188,12 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
 }
 
 const INV_STATUS_STYLES: Record<string, string> = {
-    paid:    'bg-emerald-50 text-emerald-600 border-emerald-100',
-    partial: 'bg-blue-50 text-blue-600 border-blue-100',
-    sent:    'bg-amber-50 text-amber-600 border-amber-100',
-    viewed:  'bg-amber-50 text-amber-600 border-amber-100',
-    overdue: 'bg-rose-50 text-rose-600 border-rose-100',
-    avoir:   'bg-rose-100 text-rose-700 border-rose-200',
+    paid:    'bg-tone-good-soft text-tone-good-ink border-tone-good/30',
+    partial: 'bg-tone-warn-soft text-tone-warn-ink border-tone-warn/30',
+    sent:    'bg-tone-warn-soft text-tone-warn-ink border-tone-warn/30',
+    viewed:  'bg-tone-warn-soft text-tone-warn-ink border-tone-warn/30',
+    overdue: 'bg-tone-critical-soft text-tone-critical-ink border-tone-critical/30',
+    avoir:   'bg-tone-critical-soft text-tone-critical-ink border-tone-critical/30',
 };
 const INV_STATUS_LABELS: Record<string, string> = {
     paid: 'Payé', partial: 'Partiel', sent: 'Envoyé',
@@ -203,8 +204,8 @@ function InvStatusBadge({ status, isAvoir }: { status: string; isAvoir: boolean 
     const key = isAvoir ? 'avoir' : status;
     return (
         <span className={cn(
-            "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter border",
-            INV_STATUS_STYLES[key] ?? 'bg-slate-100 text-slate-500 border-slate-200'
+            "inline-flex items-center px-2 py-0.5 rounded-xs text-2xs font-semibold uppercase tracking-tighter border",
+            INV_STATUS_STYLES[key] ?? 'bg-stone text-ink-secondary border-hairline-strong'
         )}>
             {INV_STATUS_LABELS[key] ?? key}
         </span>

@@ -1,23 +1,171 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* =============================================================================
+   Affichez — Ventes : application stylesheet
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+   The brand is affichez.ca and it lives in `frontend/branding/`. This file
+   loads it and adds only what an internal, data-dense dashboard needs on top.
+   Read `branding/brand-guide.md` before changing anything here.
 
+   Load order matters:
+     1. Tailwind 4
+     2. tokens.css       — every brand value, as :root custom properties
+     3. tailwind-v4.css  — turns those into utilities + the brand base layer
+     4. this file        — app-level additions, then the component helpers
+   ============================================================================= */
+
+@import "tailwindcss";
+@import "../branding/tokens/tokens.css";
+@import "../branding/tokens/tailwind-v4.css";
+
+/* The kit's own React references and its preview page are documentation, not
+   application code. Without this they are scanned for class names and ship
+   utilities nothing renders. */
+@source not "../branding";
+
+/* -----------------------------------------------------------------------------
+   The two brand faces.
+   tokens.css expects the host app to supply these; index.html loads them from
+   Google Fonts. Only the 400 italic cut of Inria Serif is ever requested,
+   because `.accent-serif` pins the weight and turns synthesis off.
+   -------------------------------------------------------------------------- */
+:root {
+  --font-inter: "Inter";
+  --font-inria-serif: "Inria Serif";
+}
+
+/* -----------------------------------------------------------------------------
+   App-level token additions
+
+   Two things the brand kit deliberately does not answer, because they are
+   product problems rather than brand ones. Anything else must come from
+   branding/tokens/tokens.css — a hex in a component is a bug.
+   -------------------------------------------------------------------------- */
+:root {
+  /* A fourth step below --color-ink-mute, on the same warm neutral axis.
+     2.8:1 on white: placeholders, disabled labels, inert icons and empty-cell
+     dashes ONLY. Never content — if a person has to read it, it is ink-mute. */
+  --color-ink-faint: #9a9a96;
+
+  /* ---------------------------------------------------------------------------
+     The DATA palette — categorical, and deliberately NOT brand colour.
+
+     Tag/TagCell colours ~45 distinct labels (sources, services, departments) by
+     hashing the label, so the same service is the same colour on every row.
+     That needs more distinguishable fills than the brand owns, and the brand's
+     own colours must not be spent on it: orange means action, and the status
+     tones mean status. So these ten are a separate, declared scale.
+
+     Two weights, because there are not ten pastels a person can tell apart at
+     10px: where two hues sit close on the wheel, one of them is always the
+     deeper fill. Four pale, six deep.
+
+     Tone 4 (violet) was pale until 2026-09-14, and against tone 2 (blue) it was
+     the palette's weakest pair by a long way: two near-white fills separated
+     only by the ink, which at 11px across a table is no separation at all.
+     Measured as a fill-weighted Lab distance it scored 12.0 where every other
+     pair scored 20.7 or better. Moving it to a solid lavender fill — same hue,
+     deeper weight, exactly the rule above — takes the pair to the ceiling the
+     rest of the palette sits at, and keeps violet/indigo and violet/fuchsia
+     clear (26.4 and 26.6).
+
+     Tone 8 used to be a deep ORANGE. On 2026-09-14 it became a deep gold: the
+     brand made #F5570E the action colour, and a deep-orange badge in a table
+     read as a button. Same slot, same weight, same warm half of the wheel —
+     just far enough away to stop competing. See src/components/TagCell.tsx for
+     why the slot was replaced rather than removed.
+     ------------------------------------------------------------------------ */
+  /* Pale */
+  --color-data-1: #ecfdf5;       /* green   */
+  --color-data-1-ink: #047857;
+  --color-data-1-edge: #a7f3d0;
+
+  --color-data-2: #eff6ff;       /* blue    */
+  --color-data-2-ink: #1d4ed8;
+  --color-data-2-edge: #bfdbfe;
+
+  --color-data-3: #fffbeb;       /* amber   */
+  --color-data-3-ink: #92400e;
+  --color-data-3-edge: #fde68a;
+
+  --color-data-5: #fff1f2;       /* rose    */
+  --color-data-5-ink: #be123c;
+  --color-data-5-edge: #fecdd3;
+
+  /* Deep */
+  --color-data-4: #c4b5fd;       /* violet — deep, so it cannot twin data-2 */
+  --color-data-4-ink: #4c1d95;
+  --color-data-4-edge: #a78bfa;
+
+  --color-data-6: #a5f3fc;       /* cyan    */
+  --color-data-6-ink: #164e63;
+  --color-data-6-edge: #22d3ee;
+
+  --color-data-7: #d9f99d;       /* lime    */
+  --color-data-7-ink: #365314;
+  --color-data-7-edge: #a3e635;
+
+  --color-data-8: #fcd34d;       /* gold — the slot the deep orange left */
+  --color-data-8-ink: #78350f;
+  --color-data-8-edge: #f59e0b;
+
+  --color-data-9: #f5d0fe;       /* fuchsia */
+  --color-data-9-ink: #701a75;
+  --color-data-9-edge: #e879f9;
+
+  --color-data-10: #c7d2fe;      /* indigo  */
+  --color-data-10-ink: #312e81;
+  --color-data-10-edge: #818cf8;
+}
+
+@theme inline {
+  --color-ink-faint: var(--color-ink-faint);
+  --color-hairline-input: var(--color-hairline-input);
+  --color-star: var(--color-star);
+
+  --color-data-1: var(--color-data-1);
+  --color-data-1-ink: var(--color-data-1-ink);
+  --color-data-1-edge: var(--color-data-1-edge);
+  --color-data-2: var(--color-data-2);
+  --color-data-2-ink: var(--color-data-2-ink);
+  --color-data-2-edge: var(--color-data-2-edge);
+  --color-data-3: var(--color-data-3);
+  --color-data-3-ink: var(--color-data-3-ink);
+  --color-data-3-edge: var(--color-data-3-edge);
+  --color-data-4: var(--color-data-4);
+  --color-data-4-ink: var(--color-data-4-ink);
+  --color-data-4-edge: var(--color-data-4-edge);
+  --color-data-5: var(--color-data-5);
+  --color-data-5-ink: var(--color-data-5-ink);
+  --color-data-5-edge: var(--color-data-5-edge);
+  --color-data-6: var(--color-data-6);
+  --color-data-6-ink: var(--color-data-6-ink);
+  --color-data-6-edge: var(--color-data-6-edge);
+  --color-data-7: var(--color-data-7);
+  --color-data-7-ink: var(--color-data-7-ink);
+  --color-data-7-edge: var(--color-data-7-edge);
+  --color-data-8: var(--color-data-8);
+  --color-data-8-ink: var(--color-data-8-ink);
+  --color-data-8-edge: var(--color-data-8-edge);
+  --color-data-9: var(--color-data-9);
+  --color-data-9-ink: var(--color-data-9-ink);
+  --color-data-9-edge: var(--color-data-9-edge);
+  --color-data-10: var(--color-data-10);
+  --color-data-10-ink: var(--color-data-10-ink);
+  --color-data-10-edge: var(--color-data-10-edge);
+}
+
+/* -----------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
 @layer base {
-
-  *,
-  *::before,
-  *::after {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
+  /* The site's page ground. App chrome — sidebar, headers, cards — stays white
+     on top of it, which is how affichez.ca stacks a white header over a sand
+     hero. Set on the body so overscroll shows sand, not white. */
   body {
-    @apply bg-brand-gray text-brand-dark font-sans;
+    background: var(--color-sand);
+    color: var(--color-ink);
   }
 
-  /* Custom scrollbar – minimal */
+  /* Minimal scrollbar, on the brand's warm neutral axis. */
   ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -28,38 +176,115 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-200 rounded-full;
+    background: var(--color-hairline-strong);
+    border-radius: var(--radius-pill);
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-300;
+    background: var(--color-ink-faint);
   }
 }
 
+/* -----------------------------------------------------------------------------
+   Component helpers
+
+   `.eyebrow`, `.label-caps`, `.accent-serif` and `.tnum` come from the brand
+   kit — see branding/tokens/tailwind-v4.css. What follows is this app's own
+   furniture.
+   -------------------------------------------------------------------------- */
 @layer components {
 
-  /* Reusable card component */
+  /* A white card on the sand ground. `shadow-card` is a 1px hairline plus a
+     whisper of shadow, so the card needs no border of its own — adding one
+     doubles the rule. */
   .card {
-    @apply bg-white rounded-2xl border border-slate-100 shadow-card;
+    @apply bg-white rounded-xl shadow-card;
   }
 
-  /* Compact pill badge */
+  /* Pills are allowed here and nowhere else: chips, tags, avatars, badges. */
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
   }
 
-  /* Table header cell */
+  /* Table furniture — the brand's small-caps label, as a cell. */
   .th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap;
+    @apply px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase whitespace-nowrap;
+    letter-spacing: var(--tracking-eyebrow);
   }
 
-  /* Table data cell */
   .td {
-    @apply px-4 py-3 text-sm text-slate-700;
+    @apply px-4 py-3 text-sm text-ink-secondary;
   }
 
-  /* Form input — used in lead add/edit modal */
+  /* The site's own field style: 10px radius, 1px #DDDDDD, white fill, 40px
+     tall so an input and a `md` button line up. */
   .form-input {
-    @apply w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:border-brand-main transition-colors;
+    @apply w-full h-10 px-3 rounded-md border border-hairline-input bg-white
+           text-sm text-ink placeholder:text-ink-faint transition-colors
+           focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring;
+  }
+
+  .form-input[aria-invalid="true"] {
+    @apply border-tone-critical focus:border-tone-critical focus:ring-tone-critical/30;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Buttons — 10px-radius rectangles in Inter 600, never pills.
+
+     Orange is the one main action on a screen; everything beside it is
+     black-on-white so the orange keeps its meaning.
+
+     `.btn-xs` is an app-level addition to the brand's three sizes. The guide's
+     smallest button is 36px, which is right for a page but wrong for the action
+     that sits inside a table row next to 13px text. It keeps the radius, the
+     weight and the colours — only the box is smaller.
+     ------------------------------------------------------------------------ */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap
+           rounded-md font-semibold transition-colors
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+           disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-xs { @apply h-8 px-3 text-xs gap-1.5; }
+  .btn-sm { @apply h-9 px-4 text-sm; }
+  .btn-md { @apply h-10 px-5 text-md; }
+  .btn-lg { @apply h-12 px-6 text-md; }
+
+  .btn-primary   { @apply bg-primary text-white hover:bg-primary-hover active:bg-primary-deep; }
+  .btn-secondary { @apply bg-white text-ink border border-ink/25 hover:border-ink hover:bg-sand; }
+  .btn-dark      { @apply bg-ink text-white hover:bg-ink/85; }
+  .btn-ghost     { @apply bg-transparent text-ink hover:bg-sand; }
+  /* The guide's sixth variant, `danger` (crimson fill), is not defined here
+     because nothing in this app is a destructive confirmation yet — the delete
+     controls are icon buttons that turn crimson on hover. Add it from
+     branding/reference/Button.tsx the day a confirm dialog needs it. */
+
+  /* A quiet outlined button for table toolbars: neutral until you reach for it,
+     then it picks up the action colour. */
+  .btn-quiet {
+    @apply bg-white text-ink-mute border border-hairline-strong
+           hover:border-primary hover:text-primary-press hover:bg-primary-wash;
+  }
+
+  /* A menu arriving under its trigger.
+     `Select` asked for this with `animate-in fade-in slide-in-from-top-2`,
+     which belongs to the `tailwindcss-animate` plugin — never installed, so the
+     dropdown has never actually animated. Six lines of CSS beats a dependency.
+     The reduced-motion guard in the brand kit's base layer collapses it to
+     0.01ms, so the menu still arrives at its final state. */
+  .menu-in {
+    animation: menu-in var(--duration-fast) var(--ease-out);
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

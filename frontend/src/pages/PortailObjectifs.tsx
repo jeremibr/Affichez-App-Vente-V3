@@ -49,14 +49,14 @@ interface Props { propRepName?: string; }
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function Progress({ actual, target }: { actual: number; target: number }) {
-    if (target <= 0) return <span className="text-slate-300 text-xs">—</span>;
+    if (target <= 0) return <span className="text-ink-faint text-xs">—</span>;
     const pct = Math.round((actual / target) * 100);
     const clamped = Math.min(pct, 100);
-    const color = pct >= 100 ? 'bg-emerald-400' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400';
-    const textColor = pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-600' : 'text-red-500';
+    const color = pct >= 100 ? 'bg-tone-good' : pct >= 70 ? 'bg-tone-warn' : 'bg-tone-critical';
+    const textColor = pct >= 100 ? 'text-tone-good-ink' : pct >= 70 ? 'text-tone-warn-ink' : 'text-tone-critical';
     return (
         <div className="flex items-center gap-2 min-w-[90px]">
-            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className="flex-1 h-1.5 bg-stone rounded-full overflow-hidden">
                 <div className={cn('h-full rounded-full transition-all', color)} style={{ width: `${clamped}%` }} />
             </div>
             <span className={cn('text-xs font-bold tabular-nums w-9 text-right', textColor)}>{pct}%</span>
@@ -180,11 +180,11 @@ export default function PortailObjectifs({ propRepName }: Props) {
         return (
             <div className="p-4 md:p-8 max-w-screen-xl mx-auto flex items-center justify-center min-h-[60vh]">
                 <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-                        <User className="w-7 h-7 text-slate-300" />
+                    <div className="w-14 h-14 rounded-xl bg-stone flex items-center justify-center mx-auto">
+                        <User className="w-7 h-7 text-ink-faint" />
                     </div>
-                    <h2 className="text-base font-semibold text-slate-700">Portail non configuré</h2>
-                    <p className="text-sm text-slate-400 max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur.</p>
+                    <h2 className="text-base font-semibold text-ink-secondary">Portail non configuré</h2>
+                    <p className="text-sm text-ink-mute max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur.</p>
                 </div>
             </div>
         );
@@ -196,35 +196,33 @@ export default function PortailObjectifs({ propRepName }: Props) {
         <div className="p-4 md:p-8 max-w-screen-xl mx-auto space-y-5 md:space-y-6">
 
             {/* ── Hero banner ── */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-brand-main via-brand-main/90 to-amber-500 rounded-2xl p-6 md:p-8 text-white shadow-lg shadow-brand-main/20">
-                <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
-                <div className="absolute -bottom-14 -left-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+            <div className="relative overflow-hidden bg-primary rounded-xl p-6 md:p-8 text-white shadow-lg">
                 <div className="relative flex flex-col gap-5">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                             <div className="flex items-center gap-2 mb-1.5">
-                                <Target className="w-4 h-4 text-white/70" />
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">
+                                <Target className="w-4 h-4 text-white" />
+                                <span className="text-2xs font-semibold uppercase tracking-eyebrow text-white">
                                     Mes Objectifs Factures {year}
                                 </span>
                             </div>
-                            <h1 className="text-2xl md:text-3xl font-bold leading-tight">{repName || 'Représentant'}</h1>
-                            <p className="text-white/80 mt-2 text-sm md:text-base flex items-center gap-2 flex-wrap">
+                            <h1 className="text-2xl md:text-3xl font-semibold leading-tight text-white">{repName || 'Représentant'}</h1>
+                            <p className="text-white mt-2 text-sm md:text-base flex items-center gap-2 flex-wrap">
                                 <span>{motivText}</span>
                                 <span className="text-lg">{motivEmoji}</span>
                             </p>
                         </div>
                     </div>
                     {/* KPI */}
-                    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-4 md:p-5 flex items-center justify-between gap-6 flex-wrap">
+                    <div className="bg-black/20 rounded-md p-4 md:p-5 flex items-center justify-between gap-6 flex-wrap">
                         <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-white/70 shrink-0" />
+                            <FileText className="w-5 h-5 text-white shrink-0" />
                             <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Total Facturé {year}</p>
+                                <p className="text-2xs font-semibold uppercase tracking-eyebrow text-white">Total Facturé {year}</p>
                                 <p className="text-2xl md:text-3xl font-bold tabular-nums leading-none mt-0.5">
                                     {formatCurrencyCAD(totals.actual)}
                                 </p>
-                                <p className="text-[11px] text-white/60 mt-1">
+                                <p className="text-2xs text-white mt-1">
                                     {totals.target > 0
                                         ? `sur ${formatCurrencyCAD(totals.target)} objectif`
                                         : 'Objectif non fixé — configurez dans Paramètres'}
@@ -242,7 +240,7 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                 <div className="h-2.5 bg-white/20 rounded-full overflow-hidden">
                                     <div
                                         className={cn('h-full rounded-full transition-all duration-700',
-                                            pct >= 100 ? 'bg-emerald-300' : pct >= 70 ? 'bg-amber-300' : 'bg-red-400'
+                                            pct >= 100 ? 'bg-tone-good' : pct >= 70 ? 'bg-tone-warn' : 'bg-tone-critical'
                                         )}
                                         style={{ width: `${Math.min(pct, 100)}%` }}
                                     />
@@ -262,58 +260,58 @@ export default function PortailObjectifs({ propRepName }: Props) {
 
             {!repName ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-2">
-                    <Target className="w-8 h-8 text-slate-200" />
-                    <p className="text-sm text-slate-400">Sélectionnez un représentant</p>
+                    <Target className="w-8 h-8 text-ink-faint" />
+                    <p className="text-sm text-ink-mute">Sélectionnez un représentant</p>
                 </div>
             ) : loading ? (
                 <div className="flex items-center justify-center py-20 gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
-                    <span className="text-sm text-slate-400">Chargement...</span>
+                    <Loader2 className="w-6 h-6 animate-spin text-ink-faint" />
+                    <span className="text-sm text-ink-mute">Chargement...</span>
                 </div>
             ) : (
                 <>
                     {/* ── Monthly totals table ── */}
-                    <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-card overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="border-b border-slate-100 bg-slate-50/60">
-                                        <th className="px-5 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mois</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">{prevYear}</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest">{year}</th>
-                                        <th className="px-4 py-3 text-right text-[10px] font-bold text-amber-500 uppercase tracking-widest border-l border-slate-100">Objectif</th>
-                                        <th className="px-4 py-3 text-[10px] font-bold text-amber-400 uppercase tracking-widest min-w-[130px]">Atteinte</th>
+                                    <tr className="border-b border-hairline bg-sand/60">
+                                        <th className="px-5 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Mois</th>
+                                        <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">{prevYear}</th>
+                                        <th className="px-4 py-3 text-right text-2xs font-semibold text-primary-press uppercase tracking-eyebrow">{year}</th>
+                                        <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow border-l border-hairline">Objectif</th>
+                                        <th className="px-4 py-3 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow min-w-[130px]">Atteinte</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
+                                <tbody className="divide-y divide-hairline">
                                     {rows.map(row => {
                                         const isCurrent = row.month === NOW_MONTH && year === NOW_YEAR;
                                         return (
                                             <tr key={row.month} className={cn(
-                                                'hover:bg-slate-50/60 transition-colors',
-                                                isCurrent && 'bg-brand-main/5 hover:bg-brand-main/10'
+                                                'hover:bg-sand/60 transition-colors',
+                                                isCurrent && 'bg-primary/5 hover:bg-primary/10'
                                             )}>
-                                                <td className="px-5 py-3 font-semibold text-slate-700 whitespace-nowrap">
+                                                <td className="px-5 py-3 font-semibold text-ink-secondary whitespace-nowrap">
                                                     <div className="flex items-center gap-2">
-                                                        {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-brand-main shrink-0" />}
+                                                        {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
                                                         {row.label}
                                                         {isCurrent && (
-                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-brand-main bg-brand-main/10 px-1.5 py-0.5 rounded-full">En cours</span>
+                                                            <span className="text-2xs font-semibold uppercase tracking-label text-primary-press bg-primary/10 px-1.5 py-0.5 rounded-full">En cours</span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-right tabular-nums text-slate-400">
+                                                <td className="px-4 py-3 text-right tabular-nums text-ink-mute">
                                                     {row.prevActual > 0 ? (
                                                         <span className="text-xs font-medium">{formatCurrencyCAD(row.prevActual)}</span>
                                                     ) : (
-                                                        <span className="text-slate-200">—</span>
+                                                        <span className="text-ink-faint">—</span>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-amber-700">
-                                                    {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-slate-200">—</span>}
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink">
+                                                    {row.actual > 0 ? formatCurrencyCAD(row.actual) : <span className="text-ink-faint">—</span>}
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-slate-700 border-l border-slate-100">
-                                                    {row.target > 0 ? formatCurrencyCAD(row.target) : <span className="text-slate-200">—</span>}
+                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-ink-secondary border-l border-hairline">
+                                                    {row.target > 0 ? formatCurrencyCAD(row.target) : <span className="text-ink-faint">—</span>}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <Progress actual={row.actual} target={row.target} />
@@ -323,20 +321,20 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                     })}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                        <td className="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest">Total {year}</td>
+                                    <tr className="border-t-2 border-hairline-strong bg-sand/80">
+                                        <td className="px-5 py-3 text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total {year}</td>
                                         <td className="px-4 py-3 text-right tabular-nums">
                                             {totals.prevActual > 0 ? (
-                                                <span className="text-sm font-semibold text-slate-500">{formatCurrencyCAD(totals.prevActual)}</span>
+                                                <span className="text-sm font-semibold text-ink-mute">{formatCurrencyCAD(totals.prevActual)}</span>
                                             ) : (
-                                                <span className="text-slate-300">—</span>
+                                                <span className="text-ink-faint">—</span>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-right font-bold text-amber-700 tabular-nums">
-                                            {totals.actual > 0 ? formatCurrencyCAD(totals.actual) : <span className="text-slate-300">—</span>}
+                                        <td className="px-4 py-3 text-right font-bold text-ink tabular-nums">
+                                            {totals.actual > 0 ? formatCurrencyCAD(totals.actual) : <span className="text-ink-faint">—</span>}
                                         </td>
-                                        <td className="px-4 py-3 text-right font-bold text-slate-800 tabular-nums border-l border-slate-100">
-                                            {totals.target > 0 ? formatCurrencyCAD(totals.target) : <span className="text-slate-300">—</span>}
+                                        <td className="px-4 py-3 text-right font-bold text-ink tabular-nums border-l border-hairline">
+                                            {totals.target > 0 ? formatCurrencyCAD(totals.target) : <span className="text-ink-faint">—</span>}
                                         </td>
                                         <td className="px-4 py-3"><Progress actual={totals.actual} target={totals.target} /></td>
                                     </tr>
@@ -348,24 +346,24 @@ export default function PortailObjectifs({ propRepName }: Props) {
                     {/* ── Department cards ── */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-3">
-                            <div className="w-7 h-7 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-                                <BarChart2 className="w-3.5 h-3.5 text-slate-400" />
+                            <div className="w-7 h-7 rounded-md bg-stone flex items-center justify-center shrink-0">
+                                <BarChart2 className="w-3.5 h-3.5 text-ink-mute" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-sm font-bold text-slate-800">Répartition par département</h3>
-                                <p className="text-xs text-slate-400">
-                                    <span className="text-slate-400 font-medium">{prevYear}</span>
-                                    {' · '}<span className="text-amber-500 font-medium">{year}</span>
+                                <h3 className="text-sm font-semibold text-ink">Répartition par département</h3>
+                                <p className="text-xs text-ink-mute">
+                                    <span className="text-ink-mute font-medium">{prevYear}</span>
+                                    {' · '}<span className="text-primary-press font-medium">{year}</span>
                                     {' · '}Objectif
                                 </p>
                             </div>
                         </div>
 
                         {!hasDeptData ? (
-                            <div className="bg-white rounded-2xl border border-slate-100 px-6 py-10 flex flex-col items-center gap-2 text-center">
-                                <BarChart2 className="w-8 h-8 text-slate-200" />
-                                <p className="text-sm font-medium text-slate-400">Aucun objectif par département configuré</p>
-                                <p className="text-xs text-slate-300">Rendez-vous dans Paramètres pour définir vos objectifs par département.</p>
+                            <div className="bg-white rounded-xl border border-hairline px-6 py-10 flex flex-col items-center gap-2 text-center">
+                                <BarChart2 className="w-8 h-8 text-ink-faint" />
+                                <p className="text-sm font-medium text-ink-mute">Aucun objectif par département configuré</p>
+                                <p className="text-xs text-ink-faint">Rendez-vous dans Paramètres pour définir vos objectifs par département.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
@@ -403,31 +401,31 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                         { target: 0, actual: 0, prevActual: 0 }
                                     );
                                     const pct = rowTotal.target > 0 ? Math.round((rowTotal.actual / rowTotal.target) * 100) : null;
-                                    const pctColor = pct === null ? '' : pct >= 100 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-600' : 'text-red-500';
-                                    const barColor = pct === null ? '' : pct >= 100 ? 'bg-emerald-400' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400';
+                                    const pctColor = pct === null ? '' : pct >= 100 ? 'text-tone-good-ink' : pct >= 70 ? 'text-tone-warn-ink' : 'text-tone-critical';
+                                    const barColor = pct === null ? '' : pct >= 100 ? 'bg-tone-good' : pct >= 70 ? 'bg-tone-warn' : 'bg-tone-critical';
 
                                     return (
-                                        <div key={dept} className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                                        <div key={dept} className="bg-white rounded-xl shadow-card overflow-hidden">
 
                                             {/* Card header */}
-                                            <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
-                                                <span className="text-sm font-bold text-slate-800">{dept}</span>
-                                                <div className="flex items-start gap-0 mt-2 divide-x divide-slate-200">
+                                            <div className="px-5 py-3.5 border-b border-hairline bg-sand/50">
+                                                <span className="text-sm font-bold text-ink">{dept}</span>
+                                                <div className="flex items-start gap-0 mt-2 divide-x divide-hairline-strong">
                                                     <div className="pr-4">
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{year}</p>
-                                                        <p className="text-sm font-bold text-amber-700 tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.actual)}</p>
+                                                        <p className="text-2xs font-semibold text-ink-mute uppercase tracking-label">{year}</p>
+                                                        <p className="text-sm font-bold text-ink tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.actual)}</p>
                                                     </div>
                                                     {rowTotal.target > 0 && (
                                                         <div className="px-4">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Objectif</p>
-                                                            <p className="text-sm font-semibold text-slate-600 tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.target)}</p>
+                                                            <p className="text-2xs font-semibold text-ink-mute uppercase tracking-label">Objectif</p>
+                                                            <p className="text-sm font-semibold text-ink-secondary tabular-nums leading-tight">{formatCurrencyCAD(rowTotal.target)}</p>
                                                         </div>
                                                     )}
                                                     {pct !== null && (
                                                         <div className="pl-4">
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Atteinte</p>
+                                                            <p className="text-2xs font-semibold text-ink-mute uppercase tracking-label">Atteinte</p>
                                                             <div className="flex items-center gap-2 mt-1">
-                                                                <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                                <div className="w-20 h-1.5 bg-hairline-strong rounded-full overflow-hidden">
                                                                     <div className={cn('h-full rounded-full', barColor)} style={{ width: `${Math.min(pct, 100)}%` }} />
                                                                 </div>
                                                                 <span className={cn('text-sm font-bold tabular-nums', pctColor)}>{pct}%</span>
@@ -441,13 +439,13 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead>
-                                                        <tr className="border-b border-slate-100">
-                                                            <th className="px-4 py-2 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest w-20 shrink-0" />
+                                                        <tr className="border-b border-hairline">
+                                                            <th className="px-4 py-2 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow w-20 shrink-0" />
                                                             {MONTH_SHORT.map((m, i) => (
                                                                 <th key={i} className={cn(
-                                                                    'px-3 py-2 text-center text-[10px] font-bold uppercase tracking-widest min-w-[52px]',
+                                                                    'px-3 py-2 text-center text-2xs font-semibold uppercase tracking-eyebrow min-w-[52px]',
                                                                     (i + 1) === NOW_MONTH && year === NOW_YEAR
-                                                                        ? 'text-brand-main' : 'text-slate-400'
+                                                                        ? 'text-primary-press' : 'text-ink-mute'
                                                                 )}>
                                                                     {m}
                                                                 </th>
@@ -456,33 +454,33 @@ export default function PortailObjectifs({ propRepName }: Props) {
                                                     </thead>
                                                     <tbody>
                                                         {/* current year row */}
-                                                        <tr className="border-b border-slate-50 hover:bg-slate-50/40 transition-colors">
-                                                            <td className="px-4 py-2.5 text-[10px] font-bold text-amber-500 uppercase tracking-widest whitespace-nowrap">{year}</td>
+                                                        <tr className="border-b border-hairline hover:bg-sand/40 transition-colors">
+                                                            <td className="px-4 py-2.5 text-2xs font-semibold text-primary-press uppercase tracking-eyebrow whitespace-nowrap">{year}</td>
                                                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
                                                                 const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
                                                                 const isCurrent = m === NOW_MONTH && year === NOW_YEAR;
                                                                 const cellColor = cell.target > 0
-                                                                    ? (cell.actual >= cell.target ? 'text-emerald-500' : cell.actual >= cell.target * 0.7 ? 'text-amber-500' : 'text-red-400')
-                                                                    : 'text-amber-600';
+                                                                    ? (cell.actual >= cell.target ? 'text-tone-good' : cell.actual >= cell.target * 0.7 ? 'text-tone-warn-ink' : 'text-tone-critical')
+                                                                    : 'text-ink-secondary';
                                                                 return (
                                                                     <td key={m} className={cn(
                                                                         'px-3 py-2.5 text-center tabular-nums font-bold',
                                                                         cellColor,
-                                                                        isCurrent && 'bg-brand-main/5'
+                                                                        isCurrent && 'bg-primary/5'
                                                                     )}>
-                                                                        {cell.actual > 0 ? fmtK(cell.actual) : <span className="text-slate-150 font-normal">—</span>}
+                                                                        {cell.actual > 0 ? fmtK(cell.actual) : <span className="text-ink-faint font-normal">—</span>}
                                                                     </td>
                                                                 );
                                                             })}
                                                         </tr>
                                                         {/* objective row */}
-                                                        <tr className="hover:bg-slate-50/40 transition-colors">
-                                                            <td className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest whitespace-nowrap">Objectif</td>
+                                                        <tr className="hover:bg-sand/40 transition-colors">
+                                                            <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">Objectif</td>
                                                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
                                                                 const cell = monthCells[m] ?? { target: 0, actual: 0, prevActual: 0 };
                                                                 return (
-                                                                    <td key={m} className="px-3 py-2.5 text-center tabular-nums text-slate-500 font-semibold">
-                                                                        {cell.target > 0 ? fmtK(cell.target) : <span className="text-slate-150 font-normal">—</span>}
+                                                                    <td key={m} className="px-3 py-2.5 text-center tabular-nums text-ink-mute font-semibold">
+                                                                        {cell.target > 0 ? fmtK(cell.target) : <span className="text-ink-faint font-normal">—</span>}
                                                                     </td>
                                                                 );
                                                             })}

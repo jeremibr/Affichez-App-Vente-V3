@@ -28,7 +28,7 @@ const PANEL_W = 256;
  *
  *   - table headings, whose `.th` is `white-space: nowrap` (so the text could
  *     not even wrap inside its own box and ran off the screen), and
- *   - the breakdown cards, which are `overflow-hidden` to clip their rounded
+ *   - the breakdown cards, which are `overflow-hidden` to clip their rounded-xs
  *     corners — and clipped the panel along with them.
  *
  * A portal to <body> with fixed positioning has no ancestor to be clipped by, no
@@ -108,8 +108,8 @@ export function InfoHint({ text, className }: Props) {
                 onFocus={() => { measure(); setOpen(true); }}
                 onBlur={() => setOpen(false)}
                 onClick={e => { e.stopPropagation(); measure(); setPinned(p => !p); }}
-                className="text-slate-300 transition-colors hover:text-brand-main focus:text-brand-main
-                           focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-main/40 rounded-full"
+                className="text-ink-faint transition-colors hover:text-primary-press focus:text-primary-press
+                           focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-full"
             >
                 <Info className="h-3.5 w-3.5" />
             </button>
@@ -123,10 +123,10 @@ export function InfoHint({ text, className }: Props) {
                     // table heading would otherwise impose — though inside the
                     // portal nothing inherits them any more, they are kept so the
                     // panel is immune to wherever it is mounted next.
-                    className="fixed z-[100] rounded-xl border border-slate-100 bg-white p-3
-                               text-left text-[11px] font-medium not-italic leading-relaxed
+                    className="fixed z-[100] rounded-lg border border-hairline bg-white p-3
+                               text-left text-2xs font-medium not-italic leading-relaxed
                                normal-case tracking-normal whitespace-normal
-                               text-slate-500 shadow-card-hover"
+                               text-ink-mute shadow-elevated"
                 >
                     {text}
                 </span>,

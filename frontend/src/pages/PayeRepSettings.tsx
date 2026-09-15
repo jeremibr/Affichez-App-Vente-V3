@@ -16,7 +16,7 @@ export default function PayeRepSettings() {
     if (!isAdmin) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-slate-400 text-sm">Accès réservé aux administrateurs.</p>
+                <p className="text-ink-mute text-sm">Accès réservé aux administrateurs.</p>
             </div>
         );
     }
@@ -25,11 +25,11 @@ export default function PayeRepSettings() {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto">
 
             {/* ─── Bordered container: hero + pay table ─── */}
-            <div className="rounded-2xl border border-brand-main/20 shadow-card overflow-visible">
+            <div className="rounded-xl border border-primary/20 shadow-card overflow-visible">
 
                 {/* Hero — orange gradient, no overflow-hidden so dropdown shows */}
-                <div className="bg-gradient-to-br from-brand-main to-amber-600 rounded-t-2xl px-6 py-6 md:py-8">
-                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-5">
+                <div className="bg-primary rounded-t-xl px-6 py-6 md:py-8">
+                    <p className="text-2xs font-semibold text-white uppercase tracking-eyebrow mb-5">
                         Paramètres du représentant
                     </p>
 
@@ -38,24 +38,24 @@ export default function PayeRepSettings() {
                         {/* Avatar + name */}
                         <div className="flex items-center gap-4 flex-1 min-w-0">
                             <div className={cn(
-                                "w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 transition-all",
+                                "w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-semibold shrink-0 transition-all",
                                 selectedRep
-                                    ? "bg-white text-brand-main shadow-lg shadow-black/10"
-                                    : "bg-white/20 text-white/40"
+                                    ? "bg-white text-primary-press shadow-lg shadow-black/10"
+                                    : "bg-black/15 text-white"
                             )}>
                                 {selectedRep ? selectedRep.charAt(0).toUpperCase() : <Users className="w-6 h-6" />}
                             </div>
                             <div className="min-w-0">
                                 {selectedRep ? (
-                                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight truncate">
+                                    <h1 className="text-2xl md:text-3xl font-semibold text-white tracking-tight truncate">
                                         {selectedRep}
                                     </h1>
                                 ) : (
-                                    <h1 className="text-xl md:text-2xl font-bold text-white/50">
+                                    <h1 className="text-xl md:text-2xl font-semibold text-white">
                                         Sélectionner un représentant
                                     </h1>
                                 )}
-                                <p className="text-xs text-white/60 mt-0.5">
+                                <p className="text-xs text-white mt-0.5">
                                     {selectedRep
                                         ? 'Toutes les données ci-dessous correspondent à ce représentant'
                                         : 'Choisissez un représentant pour voir et modifier sa paye'}
@@ -80,15 +80,15 @@ export default function PayeRepSettings() {
                 </div>
 
                 {/* Pay table */}
-                <div className="bg-white rounded-b-2xl overflow-visible px-4 md:px-6 py-5 md:py-6">
+                <div className="bg-white rounded-b-xl overflow-visible px-4 md:px-6 py-5 md:py-6">
                     {selectedRep ? (
                         <PortailPaye propRepName={selectedRep} embedded />
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center">
-                                <Users className="w-6 h-6 text-slate-300" />
+                            <div className="w-12 h-12 rounded-xl bg-stone flex items-center justify-center">
+                                <Users className="w-6 h-6 text-ink-faint" />
                             </div>
-                            <p className="text-sm text-slate-400">Sélectionnez un représentant ci-dessus</p>
+                            <p className="text-sm text-ink-mute">Sélectionnez un représentant ci-dessus</p>
                         </div>
                     )}
                 </div>

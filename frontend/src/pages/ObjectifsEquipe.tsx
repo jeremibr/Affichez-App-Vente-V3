@@ -57,7 +57,7 @@ export default function ObjectifsEquipe() {
     if (!isAdmin) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-slate-400 text-sm">Accès réservé aux administrateurs.</p>
+                <p className="text-ink-mute text-sm">Accès réservé aux administrateurs.</p>
             </div>
         );
     }
@@ -69,12 +69,12 @@ export default function ObjectifsEquipe() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2.5 mb-1">
-                        <div className="p-2 rounded-xl bg-brand-main/10">
-                            <Target className="w-4 h-4 text-brand-main" />
+                        <div className="p-2 rounded-md bg-primary/10">
+                            <Target className="w-4 h-4 text-primary-press" />
                         </div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">Objectifs Équipe</h1>
+                        <h1 className="text-xl font-semibold text-ink tracking-tight">Objectifs Équipe</h1>
                     </div>
-                    <p className="text-sm text-slate-400">Cibles mensuelles de facturation par département · {year}</p>
+                    <p className="text-sm text-ink-mute">Cibles mensuelles de facturation par département · {year}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -94,10 +94,10 @@ export default function ObjectifsEquipe() {
                         onClick={saveAll}
                         disabled={saving}
                         className={cn(
-                            "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all disabled:opacity-50",
+                            "btn btn-md",
                             saved
-                                ? "bg-emerald-500 text-white shadow-emerald-200"
-                                : "bg-brand-main text-white shadow-brand-main/30 hover:bg-brand-main/90"
+                                ? "bg-tone-good text-white"
+                                : "btn-primary"
                         )}
                     >
                         {saving
@@ -109,32 +109,32 @@ export default function ObjectifsEquipe() {
             </div>
 
             {/* Grid */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-x-auto">
+            <div className="bg-white rounded-xl shadow-card overflow-x-auto">
                 <table className="w-full text-sm min-w-[900px]">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/60">
-                            <th className="px-5 py-3.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/60">
+                        <tr className="border-b border-hairline bg-sand/60">
+                            <th className="px-5 py-3.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow sticky left-0 bg-sand/60">
                                 Mois
                             </th>
                             {DEPARTMENTS.map(dept => (
-                                <th key={dept} className="px-4 py-3.5 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                                <th key={dept} className="px-4 py-3.5 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap">
                                     {dept.length > 15 ? dept.substring(0, 13) + '…' : dept}
                                 </th>
                             ))}
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {loading ? (
                             <tr>
-                                <td colSpan={DEPARTMENTS.length + 1} className="px-5 py-12 text-center text-slate-400 italic text-sm">
+                                <td colSpan={DEPARTMENTS.length + 1} className="px-5 py-12 text-center text-ink-mute italic text-sm">
                                     Chargement...
                                 </td>
                             </tr>
                         ) : MONTHS.map(month => {
                             const monthNum = month.value;
                             return (
-                                <tr key={monthNum} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="px-5 py-2.5 font-semibold text-slate-700 sticky left-0 bg-white whitespace-nowrap">
+                                <tr key={monthNum} className="hover:bg-sand/60 transition-colors">
+                                    <td className="px-5 py-2.5 font-semibold text-ink-secondary sticky left-0 bg-white whitespace-nowrap">
                                         {month.label}
                                     </td>
                                     {DEPARTMENTS.map(dept => {
@@ -143,7 +143,7 @@ export default function ObjectifsEquipe() {
                                             <td key={dept} className="px-3 py-2">
                                                 <input
                                                     type="number"
-                                                    className="w-full bg-slate-50 border-0 rounded-lg px-3 py-2 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-main/30 focus:bg-white transition-all tabular-nums"
+                                                    className="w-full bg-sand border-0 rounded-md px-3 py-2 text-right text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:bg-white transition-all tabular-nums"
                                                     value={obj?.target_amount || ''}
                                                     placeholder="0"
                                                     onChange={e => handleUpdate(monthNum, dept, e.target.value)}
@@ -158,7 +158,7 @@ export default function ObjectifsEquipe() {
                 </table>
             </div>
 
-            <p className="text-xs text-slate-400 px-1">
+            <p className="text-xs text-ink-mute px-1">
                 Montants avant taxes · Cliquez sur Enregistrer après chaque modification.
             </p>
         </div>

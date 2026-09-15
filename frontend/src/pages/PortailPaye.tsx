@@ -263,11 +263,11 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
         return (
             <div className="p-4 md:p-8 max-w-screen-2xl mx-auto flex items-center justify-center min-h-[60vh]">
                 <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-                        <User className="w-7 h-7 text-slate-300" />
+                    <div className="w-14 h-14 rounded-xl bg-stone flex items-center justify-center mx-auto">
+                        <User className="w-7 h-7 text-ink-faint" />
                     </div>
-                    <h2 className="text-base font-semibold text-slate-700">Portail non configuré</h2>
-                    <p className="text-sm text-slate-400 max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
+                    <h2 className="text-base font-semibold text-ink-secondary">Portail non configuré</h2>
+                    <p className="text-sm text-ink-mute max-w-xs">Votre compte n'est pas encore associé à un représentant. Contactez un administrateur pour configurer votre accès.</p>
                 </div>
             </div>
         );
@@ -284,14 +284,14 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
             {/* Header */}
             <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                        <Wallet className="w-5 h-5 text-emerald-500" />
+                    <h2 className="text-xl font-semibold text-ink tracking-tight flex items-center gap-2">
+                        <Wallet className="w-5 h-5 text-data-1-ink" />
                         {isAdminView ? `Paye de ${repName}` : 'Ma Paye'}
                     </h2>
                     {!isAdminView && (
-                        <p className="text-sm text-slate-400 mt-0.5">
+                        <p className="text-sm text-ink-mute mt-0.5">
                             {repName || 'Représentant'}
-                            {!canEdit && <span className="ml-2 text-[10px] font-bold text-slate-300 uppercase tracking-widest">Lecture seule</span>}
+                            {!canEdit && <span className="ml-2 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Lecture seule</span>}
                         </p>
                     )}
                 </div>
@@ -306,17 +306,17 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
 
             {/* ─── Meta cards ──────────────────────────────────────────────── */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <MetaCard label="Solde Année Précédente"            value={meta.previous_year_balance} onChange={v => updateMeta('previous_year_balance', v)} bg="bg-blue-50 border-blue-100"           text="text-blue-700"    readOnly={!canEdit} />
-                <MetaCard label="Bonus Annuel"                       value={meta.annual_bonus}          onChange={v => updateMeta('annual_bonus', v)}          bg="bg-brand-main/5 border-brand-main/20" text="text-brand-main"  readOnly={!canEdit} />
-                <MetaCard label={`Commission ${year} Facturées`}     value={commissionFacturees}                                                                bg="bg-amber-50 border-amber-100"          text="text-amber-700"   readOnly />
-                <MetaCard label="Montant en Banque"                  value={bankBalance}                                                                        bg="bg-emerald-50 border-emerald-100"      text="text-emerald-700" readOnly />
+                <MetaCard label="Solde Année Précédente"            value={meta.previous_year_balance} onChange={v => updateMeta('previous_year_balance', v)} bg="bg-data-2 border-data-2-edge"   text="text-data-2-ink"    readOnly={!canEdit} />
+                <MetaCard label="Bonus Annuel"                       value={meta.annual_bonus}          onChange={v => updateMeta('annual_bonus', v)}          bg="bg-primary/5 border-primary/20" text="text-primary-press"  readOnly={!canEdit} />
+                <MetaCard label={`Commission ${year} Facturées`}     value={commissionFacturees}                                                                bg="bg-data-3 border-data-3-edge"   text="text-data-3-ink"   readOnly />
+                <MetaCard label="Montant en Banque"                  value={bankBalance}                                                                        bg="bg-data-1 border-data-1-edge"   text="text-data-1-ink" readOnly />
             </div>
 
             {/* ─── Payroll table ───────────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4 flex-wrap">
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-hairline-strong bg-sand flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                        <h3 className="text-sm font-bold text-slate-800">Détail des paies — {year}</h3>
+                        <h3 className="text-sm font-semibold text-ink">Détail des paies — {year}</h3>
                         <ExportButton
                             rows={entries}
                             columns={autoColumns(entries)}
@@ -324,7 +324,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                             disabled={entries.length === 0}
                         />
                         <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-slate-400">Taux commission :</span>
+                            <span className="text-xs text-ink-mute">Taux commission :</span>
                             {canEdit && editingRate ? (
                                 <div className="flex items-center gap-1.5">
                                     <input
@@ -345,9 +345,9 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                             }
                                             if (e.key === 'Escape') setEditingRate(false);
                                         }}
-                                        className="w-14 px-1.5 py-0.5 text-xs border border-brand-main rounded-md focus:outline-none text-center font-bold text-brand-main"
+                                        className="w-14 px-1.5 py-0.5 text-xs border border-primary rounded-md focus:outline-none text-center font-bold text-primary-press"
                                     />
-                                    <span className="text-xs text-slate-400">%</span>
+                                    <span className="text-xs text-ink-mute">%</span>
                                     <button
                                         onClick={() => {
                                             const n = parseFloat(rateDraft);
@@ -358,9 +358,9 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                             }
                                             setEditingRate(false);
                                         }}
-                                        className="p-0.5 text-emerald-500 hover:text-emerald-600"
+                                        className="p-0.5 text-tone-good hover:text-tone-good-ink"
                                     ><Check className="w-3 h-3" /></button>
-                                    <button onClick={() => setEditingRate(false)} className="p-0.5 text-slate-300 hover:text-slate-500">
+                                    <button onClick={() => setEditingRate(false)} className="p-0.5 text-ink-faint hover:text-ink-mute">
                                         <X className="w-3 h-3" />
                                     </button>
                                 </div>
@@ -369,16 +369,16 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                     onClick={() => { setRateDraft(String(Math.round(commRate * 100))); setEditingRate(true); }}
                                     className="flex items-center gap-1 group"
                                 >
-                                    <span className="text-xs font-bold text-brand-main tabular-nums">{Math.round(commRate * 100)}%</span>
-                                    <Pencil className="w-2.5 h-2.5 text-slate-300 group-hover:text-brand-main transition-colors" />
+                                    <span className="text-xs font-bold text-ink tabular-nums">{Math.round(commRate * 100)}%</span>
+                                    <Pencil className="w-2.5 h-2.5 text-ink-faint group-hover:text-primary-press transition-colors" />
                                 </button>
                             ) : (
-                                <span className="text-xs font-bold text-brand-main tabular-nums">{Math.round(commRate * 100)}%</span>
+                                <span className="text-xs font-bold text-ink tabular-nums">{Math.round(commRate * 100)}%</span>
                             )}
                         </div>
                     </div>
                     {generating && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <div className="flex items-center gap-1.5 text-xs text-ink-mute">
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             Génération du calendrier...
                         </div>
@@ -387,34 +387,34 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
 
                 {!repName ? (
                     <div className="flex items-center justify-center py-16">
-                        <p className="text-sm text-slate-400">Sélectionnez un représentant ci-dessus</p>
+                        <p className="text-sm text-ink-mute">Sélectionnez un représentant ci-dessus</p>
                     </div>
                 ) : loading ? (
                     <div className="flex items-center justify-center py-16 gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
-                        <span className="text-sm text-slate-400">Chargement...</span>
+                        <Loader2 className="w-5 h-5 animate-spin text-ink-faint" />
+                        <span className="text-sm text-ink-mute">Chargement...</span>
                     </div>
                 ) : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm border-collapse">
                         <thead>
-                            <tr className="bg-slate-100 border-b-2 border-slate-300">
-                                <Th align="left"  color="text-slate-600" className="min-w-[160px]">Date</Th>
-                                <Th align="right" color="text-blue-600">Salaire de base</Th>
-                                <Th align="right" color="text-brand-main">Commission</Th>
-                                <Th align="right" color="text-emerald-600">Remb. Dépenses</Th>
-                                <Th align="right" color="text-purple-600">Fériés</Th>
-                                <Th align="right" color="text-teal-600">Vacances</Th>
-                                <Th align="right" color="text-slate-700">Total</Th>
-                                <Th align="left"  color="text-slate-500" className="min-w-[130px]">Note</Th>
-                                {canEdit && <th className="w-8 border-l border-slate-200" />}
+                            <tr className="bg-stone border-b-2 border-hairline-strong">
+                                <Th align="left"  color="text-ink-secondary" className="min-w-[160px]">Date</Th>
+                                <Th align="right" color="text-data-2-ink">Salaire de base</Th>
+                                <Th align="right" color="text-primary-press">Commission</Th>
+                                <Th align="right" color="text-tone-good-ink">Remb. Dépenses</Th>
+                                <Th align="right" color="text-data-4-ink">Fériés</Th>
+                                <Th align="right" color="text-data-6-ink">Vacances</Th>
+                                <Th align="right" color="text-ink-secondary">Total</Th>
+                                <Th align="left"  color="text-ink-mute" className="min-w-[130px]">Note</Th>
+                                {canEdit && <th className="w-8 border-l border-hairline-strong" />}
                             </tr>
                         </thead>
 
                         <tbody>
                             {filteredEntries.length === 0 && (
                                 <tr>
-                                    <td colSpan={canEdit ? 9 : 8} className="px-5 py-12 text-center text-sm text-slate-300 italic">
+                                    <td colSpan={canEdit ? 9 : 8} className="px-5 py-12 text-center text-sm text-ink-faint italic">
                                         {false
                                             ? `Aucune paie pour ce mois`
                                             : `Aucune paie enregistrée pour ${year}`}
@@ -425,54 +425,54 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                 const rowTotal = n(entry.base_salary) + n(entry.commission) + n(entry.expenses) + n(entry.holidays) + n(entry.vacation);
                                 const dateVal = /^\d{4}-\d{2}-\d{2}$/.test(entry.pay_date) ? entry.pay_date : '';
                                 return (
-                                    <tr key={entry.id} className="border-b border-slate-200 hover:bg-amber-50/30 transition-colors group">
+                                    <tr key={entry.id} className="border-b border-hairline-strong hover:bg-primary-wash/30 transition-colors group">
                                         {/* Date */}
-                                        <td className="px-3 py-2 border-r border-slate-200">
+                                        <td className="px-3 py-2 border-r border-hairline-strong">
                                             {canEdit ? (
                                                 <DateDDMMInput
                                                     isoValue={dateVal}
                                                     onChange={iso => updateField(entry.id, 'pay_date', iso)}
                                                 />
                                             ) : (
-                                                <span className="text-slate-700 font-medium text-sm">{formatPayDate(entry.pay_date) || '—'}</span>
+                                                <span className="text-ink-secondary font-medium text-sm">{formatPayDate(entry.pay_date) || '—'}</span>
                                             )}
                                         </td>
 
                                         {canEdit ? (
                                             <>
-                                                <NumInput value={fmt(entry.base_salary)} onChange={v => updateField(entry.id, 'base_salary', v)} color="text-blue-700" />
-                                                <NumInput value={fmt(entry.commission)}  onChange={v => updateField(entry.id, 'commission', v)}  color="text-brand-main" />
-                                                <NumInput value={fmt(entry.expenses)}    onChange={v => updateField(entry.id, 'expenses', v)}    color="text-emerald-600" />
-                                                <NumInput value={fmt(entry.holidays)}    onChange={v => updateField(entry.id, 'holidays', v)}    color="text-purple-600" />
-                                                <NumInput value={fmt(entry.vacation)}    onChange={v => updateField(entry.id, 'vacation', v)}    color="text-teal-600" />
+                                                <NumInput value={fmt(entry.base_salary)} onChange={v => updateField(entry.id, 'base_salary', v)} color="text-data-2-ink" />
+                                                <NumInput value={fmt(entry.commission)}  onChange={v => updateField(entry.id, 'commission', v)}  color="text-primary-press" />
+                                                <NumInput value={fmt(entry.expenses)}    onChange={v => updateField(entry.id, 'expenses', v)}    color="text-tone-good-ink" />
+                                                <NumInput value={fmt(entry.holidays)}    onChange={v => updateField(entry.id, 'holidays', v)}    color="text-data-4-ink" />
+                                                <NumInput value={fmt(entry.vacation)}    onChange={v => updateField(entry.id, 'vacation', v)}    color="text-data-6-ink" />
                                             </>
                                         ) : (
                                             <>
-                                                <NumDisplay value={entry.base_salary} color="text-blue-700" />
-                                                <NumDisplay value={entry.commission}  color="text-brand-main" />
-                                                <NumDisplay value={entry.expenses}    color="text-emerald-600" />
-                                                <NumDisplay value={entry.holidays}    color="text-purple-600" />
-                                                <NumDisplay value={entry.vacation}    color="text-teal-600" />
+                                                <NumDisplay value={entry.base_salary} color="text-data-2-ink" />
+                                                <NumDisplay value={entry.commission}  color="text-primary-press" />
+                                                <NumDisplay value={entry.expenses}    color="text-tone-good-ink" />
+                                                <NumDisplay value={entry.holidays}    color="text-data-4-ink" />
+                                                <NumDisplay value={entry.vacation}    color="text-data-6-ink" />
                                             </>
                                         )}
 
                                         {/* Row total */}
-                                        <td className="px-3 py-2 text-right font-bold text-slate-800 tabular-nums border-r border-slate-200">
-                                            {rowTotal > 0 ? formatCurrencyCAD(rowTotal) : <span className="text-slate-200">—</span>}
+                                        <td className="px-3 py-2 text-right font-bold text-ink tabular-nums border-r border-hairline-strong">
+                                            {rowTotal > 0 ? formatCurrencyCAD(rowTotal) : <span className="text-ink-faint">—</span>}
                                         </td>
 
                                         {/* Note */}
-                                        <td className="px-3 py-2 border-r border-slate-200">
+                                        <td className="px-3 py-2 border-r border-hairline-strong">
                                             {canEdit ? (
                                                 <input
                                                     type="text"
                                                     value={entry.note}
                                                     onChange={e => updateField(entry.id, 'note', e.target.value)}
                                                     placeholder="Note..."
-                                                    className="w-full bg-transparent text-xs text-slate-400 placeholder:text-slate-200 focus:outline-none italic"
+                                                    className="w-full bg-transparent text-xs text-ink-mute placeholder:text-ink-faint focus:outline-none italic"
                                                 />
                                             ) : (
-                                                <span className="text-xs text-slate-400 italic">{entry.note || ''}</span>
+                                                <span className="text-xs text-ink-mute italic">{entry.note || ''}</span>
                                             )}
                                         </td>
 
@@ -480,7 +480,7 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                             <td className="px-2 py-2">
                                                 <button
                                                     onClick={() => deleteEntry(entry.id)}
-                                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-lg text-slate-300 hover:text-red-400 hover:bg-red-50 transition-all"
+                                                    className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-ink-faint hover:text-tone-critical hover:bg-tone-critical-soft transition-all"
                                                 >
                                                     <Trash2 className="w-3.5 h-3.5" />
                                                 </button>
@@ -494,11 +494,11 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                         <tfoot>
                             {/* Add row — admin only */}
                             {canEdit && (
-                                <tr className="border-t border-slate-200 bg-white">
+                                <tr className="border-t border-hairline-strong bg-white">
                                     <td colSpan={9} className="px-4 py-2">
                                         <button
                                             onClick={addEntry}
-                                            className="flex items-center gap-1.5 text-xs text-slate-300 hover:text-brand-main transition-colors font-medium"
+                                            className="flex items-center gap-1.5 text-xs text-ink-faint hover:text-primary-press transition-colors font-medium"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
                                             Nouvelle ligne
@@ -507,16 +507,16 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                                 </tr>
                             )}
                             {/* Totals */}
-                            <tr className="border-t-2 border-slate-300 bg-slate-100">
-                                <td className="px-3 py-3 text-xs font-bold text-slate-600 uppercase tracking-widest border-r border-slate-200">
+                            <tr className="border-t-2 border-hairline-strong bg-stone">
+                                <td className="px-3 py-3 text-xs font-semibold text-ink-secondary uppercase tracking-eyebrow border-r border-hairline-strong">
                                     {`Total ${year}`}
                                 </td>
-                                <TotalCell value={totals.base_salary} color="text-blue-700" />
-                                <TotalCell value={totals.commission}  color="text-brand-main" />
-                                <TotalCell value={totals.expenses}    color="text-emerald-600" />
-                                <TotalCell value={totals.holidays}    color="text-purple-600" />
-                                <TotalCell value={totals.vacation}    color="text-teal-600" />
-                                <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums text-base border-r border-slate-200">
+                                <TotalCell value={totals.base_salary} color="text-data-2-ink" />
+                                <TotalCell value={totals.commission}  color="text-primary-press" />
+                                <TotalCell value={totals.expenses}    color="text-tone-good-ink" />
+                                <TotalCell value={totals.holidays}    color="text-data-4-ink" />
+                                <TotalCell value={totals.vacation}    color="text-data-6-ink" />
+                                <td className="px-3 py-3 text-right font-bold text-ink tabular-nums text-base border-r border-hairline-strong">
                                     {formatCurrencyCAD(grandTotal)}
                                 </td>
                                 <td colSpan={canEdit ? 2 : 1} />
@@ -528,24 +528,24 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
             </div>
 
             {/* ─── Net total banner ────────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card px-4 md:px-6 py-4 md:py-5 flex items-center justify-between flex-wrap gap-4">
+            <div className="bg-white rounded-xl shadow-card px-4 md:px-6 py-4 md:py-5 flex items-center justify-between flex-wrap gap-4">
                 <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Total Net — {year}</p>
-                    <p className="text-2xl md:text-3xl font-bold text-slate-900 mt-1 tabular-nums">{formatCurrencyCAD(netTotal)}</p>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Total Net — {year}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-ink mt-1 tabular-nums">{formatCurrencyCAD(netTotal)}</p>
+                    <p className="text-xs text-ink-mute mt-1">
                         Paies{n(meta.previous_year_balance) !== 0 ? ` + Solde ${year - 1}` : ''}{n(meta.annual_bonus) !== 0 ? ' + Bonus' : ''}
                     </p>
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-right">
-                    <p className="text-xs text-slate-400">Total des paies</p>
-                    <p className="text-sm font-bold text-slate-700 tabular-nums">{formatCurrencyCAD(grandTotal)}</p>
+                    <p className="text-xs text-ink-mute">Total des paies</p>
+                    <p className="text-sm font-bold text-ink-secondary tabular-nums">{formatCurrencyCAD(grandTotal)}</p>
                     {n(meta.previous_year_balance) !== 0 && (<>
-                        <p className="text-xs text-slate-400">Solde {year - 1}</p>
-                        <p className="text-sm font-bold text-blue-600 tabular-nums">{formatCurrencyCAD(n(meta.previous_year_balance))}</p>
+                        <p className="text-xs text-ink-mute">Solde {year - 1}</p>
+                        <p className="text-sm font-bold text-data-2-ink tabular-nums">{formatCurrencyCAD(n(meta.previous_year_balance))}</p>
                     </>)}
                     {n(meta.annual_bonus) !== 0 && (<>
-                        <p className="text-xs text-slate-400">Bonus annuel</p>
-                        <p className="text-sm font-bold text-brand-main tabular-nums">{formatCurrencyCAD(n(meta.annual_bonus))}</p>
+                        <p className="text-xs text-ink-mute">Bonus annuel</p>
+                        <p className="text-sm font-bold text-primary-press tabular-nums">{formatCurrencyCAD(n(meta.annual_bonus))}</p>
                     </>)}
                 </div>
             </div>
@@ -560,7 +560,7 @@ function Th({ children, align, color, className }: {
 }) {
     return (
         <th className={cn(
-            "px-3 py-3 text-[10px] font-bold uppercase tracking-widest border-r border-slate-200 last:border-r-0",
+            "px-3 py-3 text-2xs font-semibold uppercase tracking-eyebrow border-r border-hairline-strong last:border-r-0",
             align === 'right' ? 'text-right' : 'text-left',
             color, className
         )}>
@@ -604,7 +604,7 @@ function DateDDMMInput({ isoValue, onChange }: { isoValue: string; onChange: (is
             onFocus={() => { setFocused(true); setDraft(isoToDDMMYYYY(isoValue)); }}
             onChange={e => setDraft(e.target.value)}
             onBlur={handleBlur}
-            className="w-full bg-transparent text-slate-700 font-medium focus:outline-none text-sm placeholder:text-slate-300 tabular-nums"
+            className="w-full bg-transparent text-ink-secondary font-medium focus:outline-none text-sm placeholder:text-ink-faint tabular-nums"
         />
     );
 }
@@ -626,7 +626,7 @@ function NumInput({ value, onChange, color }: { value: string; onChange: (v: str
     };
 
     return (
-        <td className="px-3 py-2 border-r border-slate-200">
+        <td className="px-3 py-2 border-r border-hairline-strong">
             <input
                 type="text"
                 value={focused ? draft : value}
@@ -639,7 +639,7 @@ function NumInput({ value, onChange, color }: { value: string; onChange: (v: str
                 onBlur={handleBlur}
                 placeholder="—"
                 className={cn(
-                    "w-full bg-transparent text-right font-semibold placeholder:text-slate-200 focus:outline-none tabular-nums text-sm min-w-[90px]",
+                    "w-full bg-transparent text-right font-semibold placeholder:text-ink-faint focus:outline-none tabular-nums text-sm min-w-[90px]",
                     color
                 )}
             />
@@ -649,16 +649,16 @@ function NumInput({ value, onChange, color }: { value: string; onChange: (v: str
 
 function NumDisplay({ value, color }: { value: number | null; color: string }) {
     return (
-        <td className={cn("px-3 py-2 text-right font-semibold tabular-nums text-sm border-r border-slate-200", color)}>
-            {value ? formatCurrencyCAD(value) : <span className="text-slate-200">—</span>}
+        <td className={cn("px-3 py-2 text-right font-semibold tabular-nums text-sm border-r border-hairline-strong", color)}>
+            {value ? formatCurrencyCAD(value) : <span className="text-ink-faint">—</span>}
         </td>
     );
 }
 
 function TotalCell({ value, color }: { value: number; color: string }) {
     return (
-        <td className={cn("px-3 py-3 text-right font-bold tabular-nums border-r border-slate-200", color)}>
-            {value > 0 ? formatCurrencyCAD(value) : <span className="text-slate-300">—</span>}
+        <td className={cn("px-3 py-3 text-right font-bold tabular-nums border-r border-hairline-strong", color)}>
+            {value > 0 ? formatCurrencyCAD(value) : <span className="text-ink-faint">—</span>}
         </td>
     );
 }
@@ -672,11 +672,11 @@ function MetaCard({ label, value, onChange, bg, text, readOnly }: {
     useEffect(() => { if (!editing) setDraft(value === 0 ? '' : String(value)); }, [value, editing]);
 
     return (
-        <div className={cn("p-3 md:p-4 rounded-2xl border", bg)}>
-            <p className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight mb-1.5 md:mb-2">{label}</p>
+        <div className={cn("p-3 md:p-4 rounded-xl border", bg)}>
+            <p className="text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight mb-1.5 md:mb-2">{label}</p>
             {readOnly ? (
                 <p className={cn("text-base md:text-xl font-bold tabular-nums", text)}>
-                    {value ? formatCurrencyCAD(value) : <span className="text-slate-300">—</span>}
+                    {value ? formatCurrencyCAD(value) : <span className="text-ink-faint">—</span>}
                 </p>
             ) : (
                 <input
@@ -686,7 +686,7 @@ function MetaCard({ label, value, onChange, bg, text, readOnly }: {
                     onChange={e => setDraft(e.target.value)}
                     onBlur={() => { setEditing(false); onChange?.(draft); }}
                     placeholder="0,00$"
-                    className={cn("text-base md:text-xl font-bold w-full bg-transparent focus:outline-none placeholder:text-slate-300 tabular-nums", text)}
+                    className={cn("text-base md:text-xl font-bold w-full bg-transparent focus:outline-none placeholder:text-ink-faint tabular-nums", text)}
                 />
             )}
         </div>

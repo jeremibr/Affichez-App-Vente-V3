@@ -41,15 +41,7 @@ export function ExportButton<T>({ rows, columns, filename, label = 'Exporter CSV
             onClick={handleClick}
             disabled={disabled || busy}
             title="Télécharger ces données en CSV (ouvre dans Excel)"
-            className={cn(
-                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold',
-                'border border-slate-200 text-slate-500 bg-white',
-                'hover:border-brand-main hover:text-brand-main hover:bg-amber-50/50',
-                'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-slate-200',
-                'disabled:hover:text-slate-500 disabled:hover:bg-white',
-                'transition-colors',
-                className,
-            )}
+            className={cn('btn btn-xs btn-quiet', className)}
         >
             {busy
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

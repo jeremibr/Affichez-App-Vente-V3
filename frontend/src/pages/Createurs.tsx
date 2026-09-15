@@ -136,8 +136,8 @@ export default function Createurs() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
             <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Créé par</h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-0.5">
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Créé par</h1>
+                <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                     Qui a <em>saisi</em> le devis ou la facture, peu importe à quel représentant la vente est attribuée
                 </p>
             </div>
@@ -151,9 +151,9 @@ export default function Createurs() {
                 dashboards by design. */}
 
             {backfillRunning && (
-                <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-100">
-                    <Loader2 className="w-4 h-4 text-brand-main shrink-0 mt-0.5 animate-spin" />
-                    <p className="text-xs text-slate-500 leading-relaxed">
+                <div className="flex items-start gap-3 px-4 py-3 rounded-md bg-sand border border-hairline">
+                    <Loader2 className="w-4 h-4 text-primary-press shrink-0 mt-0.5 animate-spin" />
+                    <p className="text-xs text-ink-mute leading-relaxed">
                         Les colonnes <span className="font-semibold">Devis</span> se remplissent encore&nbsp;:
                         {' '}{backfillPct}&nbsp;% traités ({(status?.quotes_linked ?? 0).toLocaleString('fr-CA')} sur{' '}
                         {(status?.quotes_total ?? 0).toLocaleString('fr-CA')}). Zoho ne donne le créateur d&rsquo;un
@@ -184,9 +184,9 @@ export default function Createurs() {
                 <ClearFiltersButton activeCount={activeFilterCount} onClear={clearFilters} />
             </FilterBar>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-slate-100">
-                    <p className="text-xs font-medium text-slate-400" translate="no">
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-hairline">
+                    <p className="text-xs font-medium text-ink-mute" translate="no">
                         {rows.length} personne{rows.length > 1 ? 's' : ''} &middot;{' '}
                         {totals.quotes.toLocaleString('fr-CA')} devis &middot;{' '}
                         {totals.invoices.toLocaleString('fr-CA')} factures
@@ -196,10 +196,10 @@ export default function Createurs() {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="w-6 h-6 animate-spin text-brand-main" />
+                        <Loader2 className="w-6 h-6 animate-spin text-primary-press" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <p className="py-20 text-center text-sm text-slate-400">Aucun document sur cette période.</p>
+                    <p className="py-20 text-center text-sm text-ink-mute">Aucun document sur cette période.</p>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full" translate="no">
@@ -228,7 +228,7 @@ export default function Createurs() {
                                         sortConfig={sortConfig} onSort={handleSort} />
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {sortedData.map(r => (
                                     // The whole row opens the person, not just the
                                     // name: in a seven-column table the name is a
@@ -246,53 +246,53 @@ export default function Createurs() {
                                         tabIndex={0}
                                         role="button"
                                         aria-label={`Voir les documents de ${r.creator}`}
-                                        className="cursor-pointer transition-colors hover:bg-slate-50/70
-                                                   focus:bg-slate-50 focus:outline-none
-                                                   focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-main/40"
+                                        className="cursor-pointer transition-colors hover:bg-sand/70
+                                                   focus:bg-sand focus:outline-none
+                                                   focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
                                     >
                                         <td className="td">
-                                            <span className="font-semibold text-brand-dark">{r.creator}</span>
+                                            <span className="font-semibold text-ink">{r.creator}</span>
                                         </td>
-                                        <td className="td text-right tabular-nums font-semibold text-slate-700">
+                                        <td className="td text-right tabular-nums font-semibold text-ink-secondary">
                                             {r.quotes_created.toLocaleString('fr-CA')}
                                         </td>
-                                        <td className="td text-right tabular-nums text-slate-600">
+                                        <td className="td text-right tabular-nums text-ink-secondary">
                                             {r.quotes_won.toLocaleString('fr-CA')}
                                         </td>
                                         <td className="td text-right tabular-nums">
                                             <span className={cn('font-bold text-xs',
-                                                r.quotes_created === 0 ? 'text-slate-300'
-                                                    : r.win_rate >= 80 ? 'text-emerald-500' : 'text-slate-400')}>
+                                                r.quotes_created === 0 ? 'text-ink-faint'
+                                                    : r.win_rate >= 80 ? 'text-tone-good' : 'text-ink-mute')}>
                                                 {r.quotes_created === 0 ? '—' : `${Number(r.win_rate).toFixed(0)} %`}
                                             </span>
                                         </td>
-                                        <td className="td text-right tabular-nums text-slate-600 text-xs">
+                                        <td className="td text-right tabular-nums text-ink-secondary text-xs">
                                             {formatCurrencyCAD(r.quotes_won_amount)}
                                         </td>
-                                        <td className="td text-right tabular-nums font-semibold text-slate-700">
+                                        <td className="td text-right tabular-nums font-semibold text-ink-secondary">
                                             {r.invoices_created.toLocaleString('fr-CA')}
                                         </td>
-                                        <td className="td text-right tabular-nums font-bold text-brand-dark text-xs">
+                                        <td className="td text-right tabular-nums font-bold text-ink text-xs">
                                             {formatCurrencyCAD(r.invoices_amount)}
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                             <tfoot>
-                                <tr className="bg-slate-50/70 border-t-2 border-slate-100">
-                                    <td className="td font-bold text-slate-700">Total</td>
-                                    <td className="td text-right tabular-nums font-bold text-slate-700">
+                                <tr className="bg-sand/70 border-t-2 border-hairline">
+                                    <td className="td font-bold text-ink-secondary">Total</td>
+                                    <td className="td text-right tabular-nums font-bold text-ink-secondary">
                                         {totals.quotes.toLocaleString('fr-CA')}
                                     </td>
-                                    <td className="td text-right tabular-nums font-bold text-slate-700">
+                                    <td className="td text-right tabular-nums font-bold text-ink-secondary">
                                         {totals.won.toLocaleString('fr-CA')}
                                     </td>
                                     <td className="td" />
                                     <td className="td" />
-                                    <td className="td text-right tabular-nums font-bold text-slate-700">
+                                    <td className="td text-right tabular-nums font-bold text-ink-secondary">
                                         {totals.invoices.toLocaleString('fr-CA')}
                                     </td>
-                                    <td className="td text-right tabular-nums font-bold text-brand-dark text-xs">
+                                    <td className="td text-right tabular-nums font-bold text-ink text-xs">
                                         {formatCurrencyCAD(totals.invAmount)}
                                     </td>
                                 </tr>
@@ -336,7 +336,7 @@ function Th({ col, label, hint, align = 'right', sortConfig, onSort }: {
                     type="button"
                     onClick={() => onSort(col)}
                     aria-label={`Trier par ${label}`}
-                    className="group inline-flex items-center gap-1 hover:text-slate-600 transition-colors"
+                    className="group inline-flex items-center gap-1 hover:text-ink-secondary transition-colors"
                 >
                     {label}
                     <SortIcon order={sortConfig.key === col ? sortConfig.order : null} />
@@ -416,24 +416,24 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs"
             onClick={onClose} role="presentation"
         >
             <div
                 role="dialog" aria-modal="true" aria-label={`Documents créés par ${creator.creator}`}
                 onClick={e => e.stopPropagation()}
-                className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+                className="flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
             >
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-brand-dark flex items-center gap-2">
-                            <FileSignature className="w-4 h-4 text-slate-300" />
+                        <h2 className="text-lg font-semibold text-ink flex items-center gap-2">
+                            <FileSignature className="w-4 h-4 text-ink-faint" />
                             {creator.creator}
                         </h2>
-                        <p className="mt-0.5 text-sm text-slate-400">
+                        <p className="mt-0.5 text-sm text-ink-mute">
                             {rows.length.toLocaleString('fr-CA')} document{rows.length > 1 ? 's' : ''} saisi{rows.length > 1 ? 's' : ''}
                             {soldByOthers > 0 && (
-                                <span className="text-slate-300">
+                                <span className="text-ink-faint">
                                     {' '}&middot; dont {soldByOthers} vendu{soldByOthers > 1 ? 's' : ''} par quelqu&rsquo;un d&rsquo;autre
                                 </span>
                             )}
@@ -452,7 +452,7 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
                         />
                         <button
                             onClick={onClose} aria-label="Fermer"
-                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-stone hover:text-ink-secondary"
                         >
                             <X className="h-5 w-5" />
                         </button>
@@ -461,10 +461,10 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary-press" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <div className="px-6 py-16 text-center text-sm text-slate-400">Aucun document.</div>
+                    <div className="px-6 py-16 text-center text-sm text-ink-mute">Aucun document.</div>
                 ) : (
                     <div className="overflow-auto">
                         <table className="w-full">
@@ -479,31 +479,31 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
                                     <th className="th text-right">Montant</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {rows.map((r, i) => {
                                     const other = r.sold_by && r.sold_by !== creator.creator;
                                     return (
                                         <tr key={`${r.module}-${r.doc_number}-${i}`}
-                                            className={cn('hover:bg-slate-50/70 transition-colors', r.is_avoir && 'bg-rose-50/30')}>
+                                            className={cn('hover:bg-sand/70 transition-colors', r.is_avoir && 'bg-tone-critical-soft/30')}>
                                             <td className="td">
                                                 <span className={cn('badge',
-                                                    r.module === 'devis' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600')}>
+                                                    r.module === 'devis' ? 'bg-data-2 text-data-2-ink' : 'bg-data-3 text-data-3-ink')}>
                                                     {r.module === 'devis' ? 'Devis' : 'Facture'}
                                                 </span>
                                             </td>
-                                            <td className="td font-medium text-brand-dark">{r.doc_number ?? '—'}</td>
-                                            <td className="td whitespace-nowrap text-slate-500">
+                                            <td className="td font-medium text-ink">{r.doc_number ?? '—'}</td>
+                                            <td className="td whitespace-nowrap text-ink-mute">
                                                 {r.doc_date ? formatShortDate(new Date(r.doc_date)) : '—'}
                                             </td>
-                                            <td className="td text-slate-500 max-w-[220px] truncate" title={r.client_name ?? ''}>
+                                            <td className="td text-ink-mute max-w-[220px] truncate" title={r.client_name ?? ''}>
                                                 {r.client_name ?? '—'}
                                             </td>
-                                            <td className="td text-slate-500 text-xs">{r.department}</td>
-                                            <td className={cn('td text-xs', other ? 'text-brand-main font-semibold' : 'text-slate-400')}>
+                                            <td className="td text-ink-mute text-xs">{r.department}</td>
+                                            <td className={cn('td text-xs', other ? 'text-ink font-semibold' : 'text-ink-mute')}>
                                                 {r.sold_by ?? '—'}
                                             </td>
                                             <td className={cn('td text-right font-semibold tabular-nums',
-                                                r.is_avoir ? 'text-rose-600' : 'text-brand-dark')}>
+                                                r.is_avoir ? 'text-tone-critical-ink' : 'text-ink')}>
                                                 {formatCurrencyCAD(r.amount)}
                                             </td>
                                         </tr>
@@ -514,8 +514,8 @@ function CreatorDetailModal({ creator, year, month, office, onClose }: {
                     </div>
                 )}
 
-                <div className="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-3">
-                    <span className="text-xs text-slate-400">
+                <div className="flex items-center justify-between gap-3 border-t border-hairline bg-sand/60 px-6 py-3">
+                    <span className="text-xs text-ink-mute">
                         Les noms en orange sont vendus par une autre personne que le créateur.
                     </span>
                     <ExportButton

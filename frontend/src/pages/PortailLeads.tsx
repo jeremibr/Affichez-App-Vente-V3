@@ -109,7 +109,7 @@ export default function PortailLeads({ propRepName }: Props) {
 
     if (!repName) {
         return (
-            <div className="p-8 text-center text-slate-400 text-sm">
+            <div className="p-8 text-center text-ink-mute text-sm">
                 Aucun représentant sélectionné.
             </div>
         );
@@ -119,11 +119,11 @@ export default function PortailLeads({ propRepName }: Props) {
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Mes Leads</h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">{repName}</p>
+                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Mes Leads</h1>
+                    <p className="text-xs md:text-sm text-ink-mute mt-0.5">{repName}</p>
                 </div>
                 {/* Tab switcher */}
-                <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                <div className="flex items-center gap-1 bg-stone rounded-md p-1">
                     <TabBtn active={tab === 'apercu'} onClick={() => setTab('apercu')}>Aperçu</TabBtn>
                     <TabBtn active={tab === 'detail'} onClick={() => setTab('detail')}>Détail</TabBtn>
                 </div>
@@ -148,8 +148,8 @@ export default function PortailLeads({ propRepName }: Props) {
 
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-20 gap-3">
-                            <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                            <p className="text-sm text-slate-400 font-medium">Chargement de vos leads...</p>
+                            <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                            <p className="text-sm text-ink-mute font-medium">Chargement de vos leads...</p>
                         </div>
                     ) : (
                         <>
@@ -187,9 +187,9 @@ export default function PortailLeads({ propRepName }: Props) {
                             </div>
 
                             {/* Monthly summary table */}
-                            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                                <div className="px-5 py-4 border-b border-slate-100">
-                                    <h3 className="text-sm font-bold text-slate-800">Résumé mensuel</h3>
+                            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                                <div className="px-5 py-4 border-b border-hairline">
+                                    <h3 className="text-sm font-semibold text-ink">Résumé mensuel</h3>
                                     <ExportButton
                                         rows={monthly}
                                         columns={[
@@ -204,12 +204,12 @@ export default function PortailLeads({ propRepName }: Props) {
                                     />
                                 </div>
                                 {monthly.length === 0 ? (
-                                    <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucune donnée</p>
+                                    <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucune donnée</p>
                                 ) : (
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="border-b border-slate-50 bg-slate-50/60">
+                                                <tr className="border-b border-hairline bg-sand/60">
                                                     <th className="th text-left">Mois</th>
                                                     <th className="th text-right">Leads</th>
                                                     <th className="th text-right">Facturés</th>
@@ -217,37 +217,37 @@ export default function PortailLeads({ propRepName }: Props) {
                                                     <th className="th text-right">Revenus</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-50">
+                                            <tbody className="divide-y divide-hairline">
                                                 {monthly.map(row => {
                                                     const rate = row.nb_leads > 0 ? ((row.nb_invoiced / row.nb_leads) * 100).toFixed(0) : '0';
                                                     return (
-                                                        <tr key={row.month} className="hover:bg-slate-50/60 transition-colors">
-                                                            <td className="td font-semibold text-slate-700">{monthLabel(row.month)}</td>
-                                                            <td className="td text-right tabular-nums font-bold text-slate-700">{row.nb_leads}</td>
-                                                            <td className="td text-right tabular-nums font-bold text-slate-700">{row.nb_invoiced}</td>
+                                                        <tr key={row.month} className="hover:bg-sand/60 transition-colors">
+                                                            <td className="td font-semibold text-ink-secondary">{monthLabel(row.month)}</td>
+                                                            <td className="td text-right tabular-nums font-bold text-ink-secondary">{row.nb_leads}</td>
+                                                            <td className="td text-right tabular-nums font-bold text-ink-secondary">{row.nb_invoiced}</td>
                                                             <td className="td text-right tabular-nums">
-                                                                <span className={cn("text-xs font-bold", Number(rate) >= 20 ? "text-emerald-500" : "text-slate-400")}>
+                                                                <span className={cn("text-xs font-bold", Number(rate) >= 20 ? "text-tone-good" : "text-ink-mute")}>
                                                                     {rate}%
                                                                 </span>
                                                             </td>
-                                                            <td className="td text-right tabular-nums font-bold text-slate-900 text-xs">
-                                                                {row.total_amount > 0 ? formatCurrencyCAD(row.total_amount) : <span className="text-slate-300">—</span>}
+                                                            <td className="td text-right tabular-nums font-bold text-ink text-xs">
+                                                                {row.total_amount > 0 ? formatCurrencyCAD(row.total_amount) : <span className="text-ink-faint">—</span>}
                                                             </td>
                                                         </tr>
                                                     );
                                                 })}
                                             </tbody>
                                             <tfoot>
-                                                <tr className="border-t border-slate-200 bg-slate-50/60">
-                                                    <td className="td font-bold text-slate-800">Total</td>
-                                                    <td className="td text-right tabular-nums font-bold text-slate-800">{kpis?.leads_received ?? 0}</td>
-                                                    <td className="td text-right tabular-nums font-bold text-slate-800">{kpis?.leads_invoiced ?? 0}</td>
+                                                <tr className="border-t border-hairline-strong bg-sand/60">
+                                                    <td className="td font-bold text-ink">Total</td>
+                                                    <td className="td text-right tabular-nums font-bold text-ink">{kpis?.leads_received ?? 0}</td>
+                                                    <td className="td text-right tabular-nums font-bold text-ink">{kpis?.leads_invoiced ?? 0}</td>
                                                     <td className="td text-right tabular-nums">
-                                                        <span className={cn("text-xs font-bold", (kpis?.invoiced_rate ?? 0) >= 20 ? "text-emerald-500" : "text-slate-400")}>
+                                                        <span className={cn("text-xs font-bold", (kpis?.invoiced_rate ?? 0) >= 20 ? "text-tone-good" : "text-ink-mute")}>
                                                             {(kpis?.invoiced_rate ?? 0).toFixed(1)}%
                                                         </span>
                                                     </td>
-                                                    <td className="td text-right tabular-nums font-bold text-slate-900 text-xs">{formatCurrencyCAD(kpis?.revenue_attributed ?? 0)}</td>
+                                                    <td className="td text-right tabular-nums font-bold text-ink text-xs">{formatCurrencyCAD(kpis?.revenue_attributed ?? 0)}</td>
                                                 </tr>
                                             </tfoot>
                                         </table>
@@ -271,8 +271,8 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
         <button
             onClick={onClick}
             className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                active ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                "px-3 py-1.5 rounded-md text-xs font-bold transition-all",
+                active ? "bg-white text-ink shadow-xs" : "text-ink-mute hover:text-ink-secondary"
             )}
         >
             {children}
@@ -282,22 +282,22 @@ function TabBtn({ active, onClick, children }: { active: boolean; onClick: () =>
 
 function KPICard({ title, value, subText, icon: Icon, highlight, hint }: { title: string; value: string; subText: string; icon: React.ElementType; highlight?: boolean; hint?: string }) {
     return (
-        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+        <div className="bg-white p-3 md:p-5 rounded-xl shadow-card flex flex-col justify-between hover:shadow-elevated transition-all group">
             <div className="flex items-start justify-between mb-2 md:mb-4">
-                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                <div className="p-2 md:p-2.5 bg-sand rounded-md text-ink-mute group-hover:text-primary-press group-hover:bg-primary-wash transition-colors">
                     <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 <div className="flex items-center gap-1.5">
                     {highlight && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Bon</span>
+                        <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-tone-good-soft text-tone-good-ink">Bon</span>
                     )}
                     {hint && <InfoHint text={hint} />}
                 </div>
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className="mt-1 text-base md:text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className="mt-1 text-base md:text-2xl font-bold text-ink tabular-nums">{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );

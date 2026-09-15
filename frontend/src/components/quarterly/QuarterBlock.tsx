@@ -41,9 +41,9 @@ export function QuarterBlock({
     const totalDeals = data.reduce((sum, row) => sum + Number(row.deal_count || 0), 0);
 
     const getStyle = (val: number) => {
-        if (val > 0) return 'text-emerald-600 bg-emerald-50';
-        if (val < 0) return 'text-red-500 bg-red-50';
-        return 'text-slate-400 bg-slate-50';
+        if (val > 0) return 'text-tone-good-ink bg-tone-good-soft';
+        if (val < 0) return 'text-tone-critical bg-tone-critical-soft';
+        return 'text-ink-mute bg-sand';
     };
 
     const getIcon = (val: number) => {
@@ -53,11 +53,11 @@ export function QuarterBlock({
     };
 
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden flex flex-col">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Trimestre {quarter}</h2>
+        <div className="bg-white rounded-xl shadow-card overflow-hidden flex flex-col">
+            <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-ink-secondary uppercase tracking-label">Trimestre {quarter}</h2>
                 <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-brand-main"
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-wash text-primary-press"
                           translate="no">
                         Q{quarter} · {currentYear}
                     </span>
@@ -72,12 +72,12 @@ export function QuarterBlock({
             <div className="flex-1 overflow-x-auto">
                 <table className="w-full text-sm">
                     <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/50 z-10">
+                        <tr className="border-b border-hairline bg-sand/50">
+                            <th className="px-3 md:px-5 py-2.5 md:py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow sticky left-0 bg-sand/50 z-10">
                                 Représentant
                             </th>
                             <th
-                                className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-4 py-3 text-right text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort('deal_count')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -85,7 +85,7 @@ export function QuarterBlock({
                                 </div>
                             </th>
                             <th
-                                className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-4 py-3 text-right text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort('current_avg')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -93,15 +93,15 @@ export function QuarterBlock({
                                 </div>
                             </th>
                             <th
-                                className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-4 py-3 text-right text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort('previous_avg')}
                             >
-                                <div className="flex items-center justify-end gap-2 text-slate-300">
+                                <div className="flex items-center justify-end gap-2 text-ink-faint">
                                     {previousYear} <SortIcon order={sortConfig.key === 'previous_avg' ? sortConfig.order : null} />
                                 </div>
                             </th>
                             <th
-                                className="px-4 py-3 text-right text-xs font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap cursor-pointer hover:bg-slate-100 transition-colors group"
+                                className="px-4 py-3 text-right text-xs font-semibold text-ink-mute uppercase tracking-eyebrow whitespace-nowrap cursor-pointer hover:bg-stone transition-colors group"
                                 onClick={() => handleSort('resultat')}
                             >
                                 <div className="flex items-center justify-end gap-2">
@@ -110,10 +110,10 @@ export function QuarterBlock({
                             </th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-50">
+                    <tbody className="divide-y divide-hairline">
                         {sortedData.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="px-5 py-8 text-center text-sm text-slate-400 italic">
+                                <td colSpan={4} className="px-5 py-8 text-center text-sm text-ink-mute italic">
                                     Aucune donnée pour ce trimestre
                                 </td>
                             </tr>
@@ -121,16 +121,16 @@ export function QuarterBlock({
                             sortedData.map((row, idx) => {
                                 const res = Number(row.resultat);
                                 return (
-                                    <tr key={idx} className="hover:bg-slate-50/60 transition-colors group">
-                                        <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-slate-700 whitespace-nowrap sticky left-0 bg-white z-10">{row.rep_name}</td>
+                                    <tr key={idx} className="hover:bg-sand/60 transition-colors group">
+                                        <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-ink-secondary whitespace-nowrap sticky left-0 bg-white z-10">{row.rep_name}</td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                                            <span className="text-sm font-bold text-slate-700 tabular-nums">{row.deal_count}</span>
-                                            <span className="text-[10px] text-slate-400 ml-1">{Number(row.deal_count) > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>
+                                            <span className="text-sm font-bold text-ink-secondary tabular-nums">{row.deal_count}</span>
+                                            <span className="text-2xs text-ink-mute ml-1">{Number(row.deal_count) > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>
                                         </td>
-                                        <td className="px-4 py-3 text-right font-semibold text-slate-800 tabular-nums group-hover:text-brand-main transition-colors whitespace-nowrap">
+                                        <td className="px-4 py-3 text-right font-semibold text-ink tabular-nums group-hover:text-primary-press transition-colors whitespace-nowrap">
                                             {formatCurrencyCAD(row.current_avg)}
                                         </td>
-                                        <td className="px-4 py-3 text-right text-slate-300 tabular-nums whitespace-nowrap">
+                                        <td className="px-4 py-3 text-right text-ink-mute tabular-nums whitespace-nowrap">
                                             {formatCurrencyCAD(row.previous_avg)}
                                         </td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -144,18 +144,18 @@ export function QuarterBlock({
                         )}
                     </tbody>
                     <tfoot>
-                        <tr className="bg-brand-main text-white font-black">
-                            <td className="px-3 md:px-5 py-3 md:py-3.5 text-xs uppercase tracking-wider sticky left-0 bg-brand-main z-10">Total équipe</td>
+                        <tr className="bg-ink text-white font-bold">
+                            <td className="px-3 md:px-5 py-3 md:py-3.5 text-xs uppercase tracking-label sticky left-0 bg-ink z-10">Total équipe</td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                <span className="text-sm font-black tabular-nums">{totalDeals}</span>
-                                <span className="text-[10px] text-white/60 ml-1">{totalDeals > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>
+                                <span className="text-sm font-bold tabular-nums">{totalDeals}</span>
+                                <span className="text-2xs text-white/60 ml-1">{totalDeals > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>
                             </td>
-                            <td className="px-4 py-3.5 text-right font-black tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalCurrent)}</td>
+                            <td className="px-4 py-3.5 text-right font-bold tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalCurrent)}</td>
                             <td className="px-4 py-3.5 text-right text-white/50 tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalPrevious)}</td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                 <span className={cn(
-                                    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-black tabular-nums border border-white/20",
-                                    totalResultat >= 0 ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+                                    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold tabular-nums border border-white/20",
+                                    totalResultat >= 0 ? "bg-tone-good text-white" : "bg-tone-critical text-white"
                                 )}>
                                     {getIcon(totalResultat)}{formatCurrencyCAD(Math.abs(totalResultat))}
                                 </span>

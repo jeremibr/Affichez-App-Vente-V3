@@ -297,19 +297,62 @@ All routes are children of `Layout`, which provides the sidebar navigation.
 
 ### Styling
 
-- **Tailwind CSS** with a custom brand palette in `tailwind.config.js`:
-  - `brand-main` = `#e38800` (orange) — primary accent, CTA buttons, active nav items
-  - `brand-dark` = `#0f172a` — deep dark backgrounds
-  - Font: `Inter` (not Poppins as in older docs — the `index.css` imports Inter)
-  - Shadows: `shadow-card`, `shadow-card-hover`
-- Global utility classes defined in `src/index.css` `@layer components`: `.card`, `.badge`, `.th`, `.td`
-- Use `cn()` from `src/lib/utils.ts` for conditional class merging (wraps `clsx` + `tailwind-merge`)
+**Tailwind CSS 4**, CSS-first. There is no `tailwind.config.js` and no
+`postcss.config.js` — the theme is CSS, compiled by `@tailwindcss/vite`.
+`src/index.css` loads, in this order:
 
-### Branding Rules (from `docs/BRANDING.md` and `tailwind.config.js`)
-- **Never** use default Tailwind color names (e.g., `text-blue-500`) for primary UI — use brand tokens
-- `brand-main` (#e38800) for CTAs, active states, highlights
-- All UI must feel premium: generous whitespace, smooth transitions, micro-interactions
-- Long logo (`/logo-long.png`) in sidebar desktop; square logo (`/logo-square.jpg`) for mobile/favicons
+1. `tailwindcss`
+2. `branding/tokens/tokens.css` — every brand value as `:root` custom properties
+3. `branding/tokens/tailwind-v4.css` — those values as utilities, plus the brand base layer
+4. the app's own additions, then `@layer components`
+
+Fonts come from `index.html` (Inter, plus the 400 italic cut of Inria Serif).
+
+App-level helpers in `src/index.css` `@layer components`: `.card`, `.badge`,
+`.th`, `.td`, `.form-input`, `.link`, and `.btn` + `.btn-{xs,sm,md,lg}` +
+`.btn-{primary,secondary,dark,ghost,danger,quiet}`. The brand kit adds
+`.eyebrow`, `.label-caps`, `.accent-serif` and `.tnum`. Use `cn()` from
+`src/lib/utils.ts` for conditional class merging (wraps `clsx` + `tailwind-merge`).
+
+## Brand (2026 — affichez.ca)
+
+Read `frontend/branding/brand-guide.md` before building or restyling any UI.
+The essentials:
+
+- **Orange `#F5570E`** = action (primary button, links, active accents, logo).
+  **Black** = headings, primary text, and emphasis — including a table's TOTAL
+  row, which is a full-width black band. Type on an orange fill is **white**.
+  The retired 2025 brand — `#e38800` as a brand orange, deep green `#154633`,
+  Poppins, the uppercase swoosh wordmark — must not appear anywhere. `#E38800`
+  survives only as `--tone-warn`, the amber status colour.
+- **Inter** everywhere. Headings and every uppercase label are **600**, never
+  700; 700 is kept for figures — money, counts, totals — where it is data
+  hierarchy rather than the heading voice. One accent word per display heading
+  in **Inria Serif italic**: write `*word*` in the copy and render with
+  `<Accented>` (`src/components/Accented.tsx`). Used on the login screen only.
+- Buttons, inputs, selects and tabs are **10px radius** (`rounded-md`), never
+  pills; cards are `rounded-xl` (16px); menus and popovers `rounded-lg` (12px).
+  Pills are for chips, tags, avatars, badges and progress tracks only.
+- Page ground is **sand**; app chrome (sidebar, headers) and cards are white.
+  `shadow-card` already carries a 1px hairline ring — do not add a `border`
+  beside it.
+- **One orange thing per screen.** Orange never marks status, severity, or a
+  value in a data column — pick a `--tone-*` for status and ink for emphasis.
+- **No hex values in component code.** Everything comes from
+  `branding/tokens/tokens.css`. No gradients, glows, or decorative blobs — the
+  brand is flat colour and type.
+- Logo only through `src/components/Logo.tsx`, which serves the real files from
+  `public/brand/`. Heights: 22 dense toolbar, 24 sidebar, 28–30 page chrome.
+
+### The data palette is not brand colour
+
+`Tag`/`TagCell` colours ~45 picklist values (sources, services, departments) by
+hashing the label, which needs more distinguishable fills than the brand owns.
+Those ten tones are declared separately in `src/index.css` as
+`--color-data-1..10` and are **deliberately not** brand or status colours. Use
+them for anything categorical: module identity, department badges, payroll
+columns. Never use a `--tone-*` for a category or a `--color-data-*` for a
+status.
 
 ### Component Patterns
 

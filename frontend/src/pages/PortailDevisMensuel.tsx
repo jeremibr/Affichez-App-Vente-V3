@@ -21,11 +21,11 @@ export default function PortailDevisMensuel({ propRepName }: Props) {
     return (
         <div className="p-6 md:p-8 max-w-screen-2xl mx-auto space-y-6">
             <div>
-                <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                    <ClipboardList className="w-5 h-5 text-blue-400" />
+                <h2 className="text-xl font-semibold text-ink tracking-tight flex items-center gap-2">
+                    <ClipboardList className="w-5 h-5 text-data-2-ink" />
                     Mes Devis — Détail Mensuel
                 </h2>
-                <p className="text-sm text-slate-400 mt-0.5">
+                <p className="text-sm text-ink-mute mt-0.5">
                     Ventes mois par mois · {repName || 'Représentant'}
                 </p>
             </div>

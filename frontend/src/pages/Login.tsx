@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { Logo } from '../components/Logo';
+import { Accented } from '../components/Accented';
 
 const ZOHO_CLIENT_ID = import.meta.env.VITE_ZOHO_CLIENT_ID as string;
 const SUPABASE_URL   = import.meta.env.VITE_SUPABASE_URL as string;
@@ -39,36 +41,43 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        // Sand ground, white card. Not the tempting black/white split — the
+        // brand runs black edge to edge or not at all.
+        <div className="min-h-screen bg-sand flex items-center justify-center p-4">
             <div className="w-full max-w-sm">
 
                 <div className="flex justify-center mb-8">
-                    <img src="/logo-long.png" alt="Affichez" className="h-9 w-auto object-contain" />
+                    <Logo height={28} />
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-lg shadow-slate-200/60 p-8">
+                <div className="bg-white rounded-xl shadow-card p-8">
                     <div className="mb-7">
-                        <h1 className="text-xl font-bold text-slate-900">Bon retour</h1>
-                        <p className="text-sm text-slate-400 mt-1">Connectez-vous avec votre compte Zoho.</p>
+                        <h1 className="text-2xl text-ink">
+                            <Accented text="Bon *retour*." />
+                        </h1>
+                        <p className="text-sm text-ink-mute mt-1">Connectez-vous avec votre compte Zoho.</p>
                     </div>
 
                     {authError && (
-                        <div className="mb-5 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+                        <div className="mb-5 text-xs font-medium text-tone-critical-ink bg-tone-critical-soft border border-tone-critical/30 rounded-md px-4 py-3">
                             {ERROR_MESSAGES[authError] ?? "Une erreur est survenue. Réessayez."}
                         </div>
                     )}
 
+                    {/* Black, not orange: the button carries Zoho's own four-colour
+                        mark, and white-on-black is the only surface that mark reads
+                        on. The orange on this screen is the wordmark. */}
                     <button
                         onClick={handleZohoLogin}
                         disabled={loading}
-                        className="w-full flex items-center justify-center gap-3 bg-black text-white py-3 rounded-xl text-sm font-semibold hover:bg-slate-800 transition-all disabled:opacity-60"
+                        className="btn btn-dark btn-lg w-full gap-3"
                     >
                         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ZohoIcon />}
-                        {loading ? 'Redirection...' : 'Se connecter avec Zoho'}
+                        {loading ? 'Redirection…' : 'Se connecter avec Zoho'}
                     </button>
                 </div>
 
-                <p className="text-center text-xs text-slate-300 mt-6">
+                <p className="text-center text-xs text-ink-faint mt-6">
                     {new Date().getFullYear()} Affichez — Usage interne seulement
                 </p>
             </div>
@@ -77,7 +86,7 @@ export default function Login() {
 }
 
 function ZohoIcon() {
-    return (
-        <img src="/zoho-logo.svg" alt="Zoho" className="h-5 w-auto" style={{ mixBlendMode: 'screen' }} />
-    );
+    // The mark's letterforms are already white in the file, so it needs no
+    // blend mode on a black fill.
+    return <img src="/zoho-logo.svg" alt="" className="h-5 w-auto" />;
 }

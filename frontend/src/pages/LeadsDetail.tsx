@@ -19,8 +19,8 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_COLORS: Record<string, string> = {
-    lead: 'bg-blue-50 text-blue-600',
-    contact: 'bg-emerald-50 text-emerald-600',
+    lead: 'bg-data-2 text-data-2-ink',
+    contact: 'bg-data-1 text-data-1-ink',
 };
 
 const INVOICE_STATUS_LABELS: Record<string, string> = {
@@ -29,13 +29,13 @@ const INVOICE_STATUS_LABELS: Record<string, string> = {
 };
 
 const INVOICE_STATUS_COLORS: Record<string, string> = {
-    paid: 'bg-emerald-50 text-emerald-600',
-    partial: 'bg-amber-50 text-amber-600',
-    sent: 'bg-slate-100 text-slate-500',
-    viewed: 'bg-slate-100 text-slate-500',
-    overdue: 'bg-rose-50 text-rose-600',
-    avoir: 'bg-rose-50 text-rose-600',
-    void: 'bg-slate-100 text-slate-400',
+    paid: 'bg-tone-good-soft text-tone-good-ink',
+    partial: 'bg-tone-warn-soft text-tone-warn-ink',
+    sent: 'bg-stone text-ink-secondary',
+    viewed: 'bg-stone text-ink-secondary',
+    overdue: 'bg-tone-critical-soft text-tone-critical-ink',
+    avoir: 'bg-tone-critical-soft text-tone-critical-ink',
+    void: 'bg-stone text-ink-secondary',
 };
 
 /** Zoho writes "-None-" into a picklist that was never set. */
@@ -338,16 +338,16 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         { value: 'sans', label: 'Sans factures' },
     ];
 
-    const pageBtn = 'min-w-[2rem] rounded-lg px-2 py-1.5 text-sm font-medium transition-colors';
+    const pageBtn = 'min-w-[2rem] rounded-md px-2 py-1.5 text-sm font-medium transition-colors';
 
     const renderPagination = (position: 'top' | 'bottom') => (
         <div
             className={cn(
                 'flex flex-wrap items-center justify-between gap-3 px-6 py-3',
-                position === 'top' ? 'border-b border-slate-100' : 'border-t border-slate-100',
+                position === 'top' ? 'border-b border-hairline' : 'border-t border-hairline',
             )}
         >
-            <span className="text-sm text-slate-500" translate="no">
+            <span className="text-sm text-ink-mute" translate="no">
                 {`${rangeStart}–${rangeEnd} / ${total.toLocaleString('fr-CA')}`}
             </span>
             <div className="flex items-center gap-1">
@@ -355,14 +355,14 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page === 1}
                     aria-label="Page précédente"
-                    className={cn(pageBtn, 'text-slate-600 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40')}
+                    className={cn(pageBtn, 'text-ink-secondary hover:bg-stone disabled:pointer-events-none disabled:opacity-40')}
                 >
                     <ChevronLeft className="h-4 w-4" />
                 </button>
 
                 {pageNumbers.map((p, i) =>
                     p === 'gap' ? (
-                        <span key={`gap-${i}`} className="px-1 text-sm text-slate-300">…</span>
+                        <span key={`gap-${i}`} className="px-1 text-sm text-ink-faint">…</span>
                     ) : (
                         <button
                             key={p}
@@ -371,8 +371,8 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                             className={cn(
                                 pageBtn,
                                 p === page
-                                    ? 'bg-brand-main text-white'
-                                    : 'text-slate-600 hover:bg-slate-100',
+                                    ? 'bg-primary text-white'
+                                    : 'text-ink-secondary hover:bg-stone',
                             )}
                         >
                             {p}
@@ -384,7 +384,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                     onClick={() => setPage(Math.min(totalPages, page + 1))}
                     disabled={page >= totalPages}
                     aria-label="Page suivante"
-                    className={cn(pageBtn, 'text-slate-600 hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40')}
+                    className={cn(pageBtn, 'text-ink-secondary hover:bg-stone disabled:pointer-events-none disabled:opacity-40')}
                 >
                     <ChevronRight className="h-4 w-4" />
                 </button>
@@ -396,15 +396,14 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         <div className="space-y-6">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-semibold text-brand-dark">Leads — Détail</h1>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <h1 className="text-2xl font-semibold text-ink">Leads — Détail</h1>
+                    <p className="mt-1 text-sm text-ink-mute">
                         Leads et contacts synchronisés depuis Zoho CRM
                     </p>
                 </div>
                 <button
                     onClick={() => { fetchData(); fetchOptions(); }}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2
-                               text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                    className="btn btn-sm btn-secondary"
                 >
                     <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                     Actualiser
@@ -447,27 +446,27 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
             </FilterBar>
 
             <div className="card">
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-hairline px-6 py-4">
                     <div className="flex items-baseline gap-3">
-                        <span className="text-lg font-semibold text-brand-dark" translate="no">
+                        <span className="text-lg font-semibold text-ink" translate="no">
                             {`${total.toLocaleString('fr-CA')} ${total === 1 ? 'enregistrement' : 'enregistrements'}`}
                         </span>
-                        <span className="text-sm text-slate-400" translate="no">
+                        <span className="text-sm text-ink-mute" translate="no">
                             {total > 0
                                 ? `${rangeStart}–${rangeEnd} affichés · ${counts.leads} leads · ${counts.contacts} contacts`
                                 : ''}
                         </span>
                     </div>
                     <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-mute" />
                         <input
                             type="search"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="Nom, entreprise, courriel, téléphone…"
-                            className="w-72 rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm
-                                       placeholder:text-slate-400 focus:border-brand-main
-                                       focus:outline-none focus:ring-1 focus:ring-brand-main"
+                            className="w-72 rounded-md border border-hairline-strong py-2 pl-9 pr-3 text-sm
+                                       placeholder:text-ink-mute focus:border-primary
+                                       focus:outline-none focus:ring-1 focus:ring-primary"
                         />
                     </div>
                 </div>
@@ -476,10 +475,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary-press" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <div className="px-6 py-20 text-center text-sm text-slate-400">
+                    <div className="px-6 py-20 text-center text-sm text-ink-mute">
                         Aucun enregistrement pour ces filtres.
                     </div>
                 ) : (
@@ -503,13 +502,13 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                             </thead>
                             <tbody>
                                 {rows.map(r => (
-                                    <tr key={r.zoho_record_id} className="transition-colors hover:bg-slate-50/70">
-                                        <td className="td font-medium text-brand-dark">{r.full_name ?? '—'}</td>
+                                    <tr key={r.zoho_record_id} className="transition-colors hover:bg-sand/70">
+                                        <td className="td font-medium text-ink">{r.full_name ?? '—'}</td>
                                         <td className="td">{r.company ?? '—'}</td>
                                         <td className="td whitespace-nowrap tabular-nums">{formatPhone(r.phone) ?? '—'}</td>
                                         <td className="td">
                                             {r.email
-                                                ? <a href={`mailto:${r.email}`} className="text-brand-main hover:underline">{r.email}</a>
+                                                ? <a href={`mailto:${r.email}`} className="text-primary-press hover:underline">{r.email}</a>
                                                 : '—'}
                                         </td>
                                         <td className="td">{r.rep_name ?? r.owner_name ?? '—'}</td>
@@ -527,15 +526,15 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                                                 {STAGE_LABELS[r.stage]}
                                             </span>
                                         </td>
-                                        <td className="td whitespace-nowrap text-slate-500">{formatDateTime(r.created_time)}</td>
-                                        <td className="td whitespace-nowrap text-slate-500">{formatDateTime(r.modified_time)}</td>
+                                        <td className="td whitespace-nowrap text-ink-mute">{formatDateTime(r.created_time)}</td>
+                                        <td className="td whitespace-nowrap text-ink-mute">{formatDateTime(r.modified_time)}</td>
                                         <td className="td">
                                             {r.zoho_crm_url && (
                                                 <a
                                                     href={r.zoho_crm_url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-slate-400 transition-colors hover:text-brand-main"
+                                                    className="text-ink-mute transition-colors hover:text-primary-press"
                                                     title="Ouvrir dans Zoho CRM"
                                                 >
                                                     <ExternalLink className="h-4 w-4" />
@@ -577,33 +576,33 @@ function InvoiceCell({ row, totals, onOpen }: {
     onOpen: () => void;
 }) {
     if (!row.account_id) {
-        return <span className="text-slate-300" title="Aucun compte Zoho associe">&mdash;</span>;
+        return <span className="text-ink-faint" title="Aucun compte Zoho associe">&mdash;</span>;
     }
     // `=== false`, not `!`: the flag comes from the view, so a frontend shipped
     // ahead of its migration would otherwise read undefined and blank the whole
     // column. Missing falls through to the rollup, which is the previous behaviour.
     if (row.has_invoices === false) {
-        return <span className="text-slate-300" title="Aucune facture pour ce compte">&mdash;</span>;
+        return <span className="text-ink-faint" title="Aucune facture pour ce compte">&mdash;</span>;
     }
     if (row.has_invoices === undefined && !totals) {
-        return <span className="text-slate-300" title="Aucune facture pour ce compte">&mdash;</span>;
+        return <span className="text-ink-faint" title="Aucune facture pour ce compte">&mdash;</span>;
     }
     if (!totals || (totals.invoice_count === 0 && totals.credit_count === 0)) {
-        return <span className="text-slate-300" title="Chargement des montants">&hellip;</span>;
+        return <span className="text-ink-faint" title="Chargement des montants">&hellip;</span>;
     }
     const count = totals.invoice_count + totals.credit_count;
     return (
         <button
             onClick={onOpen}
             title={`Voir les ${count} facture${count > 1 ? 's' : ''}`}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-1
-                       text-xs font-semibold text-slate-600 transition-colors
-                       hover:border-brand-main hover:bg-amber-50 hover:text-brand-main"
+            className="inline-flex items-center gap-2 rounded-md border border-hairline-strong px-2 py-1
+                       text-xs font-semibold text-ink-secondary transition-colors
+                       hover:border-primary hover:bg-primary-wash hover:text-primary-press"
         >
             <FileText className="h-3.5 w-3.5" />
             <span className="tabular-nums">{count}</span>
-            <span className="text-slate-300">|</span>
-            <span className={cn('tabular-nums', totals.total_amount < 0 && 'text-rose-600')}>
+            <span className="text-ink-faint">|</span>
+            <span className={cn('tabular-nums', totals.total_amount < 0 && 'text-tone-critical-ink')}>
                 {formatCurrencyCAD(totals.total_amount)}
             </span>
         </button>
@@ -635,18 +634,18 @@ function SourceCell({ row }: { row: ZohoLeadRow }) {
     const origin = row.source_origin
         ?? (row.attribution_inherited ? 'lead' : 'own') as AttributionOrigin;
 
-    if (isBlankPick(source)) return <span className="text-slate-300">&mdash;</span>;
+    if (isBlankPick(source)) return <span className="text-ink-faint">&mdash;</span>;
     return (
         <span title={ORIGIN_HINTS[origin]}>
             {source}
-            {isBorrowed(origin) && <span className="ml-1 text-slate-400">*</span>}
+            {isBorrowed(origin) && <span className="ml-1 text-ink-mute">*</span>}
         </span>
     );
 }
 
 function ServiceCell({ row }: { row: ZohoLeadRow }) {
     const services = row.service_resolved ?? row.service_interest;
-    if (!services?.length) return <span className="text-slate-300">&mdash;</span>;
+    if (!services?.length) return <span className="text-ink-faint">&mdash;</span>;
 
     const origin = row.service_origin
         ?? (row.attribution_inherited ? 'lead' : 'own') as AttributionOrigin;
@@ -672,9 +671,9 @@ function ServiceCell({ row }: { row: ZohoLeadRow }) {
                 {text}
                 {/* One ellipsis, never two: `text` already ends in one when the
                     name itself was cut. */}
-                {hiddenCount > 0 && !truncated && <span className="text-slate-400">&hellip;</span>}
+                {hiddenCount > 0 && !truncated && <span className="text-ink-mute">&hellip;</span>}
             </span>
-            {isBorrowed(origin) && <span className="text-slate-400">*</span>}
+            {isBorrowed(origin) && <span className="text-ink-mute">*</span>}
         </span>
     );
 }
@@ -709,7 +708,7 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs"
             onClick={onClose}
             role="presentation"
         >
@@ -718,23 +717,23 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
                 aria-modal="true"
                 aria-label={`Factures de ${lead.company ?? lead.full_name ?? 'ce compte'}`}
                 onClick={e => e.stopPropagation()}
-                className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl
+                className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl
                            bg-white shadow-2xl"
             >
-                <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+                <div className="flex items-start justify-between gap-4 border-b border-hairline px-6 py-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-brand-dark">
+                        <h2 className="text-lg font-semibold text-ink">
                             {lead.company ?? lead.full_name ?? 'Compte'}
                         </h2>
-                        <p className="mt-0.5 text-sm text-slate-400">
+                        <p className="mt-0.5 text-sm text-ink-mute">
                             {lead.full_name ?? '\u2014'}
-                            {lead.email && <span className="text-slate-300"> &middot; {lead.email}</span>}
+                            {lead.email && <span className="text-ink-faint"> &middot; {lead.email}</span>}
                         </p>
                     </div>
                     <button
                         onClick={onClose}
                         aria-label="Fermer"
-                        className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                        className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-stone hover:text-ink-secondary"
                     >
                         <X className="h-5 w-5" />
                     </button>
@@ -742,10 +741,10 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
 
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
-                        <Loader2 className="h-6 w-6 animate-spin text-brand-main" />
+                        <Loader2 className="h-6 w-6 animate-spin text-primary-press" />
                     </div>
                 ) : rows.length === 0 ? (
-                    <div className="px-6 py-16 text-center text-sm text-slate-400">
+                    <div className="px-6 py-16 text-center text-sm text-ink-mute">
                         Aucune facture pour ce compte.
                     </div>
                 ) : (
@@ -768,23 +767,23 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
                                     return (
                                         <tr
                                             key={inv.zoho_id}
-                                            className={cn('transition-colors hover:bg-slate-50/70',
-                                                          inv.is_avoir && 'bg-rose-50/30')}
+                                            className={cn('transition-colors hover:bg-sand/70',
+                                                          inv.is_avoir && 'bg-tone-critical-soft/30')}
                                         >
-                                            <td className="td font-medium text-brand-dark">{inv.invoice_number ?? '\u2014'}</td>
-                                            <td className="td whitespace-nowrap text-slate-500">
+                                            <td className="td font-medium text-ink">{inv.invoice_number ?? '\u2014'}</td>
+                                            <td className="td whitespace-nowrap text-ink-mute">
                                                 {inv.invoice_date ? formatShortDate(new Date(inv.invoice_date)) : '\u2014'}
                                             </td>
-                                            <td className="td text-slate-500">{inv.department ?? '\u2014'}</td>
-                                            <td className="td text-slate-500">{inv.office ?? '\u2014'}</td>
-                                            <td className="td text-slate-500">{inv.rep_name ?? '\u2014'}</td>
+                                            <td className="td text-ink-mute">{inv.department ?? '\u2014'}</td>
+                                            <td className="td text-ink-mute">{inv.office ?? '\u2014'}</td>
+                                            <td className="td text-ink-mute">{inv.rep_name ?? '\u2014'}</td>
                                             <td className="td">
                                                 <span className={cn('badge', INVOICE_STATUS_COLORS[key])}>
                                                     {INVOICE_STATUS_LABELS[key] ?? key}
                                                 </span>
                                             </td>
                                             <td className={cn('td text-right font-semibold tabular-nums',
-                                                              inv.is_avoir ? 'text-rose-600' : 'text-brand-dark')}>
+                                                              inv.is_avoir ? 'text-tone-critical-ink' : 'text-ink')}>
                                                 {formatCurrencyCAD(inv.amount)}
                                             </td>
                                         </tr>
@@ -795,13 +794,13 @@ function InvoiceModal({ lead, onClose }: { lead: ZohoLeadRow; onClose: () => voi
                     </div>
                 )}
 
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100
-                                bg-slate-50/60 px-6 py-3">
-                    <span className="text-sm text-slate-500" translate="no">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline
+                                bg-sand/60 px-6 py-3">
+                    <span className="text-sm text-ink-mute" translate="no">
                         {`${invoiceCount} facture${invoiceCount > 1 ? 's' : ''}`}
                         {creditCount > 0 && ` \u00b7 ${creditCount} avoir${creditCount > 1 ? 's' : ''}`}
                     </span>
-                    <span className="text-sm font-semibold text-brand-dark">
+                    <span className="text-sm font-semibold text-ink">
                         Total net{' '}
                         <span className="tabular-nums text-base">{formatCurrencyCAD(net)}</span>
                     </span>

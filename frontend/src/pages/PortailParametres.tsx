@@ -68,15 +68,15 @@ function TargetCell({
                     onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
                     className={cn(
-                        'px-2 py-1.5 text-sm border border-brand-main rounded-lg focus:outline-none text-right font-semibold bg-white',
+                        'px-2 py-1.5 text-sm border border-primary rounded-md focus:outline-none text-right font-semibold bg-white',
                         compact ? 'w-24' : 'w-32'
                     )}
                     placeholder="0"
                 />
-                <button onClick={commit} className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors">
+                <button onClick={commit} className="p-1.5 text-tone-good hover:bg-tone-good-soft rounded-md transition-colors">
                     <Check className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => setEditing(false)} className="p-1.5 text-slate-300 hover:bg-slate-100 rounded-lg transition-colors">
+                <button onClick={() => setEditing(false)} className="p-1.5 text-ink-faint hover:bg-stone rounded-md transition-colors">
                     <X className="w-3.5 h-3.5" />
                 </button>
             </div>
@@ -87,13 +87,13 @@ function TargetCell({
         <button
             onClick={() => { setDraft(value > 0 ? String(value) : ''); setEditing(true); }}
             className={cn(
-                'w-full flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-lg transition-all group',
+                'w-full flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-md transition-all group',
                 value > 0
-                    ? 'bg-slate-50 hover:bg-brand-main/5 hover:text-brand-main text-slate-700'
-                    : 'bg-slate-50 hover:bg-brand-main/5 text-slate-300 hover:text-brand-main'
+                    ? 'bg-sand hover:bg-primary/5 hover:text-primary-press text-ink-secondary'
+                    : 'bg-sand hover:bg-primary/5 text-ink-faint hover:text-primary-press'
             )}
         >
-            <Save className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-brand-main shrink-0" />
+            <Save className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity text-primary-press shrink-0" />
             <span className={cn('flex-1 text-right tabular-nums font-semibold', compact ? 'text-xs' : 'text-sm')}>
                 {value > 0 ? formatCurrencyCAD(value) : (placeholder ?? '—')}
             </span>
@@ -121,11 +121,11 @@ export default function PortailParametres({ propRepName }: Props) {
         return (
             <div className="p-4 md:p-8 max-w-screen-xl mx-auto flex items-center justify-center min-h-[60vh]">
                 <div className="text-center space-y-3">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto">
-                        <Settings className="w-7 h-7 text-slate-300" />
+                    <div className="w-14 h-14 rounded-xl bg-stone flex items-center justify-center mx-auto">
+                        <Settings className="w-7 h-7 text-ink-faint" />
                     </div>
-                    <h2 className="text-base font-semibold text-slate-700">Accès réservé aux administrateurs</h2>
-                    <p className="text-sm text-slate-400 max-w-xs">Cette section est gérée par l'administrateur.</p>
+                    <h2 className="text-base font-semibold text-ink-secondary">Accès réservé aux administrateurs</h2>
+                    <p className="text-sm text-ink-mute max-w-xs">Cette section est gérée par l'administrateur.</p>
                 </div>
             </div>
         );
@@ -233,10 +233,10 @@ export default function PortailParametres({ propRepName }: Props) {
             {/* Header row */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h2 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
+                    <h2 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                         Objectifs Reps
                     </h2>
-                    <p className="text-sm text-slate-400 mt-0.5">
+                    <p className="text-sm text-ink-mute mt-0.5">
                         {repName ? `Objectifs de ${repName}` : 'Sélectionnez un représentant'}
                     </p>
                 </div>
@@ -250,21 +250,21 @@ export default function PortailParametres({ propRepName }: Props) {
             </div>
 
             {/* Module tabs */}
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+            <div className="flex items-center gap-1 p-1 bg-stone rounded-xl w-fit">
                 {(['devis', 'factures'] as const).map(m => (
                     <button
                         key={m}
                         onClick={() => setDeptModule(m)}
                         className={cn(
-                            'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all',
+                            'flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold transition-all',
                             module === m
-                                ? 'bg-white text-slate-900 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700'
+                                ? 'bg-white text-ink shadow-xs'
+                                : 'text-ink-mute hover:text-ink-secondary'
                         )}
                     >
                         {m === 'devis'
-                            ? <ClipboardList className={cn('w-4 h-4', module === m ? 'text-blue-500' : 'text-slate-400')} />
-                            : <FileText className={cn('w-4 h-4', module === m ? 'text-amber-500' : 'text-slate-400')} />}
+                            ? <ClipboardList className={cn('w-4 h-4', module === m ? 'text-data-2-ink' : 'text-ink-mute')} />
+                            : <FileText className={cn('w-4 h-4', module === m ? 'text-data-3-ink' : 'text-ink-mute')} />}
                         {m === 'devis' ? 'Objectifs Devis' : 'Objectifs Factures'}
                     </button>
                 ))}
@@ -272,45 +272,45 @@ export default function PortailParametres({ propRepName }: Props) {
 
             {/* Objectives table */}
             {!repName ? (
-                <div className="flex items-center justify-center py-16 bg-white rounded-2xl border border-slate-100">
-                    <p className="text-sm text-slate-400">Représentant non sélectionné</p>
+                <div className="flex items-center justify-center py-16 bg-white rounded-xl border border-hairline">
+                    <p className="text-sm text-ink-mute">Représentant non sélectionné</p>
                 </div>
             ) : loading ? (
                 <div className="flex items-center justify-center py-12 gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin text-slate-300" />
-                    <span className="text-sm text-slate-400">Chargement...</span>
+                    <Loader2 className="w-5 h-5 animate-spin text-ink-faint" />
+                    <span className="text-sm text-ink-mute">Chargement...</span>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
+                <div className="bg-white rounded-xl shadow-card overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/60">
-                                    <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-50/60 whitespace-nowrap">
+                                <tr className="border-b border-hairline bg-sand/60">
+                                    <th className="px-4 py-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow sticky left-0 bg-sand/60 whitespace-nowrap">
                                         Mois
                                     </th>
                                     {DEPARTMENTS.map(d => (
-                                        <th key={d} className="px-2 py-3 text-[10px] font-bold uppercase tracking-widest text-slate-500 whitespace-nowrap min-w-[110px]">
+                                        <th key={d} className="px-2 py-3 text-2xs font-semibold uppercase tracking-eyebrow text-ink-mute whitespace-nowrap min-w-[110px]">
                                             <span title={d}>{DEPT_SHORT[d] ?? d}</span>
                                         </th>
                                     ))}
-                                    <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-600 uppercase tracking-widest whitespace-nowrap min-w-[130px] border-l border-slate-100">
+                                    <th className="px-4 py-3 text-right text-2xs font-semibold text-ink-secondary uppercase tracking-eyebrow whitespace-nowrap min-w-[130px] border-l border-hairline">
                                         Total mois
                                     </th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {MONTH_LABELS.map((label, i) => {
                                     const month = i + 1;
                                     const deptSum = deptSumForMonth(month);
                                     const manualTotal = monthTargets[`${module}-${month}`] ?? 0;
                                     const hasDeptsSet = deptSum > 0;
                                     return (
-                                        <tr key={month} className="hover:bg-slate-50/40 transition-colors">
-                                            <td className="px-4 py-2 font-semibold text-slate-700 sticky left-0 bg-white whitespace-nowrap text-sm">
+                                        <tr key={month} className="hover:bg-sand/40 transition-colors">
+                                            <td className="px-4 py-2 font-semibold text-ink-secondary sticky left-0 bg-white whitespace-nowrap text-sm">
                                                 {label}
                                                 {saving?.startsWith(`${month}-`) || saving === `${module}-${month}` ? (
-                                                    <Loader2 className="w-3 h-3 animate-spin text-slate-300 inline ml-2" />
+                                                    <Loader2 className="w-3 h-3 animate-spin text-ink-faint inline ml-2" />
                                                 ) : null}
                                             </td>
                                             {DEPARTMENTS.map(dept => {
@@ -319,7 +319,7 @@ export default function PortailParametres({ propRepName }: Props) {
                                                     <td key={dept} className="px-2 py-1.5">
                                                         {saving === key ? (
                                                             <div className="flex items-center justify-center h-8">
-                                                                <Loader2 className="w-3 h-3 animate-spin text-slate-300" />
+                                                                <Loader2 className="w-3 h-3 animate-spin text-ink-faint" />
                                                             </div>
                                                         ) : (
                                                             <TargetCell
@@ -331,11 +331,11 @@ export default function PortailParametres({ propRepName }: Props) {
                                                     </td>
                                                 );
                                             })}
-                                            <td className="px-3 py-1.5 border-l border-slate-100">
+                                            <td className="px-3 py-1.5 border-l border-hairline">
                                                 {hasDeptsSet ? (
                                                     <div className="flex items-center justify-end gap-1.5 px-2.5 py-2">
-                                                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-full shrink-0">auto</span>
-                                                        <span className="text-sm font-bold tabular-nums text-slate-800">
+                                                        <span className="text-2xs font-semibold uppercase tracking-label text-tone-good bg-tone-good-soft px-1.5 py-0.5 rounded-full shrink-0">auto</span>
+                                                        <span className="text-sm font-bold tabular-nums text-ink">
                                                             {formatCurrencyCAD(deptSum)}
                                                         </span>
                                                     </div>
@@ -352,23 +352,23 @@ export default function PortailParametres({ propRepName }: Props) {
                                 })}
                             </tbody>
                             <tfoot>
-                                <tr className="border-t-2 border-slate-100 bg-slate-50/60">
-                                    <td className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-widest sticky left-0 bg-slate-50/60">
+                                <tr className="border-t-2 border-hairline bg-sand/60">
+                                    <td className="px-4 py-3 text-xs font-semibold text-ink-mute uppercase tracking-eyebrow sticky left-0 bg-sand/60">
                                         Total {year}
                                     </td>
                                     {DEPARTMENTS.map(dept => {
                                         const t = deptAnnualTotal(dept);
                                         return (
                                             <td key={dept} className="px-2 py-3 text-center">
-                                                <span className="text-xs font-bold text-slate-700 tabular-nums">
-                                                    {t > 0 ? formatCurrencyCAD(t) : <span className="text-slate-200">—</span>}
+                                                <span className="text-xs font-bold text-ink-secondary tabular-nums">
+                                                    {t > 0 ? formatCurrencyCAD(t) : <span className="text-ink-faint">—</span>}
                                                 </span>
                                             </td>
                                         );
                                     })}
-                                    <td className="px-4 py-3 text-right border-l border-slate-100">
-                                        <span className="text-sm font-bold text-slate-800 tabular-nums">
-                                            {grandTotal > 0 ? formatCurrencyCAD(grandTotal) : <span className="text-slate-200">—</span>}
+                                    <td className="px-4 py-3 text-right border-l border-hairline">
+                                        <span className="text-sm font-bold text-ink tabular-nums">
+                                            {grandTotal > 0 ? formatCurrencyCAD(grandTotal) : <span className="text-ink-faint">—</span>}
                                         </span>
                                     </td>
                                 </tr>
@@ -385,19 +385,19 @@ export default function PortailParametres({ propRepName }: Props) {
 
             {isAdmin && !propRepName && !viewAsRep ? (
                 /* ─── Admin view: bordered container with hero + content ─── */
-                <div className="rounded-2xl border border-brand-main/20 shadow-card overflow-visible">
+                <div className="rounded-xl border border-primary/20 shadow-card overflow-visible">
                     {/* Hero — orange gradient */}
-                    <div className="bg-gradient-to-br from-brand-main to-amber-600 rounded-t-2xl px-6 py-6 md:py-7">
-                        <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-5">
+                    <div className="bg-primary rounded-t-xl px-6 py-6 md:py-7">
+                        <p className="text-2xs font-semibold text-white uppercase tracking-eyebrow mb-5">
                             Objectifs du représentant
                         </p>
                         <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                 <div className={cn(
-                                    "w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black shrink-0 transition-all",
+                                    "w-14 h-14 rounded-xl flex items-center justify-center text-2xl font-semibold shrink-0 transition-all",
                                     adminPickedRep
-                                        ? "bg-white text-brand-main shadow-lg shadow-black/10"
-                                        : "bg-white/20 text-white/40"
+                                        ? "bg-white text-primary-press shadow-lg shadow-black/10"
+                                        : "bg-black/15 text-white"
                                 )}>
                                     {adminPickedRep
                                         ? adminPickedRep.charAt(0).toUpperCase()
@@ -405,15 +405,15 @@ export default function PortailParametres({ propRepName }: Props) {
                                 </div>
                                 <div className="min-w-0">
                                     {adminPickedRep ? (
-                                        <h2 className="text-xl md:text-2xl font-black text-white tracking-tight truncate">
+                                        <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight truncate">
                                             {adminPickedRep}
                                         </h2>
                                     ) : (
-                                        <h2 className="text-lg md:text-xl font-bold text-white/50">
+                                        <h2 className="text-lg md:text-xl font-semibold text-white">
                                             Sélectionner un représentant
                                         </h2>
                                     )}
-                                    <p className="text-xs text-white/60 mt-0.5">
+                                    <p className="text-xs text-white mt-0.5">
                                         {adminPickedRep
                                             ? 'Tous les objectifs ci-dessous correspondent à ce représentant'
                                             : 'Choisissez un représentant pour modifier ses objectifs'}
@@ -435,7 +435,7 @@ export default function PortailParametres({ propRepName }: Props) {
                         </div>
                     </div>
                     {/* Content inside the border box */}
-                    <div className="px-4 md:px-6 py-5 bg-white rounded-b-2xl">
+                    <div className="px-4 md:px-6 py-5 bg-white rounded-b-xl">
                         {objectivesContent}
                     </div>
                 </div>

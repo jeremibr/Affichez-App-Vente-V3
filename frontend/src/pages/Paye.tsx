@@ -58,11 +58,11 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-                    className="w-14 px-2 py-1 text-xs border border-brand-main rounded-lg focus:outline-none text-center font-semibold"
+                    className="w-14 px-2 py-1 text-xs border border-primary rounded-md focus:outline-none text-center font-semibold"
                 />
-                <span className="text-xs text-slate-400">%</span>
-                <button onClick={commit} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-colors"><Check className="w-3 h-3" /></button>
-                <button onClick={() => setEditing(false)} className="p-1 text-slate-400 hover:bg-slate-100 rounded transition-colors"><X className="w-3 h-3" /></button>
+                <span className="text-xs text-ink-mute">%</span>
+                <button onClick={commit} className="p-1 text-tone-good hover:bg-tone-good-soft rounded-xs transition-colors"><Check className="w-3 h-3" /></button>
+                <button onClick={() => setEditing(false)} className="p-1 text-ink-mute hover:bg-stone rounded-xs transition-colors"><X className="w-3 h-3" /></button>
             </div>
         );
     }
@@ -72,8 +72,8 @@ function TauxCell({ value, onSave }: { value: number; onSave: (v: number) => voi
             onClick={() => setEditing(true)}
             className="inline-flex items-center gap-1.5 group"
         >
-            <span className="text-sm font-bold text-slate-700 tabular-nums">{Math.round(value * 100)}%</span>
-            <Pencil className="w-3 h-3 text-slate-300 group-hover:text-brand-main transition-colors opacity-0 group-hover:opacity-100" />
+            <span className="text-sm font-bold text-ink-secondary tabular-nums">{Math.round(value * 100)}%</span>
+            <Pencil className="w-3 h-3 text-ink-faint group-hover:text-primary-press transition-colors opacity-0 group-hover:opacity-100" />
         </button>
     );
 }
@@ -95,11 +95,11 @@ function NotesCell({ value, onSave }: { value: string; onSave: (v: string) => vo
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
-                    className="w-full min-w-[140px] px-2 py-1 text-xs border border-brand-main rounded-lg focus:outline-none"
+                    className="w-full min-w-[140px] px-2 py-1 text-xs border border-primary rounded-md focus:outline-none"
                     placeholder="Ajouter une note..."
                 />
-                <button onClick={commit} className="p-1 text-emerald-500 hover:bg-emerald-50 rounded transition-colors"><Check className="w-3 h-3" /></button>
-                <button onClick={() => setEditing(false)} className="p-1 text-slate-400 hover:bg-slate-100 rounded transition-colors"><X className="w-3 h-3" /></button>
+                <button onClick={commit} className="p-1 text-tone-good hover:bg-tone-good-soft rounded-xs transition-colors"><Check className="w-3 h-3" /></button>
+                <button onClick={() => setEditing(false)} className="p-1 text-ink-mute hover:bg-stone rounded-xs transition-colors"><X className="w-3 h-3" /></button>
             </div>
         );
     }
@@ -109,10 +109,10 @@ function NotesCell({ value, onSave }: { value: string; onSave: (v: string) => vo
             onClick={() => setEditing(true)}
             className="flex items-center gap-1.5 group text-left w-full"
         >
-            <span className="text-xs text-slate-400 italic group-hover:text-slate-600 transition-colors truncate max-w-[160px]">
+            <span className="text-xs text-ink-mute italic group-hover:text-ink-secondary transition-colors truncate max-w-[160px]">
                 {value || 'Ajouter une note...'}
             </span>
-            <Pencil className="w-3 h-3 text-slate-300 group-hover:text-brand-main transition-colors opacity-0 group-hover:opacity-100 shrink-0" />
+            <Pencil className="w-3 h-3 text-ink-faint group-hover:text-primary-press transition-colors opacity-0 group-hover:opacity-100 shrink-0" />
         </button>
     );
 }
@@ -124,16 +124,16 @@ function KPICard({ title, value, sub, icon: Icon, color }: {
     icon: React.ElementType; color: string;
 }) {
     return (
-        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+        <div className="bg-white p-3 md:p-5 rounded-xl shadow-card flex flex-col justify-between hover:shadow-elevated transition-all group">
             <div className="flex items-start justify-between mb-2 md:mb-4">
-                <div className={cn("p-2 md:p-2.5 rounded-xl", color)}>
+                <div className={cn("p-2 md:p-2.5 rounded-md", color)}>
                     <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className="text-base md:text-2xl font-bold text-slate-900 mt-0.5 md:mt-1 tabular-nums">{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{sub}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className="text-base md:text-2xl font-bold text-ink mt-0.5 md:mt-1 tabular-nums">{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 font-medium italic">{sub}</p>
             </div>
         </div>
     );
@@ -245,7 +245,7 @@ export default function Paye() {
     if (!isAdmin) {
         return (
             <div className="flex items-center justify-center h-64">
-                <p className="text-slate-400 text-sm">Accès réservé aux administrateurs.</p>
+                <p className="text-ink-mute text-sm">Accès réservé aux administrateurs.</p>
             </div>
         );
     }
@@ -256,10 +256,10 @@ export default function Paye() {
             {/* ─── Header ─── */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-2xl font-semibold text-ink tracking-tight">
                         Commissions
                     </h1>
-                    <p className="text-sm text-slate-400 mt-0.5">
+                    <p className="text-sm text-ink-mute mt-0.5">
                         {viewMode === 'annual'
                             ? `Vue annuelle · ${year}`
                             : `${MONTH_FULL[selectedMonth]} ${year}`}
@@ -267,16 +267,16 @@ export default function Paye() {
                 </div>
 
                 {/* Annual / Monthly toggle */}
-                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl">
+                <div className="flex items-center gap-1 p-1 bg-stone rounded-xl">
                     {(['annual', 'monthly'] as const).map(mode => (
                         <button
                             key={mode}
                             onClick={() => setViewMode(mode)}
                             className={cn(
-                                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all',
+                                'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-all',
                                 viewMode === mode
-                                    ? 'bg-white text-slate-900 shadow-sm'
-                                    : 'text-slate-500 hover:text-slate-700'
+                                    ? 'bg-white text-ink shadow-xs'
+                                    : 'text-ink-secondary hover:text-ink'
                             )}
                         >
                             {mode === 'annual' ? 'Annuel' : 'Mensuel'}
@@ -296,20 +296,20 @@ export default function Paye() {
                     </FilterGroup>
                 </FilterBar>
             ) : (
-                <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-3">
+                <div className="flex items-center justify-between bg-white rounded-xl shadow-card px-5 py-3">
                     <button
                         onClick={() => goTo(py, pm)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-50 text-sm font-medium transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-ink-mute hover:text-ink hover:bg-sand text-sm font-medium transition-all"
                     >
                         <ChevronLeft className="w-4 h-4" />
                         {MONTH_SHORT[pm]} {py}
                     </button>
 
                     <div className="text-center">
-                        <h3 className="text-base font-bold text-slate-900">
+                        <h3 className="text-base font-semibold text-ink">
                             {MONTH_FULL[selectedMonth]} {year}
                         </h3>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                        <p className="text-2xs text-ink-mute uppercase tracking-eyebrow mt-0.5">
                             Commissions
                         </p>
                     </div>
@@ -318,10 +318,10 @@ export default function Paye() {
                         onClick={() => goTo(ny, nm)}
                         disabled={isFuture}
                         className={cn(
-                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
                             isFuture
-                                ? "text-slate-200 cursor-not-allowed"
-                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                ? "text-ink-faint cursor-not-allowed"
+                                : "text-ink-mute hover:text-ink hover:bg-sand"
                         )}
                     >
                         {MONTH_SHORT[nm]} {ny}
@@ -337,58 +337,58 @@ export default function Paye() {
                     value={formatCurrencyCAD(totalFacture)}
                     sub={`${repData.length} représentants actifs`}
                     icon={TrendingUp}
-                    color="bg-blue-50 text-blue-500"
+                    color="bg-sand text-ink-mute"
                 />
                 <KPICard
                     title="Commissions Totales"
                     value={formatCurrencyCAD(totalCommission)}
                     sub="Basé sur les taux individuels"
                     icon={Wallet}
-                    color="bg-brand-main/10 text-brand-main"
+                    color="bg-primary-wash text-primary-press"
                 />
             </div>
 
             {/* ─── Main Table ─── */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    <h3 className="text-sm font-bold text-slate-800">Suivi des paiements</h3>
+            <div className="bg-white rounded-xl shadow-card overflow-hidden">
+                <div className="px-5 py-4 border-b border-hairline flex items-center gap-2">
+                    <Users className="w-4 h-4 text-ink-mute" />
+                    <h3 className="text-sm font-semibold text-ink">Suivi des paiements</h3>
                     <ExportButton
                         rows={repData}
                         columns={autoColumns(repData)}
                         filename="suivi_paiements" label="CSV"
                         disabled={repData.length === 0}
                     />
-                    <span className="ml-auto text-xs text-slate-400 italic">
+                    <span className="ml-auto text-xs text-ink-mute italic">
                         Les taux sont sauvegardés dans la base de données
                     </span>
                 </div>
 
                 {loading ? (
                     <div className="flex items-center justify-center py-16 gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-                        <span className="text-sm text-slate-400">Chargement...</span>
+                        <Loader2 className="w-5 h-5 animate-spin text-ink-mute" />
+                        <span className="text-sm text-ink-mute">Chargement...</span>
                     </div>
                 ) : repData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-2">
-                        <Users className="w-8 h-8 text-slate-200" />
-                        <p className="text-sm text-slate-400">Aucune donnée pour cette période</p>
+                        <Users className="w-8 h-8 text-ink-faint" />
+                        <p className="text-sm text-ink-mute">Aucune donnée pour cette période</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b border-slate-100 bg-slate-50/60">
-                                    <th className="px-5 py-3 text-left   text-[10px] font-bold text-slate-400 uppercase tracking-widest">Représentant</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Siège</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturé</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nb Fact.</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Taux</th>
-                                    <th className="px-4 py-3 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">Commission</th>
-                                    <th className="px-4 py-3 text-left   text-[10px] font-bold text-slate-400 uppercase tracking-widest">Notes</th>
+                                <tr className="border-b border-hairline bg-sand/60">
+                                    <th className="px-5 py-3 text-left   text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Représentant</th>
+                                    <th className="px-4 py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Siège</th>
+                                    <th className="px-4 py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Facturé</th>
+                                    <th className="px-4 py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Nb Fact.</th>
+                                    <th className="px-4 py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Taux</th>
+                                    <th className="px-4 py-3 text-center text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Commission</th>
+                                    <th className="px-4 py-3 text-left   text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Notes</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-50">
+                            <tbody className="divide-y divide-hairline">
                                 {repData.map((rep) => {
                                     const paye = payeRecords[rep.rep_name] ?? {
                                         taux: 0.05, commission: rep.total_amount * 0.05,
@@ -398,8 +398,8 @@ export default function Paye() {
                                         <tr
                                             key={rep.rep_name}
                                             className={cn(
-                                                "hover:bg-slate-50/60 transition-colors",
-                                                paye.paid && "bg-emerald-50/20"
+                                                "hover:bg-sand/60 transition-colors",
+                                                paye.paid && "bg-tone-good-soft/20"
                                             )}
                                         >
                                             {/* Rep name */}
@@ -408,29 +408,29 @@ export default function Paye() {
                                                     <div className={cn(
                                                         "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
                                                         paye.paid
-                                                            ? "bg-emerald-100 text-emerald-600"
-                                                            : "bg-brand-main/10 text-brand-main"
+                                                            ? "bg-tone-good-soft text-tone-good-ink"
+                                                            : "bg-primary-wash text-primary-press"
                                                     )}>
                                                         {rep.rep_name.charAt(0)}
                                                     </div>
-                                                    <span className="font-semibold text-slate-800">{rep.rep_name}</span>
+                                                    <span className="font-semibold text-ink">{rep.rep_name}</span>
                                                 </div>
                                             </td>
 
                                             {/* Office */}
                                             <td className="px-4 py-3 text-center">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-full">
+                                                <span className="text-2xs font-semibold text-ink-secondary uppercase bg-stone px-2 py-0.5 rounded-full">
                                                     {rep.office}
                                                 </span>
                                             </td>
 
                                             {/* Facturé */}
-                                            <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">
+                                            <td className="px-4 py-3 text-center font-bold text-ink tabular-nums">
                                                 {formatCurrencyCAD(rep.total_amount)}
                                             </td>
 
                                             {/* Nb factures */}
-                                            <td className="px-4 py-3 text-center text-slate-500 tabular-nums">
+                                            <td className="px-4 py-3 text-center text-ink-mute tabular-nums">
                                                 {rep.deal_count}
                                             </td>
 
@@ -441,7 +441,7 @@ export default function Paye() {
 
                                             {/* Commission calculée */}
                                             <td className="px-4 py-3 text-center">
-                                                <span className="font-bold text-brand-main tabular-nums text-sm">
+                                                <span className="font-bold text-ink tabular-nums text-sm">
                                                     {formatCurrencyCAD(paye.commission)}
                                                 </span>
                                             </td>
@@ -457,19 +457,19 @@ export default function Paye() {
 
                             {/* Footer totals */}
                             <tfoot>
-                                <tr className="border-t-2 border-slate-200 bg-slate-50/80">
-                                    <td className="px-5 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                                <tr className="border-t-2 border-hairline-strong bg-sand/80">
+                                    <td className="px-5 py-3 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">
                                         Total — {repData.length} reps
                                     </td>
                                     <td className="px-4 py-3" />
-                                    <td className="px-4 py-3 text-center font-bold text-slate-900 tabular-nums">
+                                    <td className="px-4 py-3 text-center font-bold text-ink tabular-nums">
                                         {formatCurrencyCAD(totalFacture)}
                                     </td>
-                                    <td className="px-4 py-3 text-center text-slate-500 tabular-nums font-bold">
+                                    <td className="px-4 py-3 text-center text-ink-mute tabular-nums font-bold">
                                         {repData.reduce((s, r) => s + r.deal_count, 0)}
                                     </td>
                                     <td className="px-4 py-3" />
-                                    <td className="px-4 py-3 text-center font-bold text-brand-main tabular-nums">
+                                    <td className="px-4 py-3 text-center font-bold text-ink tabular-nums">
                                         {formatCurrencyCAD(totalCommission)}
                                     </td>
                                     <td className="px-4 py-3" />

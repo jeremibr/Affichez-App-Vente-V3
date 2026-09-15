@@ -245,8 +245,8 @@ export default function AccountsDashboard() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
             <div>
-                <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Comptes — Tableau de bord</h1>
-                <p className="text-xs md:text-sm text-slate-400 mt-0.5">
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Comptes — Tableau de bord</h1>
+                <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                     Comptes clients du CRM, et ce qu&rsquo;ils ont facturé après leur arrivée
                 </p>
             </div>
@@ -298,8 +298,8 @@ export default function AccountsDashboard() {
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                    <p className="text-sm text-slate-400 font-medium">Chargement des comptes...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                    <p className="text-sm text-ink-mute font-medium">Chargement des comptes...</p>
                 </div>
             ) : (
                 <>
@@ -399,39 +399,39 @@ function BreakdownTable({ title, rows, note, filename }: {
 }) {
     const totalAccounts = rows.reduce((s, r) => s + r.nb_accounts, 0);
     return (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-card overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+        <div className="bg-white rounded-xl shadow-card overflow-hidden">
+            <div className="px-5 py-4 border-b border-hairline flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-ink">{title}</h3>
                 {note && <InfoHint text={note} />}
                 <div className="ml-auto">
                     <ExportButton rows={rows} columns={BREAKDOWN_CSV} filename={filename} disabled={rows.length === 0} />
                 </div>
             </div>
             {rows.length === 0 ? (
-                <p className="px-5 py-8 text-sm text-slate-400 text-center">Aucun compte</p>
+                <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucun compte</p>
             ) : (
                 <div className="max-h-[420px] overflow-y-auto">
                     <table className="w-full text-sm" translate="no">
-                        <thead className="sticky top-0 bg-slate-50/95 backdrop-blur">
-                            <tr className="border-b border-slate-50">
-                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nom</th>
-                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Comptes</th>
-                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facturés</th>
-                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revenus</th>
-                                <th className="px-4 py-2.5 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">/ compte</th>
+                        <thead className="sticky top-0 bg-sand/95 backdrop-blur">
+                            <tr className="border-b border-hairline">
+                                <th className="px-4 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Nom</th>
+                                <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Comptes</th>
+                                <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Facturés</th>
+                                <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Revenus</th>
+                                <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">/ compte</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-50">
+                        <tbody className="divide-y divide-hairline">
                             {rows.map(r => {
                                 const pct = totalAccounts > 0 ? Math.round((r.nb_accounts / totalAccounts) * 100) : 0;
                                 const rate = r.nb_accounts > 0 ? ((r.nb_invoiced / r.nb_accounts) * 100).toFixed(0) : '0';
                                 return (
-                                    <tr key={r.label} className="hover:bg-slate-50/60 transition-colors">
+                                    <tr key={r.label} className="hover:bg-sand/60 transition-colors">
                                         <td className="px-4 py-2.5">
-                                            <p className="font-semibold text-slate-700 text-xs truncate max-w-[170px] flex items-center gap-1.5" title={r.label}>
+                                            <p className="font-semibold text-ink-secondary text-xs truncate max-w-[170px] flex items-center gap-1.5" title={r.label}>
                                                 {r.is_bulk_import && (
                                                     <span
-                                                        className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                                                        className="w-1.5 h-1.5 rounded-full bg-tone-warn shrink-0"
                                                         title={"Liste de clients rachetée, pas une campagne — le volume ne se compare pas à celui d'une campagne publicitaire."
                                                             + (r.label.includes('Royer')
                                                                 ? " Cette entreprise est aussi facturée hors des organisations Zoho Books lues par l'application : ses revenus réels n'apparaissent pas dans cette ligne."
@@ -440,22 +440,22 @@ function BreakdownTable({ title, rows, note, filename }: {
                                                 )}
                                                 {r.label}
                                             </p>
-                                            <div className="mt-1 h-1 rounded-full bg-slate-100 w-full max-w-[100px]">
-                                                <div className="h-1 rounded-full bg-brand-main" style={{ width: `${pct}%` }} />
+                                            <div className="mt-1 h-1 rounded-full bg-stone w-full max-w-[100px]">
+                                                <div className="h-1 rounded-full bg-primary" style={{ width: `${pct}%` }} />
                                             </div>
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-700 tabular-nums">{r.nb_accounts}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink-secondary tabular-nums">{r.nb_accounts}</td>
                                         <td className="px-4 py-2.5 text-right tabular-nums">
-                                            <span className="font-bold text-slate-700">{r.nb_invoiced}</span>
-                                            <span className={cn('ml-1 text-[10px] font-bold',
-                                                Number(rate) >= 20 ? 'text-emerald-500' : 'text-slate-400')}>
+                                            <span className="font-bold text-ink-secondary">{r.nb_invoiced}</span>
+                                            <span className={cn('ml-1 text-2xs font-bold',
+                                                Number(rate) >= 20 ? 'text-tone-good' : 'text-ink-mute')}>
                                                 ({rate}%)
                                             </span>
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-slate-900 tabular-nums text-xs">
+                                        <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums text-xs">
                                             {formatCurrencyCAD(r.total_amount)}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-semibold text-slate-500 tabular-nums text-xs">
+                                        <td className="px-4 py-2.5 text-right font-semibold text-ink-mute tabular-nums text-xs">
                                             {formatCurrencyCAD(r.revenue_per_account)}
                                         </td>
                                     </tr>
@@ -478,22 +478,22 @@ function KPICard({ title, value, subText, icon: Icon, highlight, hint }: {
     hint?: string;
 }) {
     return (
-        <div className="bg-white p-3 md:p-5 rounded-2xl border border-slate-100 shadow-card flex flex-col justify-between hover:shadow-card-hover transition-all group">
+        <div className="bg-white p-3 md:p-5 rounded-xl shadow-card flex flex-col justify-between hover:shadow-elevated transition-all group">
             <div className="flex items-start justify-between mb-2 md:mb-4">
-                <div className="p-2 md:p-2.5 bg-slate-50 rounded-xl text-slate-400 group-hover:text-brand-main group-hover:bg-amber-50 transition-colors">
+                <div className="p-2 md:p-2.5 bg-sand rounded-md text-ink-mute group-hover:text-primary-press group-hover:bg-primary-wash transition-colors">
                     <Icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
                 <div className="flex items-center gap-1.5">
                     {highlight && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">Bon</span>
+                        <span className="text-2xs font-bold px-2 py-0.5 rounded-full bg-tone-good-soft text-tone-good-ink">Bon</span>
                     )}
                     {hint && <InfoHint text={hint} />}
                 </div>
             </div>
             <div>
-                <p className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest leading-tight">{title}</p>
-                <p className="mt-1 text-base md:text-2xl font-bold text-slate-900 tabular-nums">{value}</p>
-                <p className="text-[10px] md:text-[11px] text-slate-400 mt-0.5 md:mt-1 font-medium italic">{subText}</p>
+                <p className="text-2xs md:text-xs font-semibold text-ink-mute uppercase tracking-eyebrow leading-tight">{title}</p>
+                <p className="mt-1 text-base md:text-2xl font-bold text-ink tabular-nums">{value}</p>
+                <p className="text-2xs text-ink-mute mt-0.5 md:mt-1 font-medium italic">{subText}</p>
             </div>
         </div>
     );

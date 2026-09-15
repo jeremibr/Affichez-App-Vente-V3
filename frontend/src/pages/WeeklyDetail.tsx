@@ -146,10 +146,10 @@ export default function WeeklyDetail() {
             {/* Header */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">Détail Hebdomadaire</h1>
-                    <p className="text-xs md:text-sm text-slate-400 mt-0.5">Devis — Vue équipe complète</p>
+                    <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Détail Hebdomadaire</h1>
+                    <p className="text-xs md:text-sm text-ink-mute mt-0.5">Devis — Vue équipe complète</p>
                 </div>
-                <div className="rounded-lg border border-brand-main/40">
+                <div className="rounded-md border border-primary/40">
                     <Select
                         value={selectedRep}
                         onChange={setSelectedRep}
@@ -161,13 +161,13 @@ export default function WeeklyDetail() {
             </div>
 
             {/* Week switcher */}
-            <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-card px-5 py-3">
+            <div className="flex items-center justify-between bg-white rounded-xl shadow-card px-5 py-3">
                 <button
                     onClick={() => prevWeekObj && setSelectedWeek(prevWeekObj.week_start)}
                     disabled={!prevWeekObj}
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                        !prevWeekObj ? "text-slate-200 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                        !prevWeekObj ? "text-ink-faint cursor-not-allowed" : "text-ink-mute hover:text-ink hover:bg-sand"
                     )}
                 >
                     <ChevronLeft className="w-4 h-4" />
@@ -175,10 +175,10 @@ export default function WeeklyDetail() {
                 </button>
 
                 <div className="text-center">
-                    <h3 className="text-base font-bold text-slate-900">
+                    <h3 className="text-base font-semibold text-ink">
                         {currentWeekObj ? fmtWeekRange(currentWeekObj.week_start, currentWeekObj.week_end) : '—'}
                     </h3>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">
+                    <p className="text-2xs text-ink-mute uppercase tracking-eyebrow mt-0.5">
                         Détail des devis
                     </p>
                 </div>
@@ -187,8 +187,8 @@ export default function WeeklyDetail() {
                     onClick={() => nextWeekObj && setSelectedWeek(nextWeekObj.week_start)}
                     disabled={!nextWeekObj}
                     className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                        !nextWeekObj ? "text-slate-200 cursor-not-allowed" : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                        !nextWeekObj ? "text-ink-faint cursor-not-allowed" : "text-ink-mute hover:text-ink hover:bg-sand"
                     )}
                 >
                     {nextWeekObj ? fmtShort(nextWeekObj.week_start) : '—'}
@@ -198,44 +198,44 @@ export default function WeeklyDetail() {
 
             {loading ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
-                    <p className="text-sm text-slate-400 font-medium">Récupération des détails...</p>
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
+                    <p className="text-sm text-ink-mute font-medium">Récupération des détails...</p>
                 </div>
             ) : availableWeeks.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-card p-20 text-center">
-                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Calendar className="w-8 h-8 text-slate-200" />
+                <div className="bg-white rounded-xl shadow-card p-20 text-center">
+                    <div className="w-16 h-16 bg-sand rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Calendar className="w-8 h-8 text-ink-faint" />
                     </div>
-                    <h3 className="text-base font-bold text-slate-700">Aucune vente enregistrée</h3>
-                    <p className="text-sm text-slate-400 mt-1">Essayez de modifier l'année.</p>
+                    <h3 className="text-base font-semibold text-ink-secondary">Aucune vente enregistrée</h3>
+                    <p className="text-sm text-ink-mute mt-1">Essayez de modifier l'année.</p>
                 </div>
             ) : (
                 <div className="space-y-4 md:space-y-6">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-6">
-                        <div className="bg-brand-main rounded-2xl p-3 md:p-6 text-white shadow-lg shadow-brand-main/20 flex items-center justify-between">
+                        <div className="bg-primary rounded-xl p-3 md:p-6 text-white shadow-lg flex items-center justify-between">
                             <div className="min-w-0">
-                                <p className="text-white/60 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Total Hebdo</p>
-                                <p className="text-base md:text-3xl font-black mt-1 tabular-nums truncate">{formatCurrencyCAD(grandTotal)}</p>
+                                <p className="text-white text-2xs font-semibold uppercase tracking-eyebrow">Total Hebdo</p>
+                                <p className="text-base md:text-3xl font-bold mt-1 tabular-nums truncate">{formatCurrencyCAD(grandTotal)}</p>
                             </div>
-                            <div className="p-2 md:p-3 bg-white/10 rounded-xl shrink-0 ml-2">
+                            <div className="p-2 md:p-3 bg-black/15 rounded-md shrink-0 ml-2">
                                 <TrendingUp className="w-4 h-4 md:w-6 md:h-6" />
                             </div>
                         </div>
-                        <div className="hidden sm:flex bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card items-center justify-between group hover:border-brand-main/20 transition-all">
+                        <div className="hidden sm:flex bg-white rounded-xl p-3 md:p-6 shadow-card items-center justify-between group hover:shadow-elevated transition-all">
                             <div className="min-w-0">
-                                <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Moy./vente</p>
-                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1 tabular-nums truncate">{formatCurrencyCAD(avgTicket)}</p>
+                                <p className="text-ink-mute text-2xs font-semibold uppercase tracking-eyebrow">Moy./vente</p>
+                                <p className="text-base md:text-2xl font-bold text-ink mt-1 tabular-nums truncate">{formatCurrencyCAD(avgTicket)}</p>
                             </div>
-                            <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2 hidden sm:flex">
+                            <div className="p-2 md:p-3 bg-sand rounded-md text-ink-faint group-hover:bg-primary-wash group-hover:text-primary-press transition-colors shrink-0 ml-2 hidden sm:flex">
                                 <Briefcase className="w-4 h-4 md:w-6 md:h-6" />
                             </div>
                         </div>
-                        <div className="bg-white rounded-2xl p-3 md:p-6 border border-slate-100 shadow-card flex items-center justify-between group hover:border-brand-main/20 transition-all">
+                        <div className="bg-white rounded-xl p-3 md:p-6 shadow-card flex items-center justify-between group hover:shadow-elevated transition-all">
                             <div className="min-w-0">
-                                <p className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest">Volume</p>
-                                <p className="text-base md:text-2xl font-black text-slate-800 mt-1">{filteredLineItems.length} <span className="text-xs md:text-base">Devis</span></p>
+                                <p className="text-ink-mute text-2xs font-semibold uppercase tracking-eyebrow">Volume</p>
+                                <p className="text-base md:text-2xl font-bold text-ink mt-1">{filteredLineItems.length} <span className="text-xs md:text-base">Devis</span></p>
                             </div>
-                            <div className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-amber-50 group-hover:text-brand-main transition-colors shrink-0 ml-2 hidden sm:flex">
+                            <div className="p-2 md:p-3 bg-sand rounded-md text-ink-faint group-hover:bg-primary-wash group-hover:text-primary-press transition-colors shrink-0 ml-2 hidden sm:flex">
                                 <Users className="w-4 h-4 md:w-6 md:h-6" />
                             </div>
                         </div>

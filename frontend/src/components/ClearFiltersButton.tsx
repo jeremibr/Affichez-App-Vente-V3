@@ -36,12 +36,15 @@ export function ClearFiltersButton({ activeCount, onClear, className }: {
             title={active
                 ? `Remettre les ${activeCount} filtre${activeCount > 1 ? 's' : ''} actif${activeCount > 1 ? 's' : ''} à leur valeur par défaut`
                 : 'Aucun filtre actif'}
+            // `btn-sm` is 36px — the same height as the Select triggers beside
+            // it. The hand-set 38px it used to carry left it 2px proud of them.
             className={cn(
-                'inline-flex items-center gap-1.5 h-[38px] px-3 rounded-lg text-xs font-semibold',
-                'border transition-colors whitespace-nowrap',
+                'btn btn-sm text-xs gap-1.5',
+                // Not `.btn-quiet`: this one is already *on* when filters are
+                // active, so it wears the tint instead of waiting for a hover.
                 active
-                    ? 'border-brand-main/40 text-brand-main bg-amber-50/50 hover:bg-amber-50 hover:border-brand-main'
-                    : 'border-slate-200 text-slate-300 bg-white cursor-not-allowed',
+                    ? 'border border-primary/40 text-primary-press bg-primary-wash hover:border-primary'
+                    : 'border border-hairline-strong text-ink-faint bg-white cursor-not-allowed',
                 className,
             )}
         >
@@ -51,7 +54,7 @@ export function ClearFiltersButton({ activeCount, onClear, className }: {
                 <span
                     translate="no"
                     className="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1
-                               rounded-full bg-brand-main text-white text-[10px] font-bold tabular-nums"
+                               rounded-full bg-primary text-white text-2xs font-bold tabular-nums"
                 >
                     {activeCount}
                 </span>

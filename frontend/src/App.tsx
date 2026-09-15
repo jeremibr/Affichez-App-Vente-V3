@@ -37,8 +37,8 @@ function AppRoutes() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-brand-main" />
+            <div className="min-h-screen bg-sand flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary-press" />
             </div>
         );
     }

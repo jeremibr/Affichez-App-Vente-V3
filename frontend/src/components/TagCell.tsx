@@ -30,24 +30,49 @@ import { cn } from '../lib/utils';
  *
  * So neighbouring hues are separated by weight as well as by hue — where two
  * hues sit close on the wheel, one of them is always the deeper fill. Light
- * blue against deep cyan, light amber against deep orange, light violet against
- * deep fuchsia and deep indigo: different at a glance, not on inspection.
+ * blue against deep violet, light amber against deep gold, deep fuchsia
+ * against deep indigo: different at a glance, not on inspection.
+ *
+ * These are the DATA palette (see src/index.css), not brand colours, and that
+ * is deliberate: orange means action and the status tones mean status, so
+ * neither can be spent on colouring forty-five picklist values.
+ *
+ * Tone 7 used to be a deep ORANGE. The 2026 brand made #F5570E the action
+ * colour, and a deep-orange badge sitting in a table read as a button. It was
+ * swapped for a deep gold on 2026-09-14 — the same slot, the same weight, the
+ * same warm half of the wheel, just far enough from the brand orange to stop
+ * competing with it.
+ *
+ * Tone 3 (violet) was a PALE fill until 2026-09-14, which made it a near-white
+ * twin of tone 1 (blue) — Cold-call and Meta Ads sitting one above the other in
+ * the Source column with nothing but the ink between them. It is now a solid
+ * lavender. Same hue, same slot, deeper weight: exactly the rule above. The
+ * numbers are in src/index.css.
+ *
+ * Neither the slot COUNT nor the ORDER changed, and neither did the two hash
+ * constants below, because they were tuned against the real distribution of
+ * labels in this database. Dropping a tone would have re-shuffled every label
+ * onto a new colour and there is no way to re-run that search from the code
+ * alone — the picklists live in Zoho. So every label still lands on the slot it
+ * always did; two of those slots simply look different now.
  */
 const TONES = [
     // Pale.
-    'bg-emerald-50 text-emerald-700 ring-emerald-200',   // 0
-    'bg-blue-50 text-blue-700 ring-blue-200',            // 1
-    'bg-amber-50 text-amber-800 ring-amber-200',         // 2
-    'bg-violet-50 text-violet-700 ring-violet-200',      // 3
-    'bg-rose-50 text-rose-700 ring-rose-200',            // 4
+    'bg-data-1 text-data-1-ink ring-data-1-edge',        // 0  green
+    'bg-data-2 text-data-2-ink ring-data-2-edge',        // 1  blue
+    'bg-data-3 text-data-3-ink ring-data-3-edge',        // 2  amber
+    'bg-data-4 text-data-4-ink ring-data-4-edge',        // 3  violet — a DEEP
+                                                        //    fill despite its
+                                                        //    place in this run
+    'bg-data-5 text-data-5-ink ring-data-5-edge',        // 4  rose
     // Saturated. A pale badge and a deep one are never mistaken for each other
     // even when the hues are neighbours — which is what the first attempt at
     // this palette, eight pale tones, got wrong.
-    'bg-cyan-200 text-cyan-900 ring-cyan-400',           // 5
-    'bg-lime-200 text-lime-900 ring-lime-400',           // 6
-    'bg-orange-200 text-orange-900 ring-orange-400',     // 7
-    'bg-fuchsia-200 text-fuchsia-900 ring-fuchsia-400',  // 8
-    'bg-indigo-200 text-indigo-900 ring-indigo-400',     // 9
+    'bg-data-6 text-data-6-ink ring-data-6-edge',        // 5  cyan
+    'bg-data-7 text-data-7-ink ring-data-7-edge',        // 6  lime
+    'bg-data-8 text-data-8-ink ring-data-8-edge',        // 7  gold  (was orange)
+    'bg-data-9 text-data-9-ink ring-data-9-edge',        // 8  fuchsia
+    'bg-data-10 text-data-10-ink ring-data-10-edge',     // 9  indigo
 ] as const;
 
 /**
@@ -101,8 +126,8 @@ export function Tag({ label, muted, full, className }: {
                 // node inside simply overflowed the cell instead of eliding.
                 'inline-block align-middle rounded-md px-1.5 py-0.5',
                 full ? 'max-w-full whitespace-normal break-words' : 'max-w-[128px] truncate',
-                'text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset',
-                muted ? 'bg-slate-50 text-slate-400 ring-slate-100' : toneFor(label),
+                'text-2xs font-semibold uppercase tracking-wide ring-1 ring-inset',
+                muted ? 'bg-sand text-ink-mute ring-hairline' : toneFor(label),
                 className,
             )}
         >
@@ -136,7 +161,7 @@ export function TagCell({ values, muted, emptyLabel = '—' }: {
     }, [open]);
 
     const clean = (values ?? []).filter(v => v && v.trim() && v !== '-None-');
-    if (clean.length === 0) return <span className="text-slate-300">{emptyLabel}</span>;
+    if (clean.length === 0) return <span className="text-ink-faint">{emptyLabel}</span>;
 
     const [first, ...rest] = clean;
 
@@ -152,8 +177,8 @@ export function TagCell({ values, muted, emptyLabel = '—' }: {
                         onFocus={() => setOpen(true)}
                         onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
                         aria-label={`${rest.length} autre${rest.length > 1 ? 's' : ''}`}
-                        className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold
-                                   text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
+                        className="rounded-md bg-stone px-1.5 py-0.5 text-2xs font-bold
+                                   text-ink-secondary transition-colors hover:bg-hairline-strong hover:text-ink"
                     >
                         <span translate="no">+{rest.length}</span>
                     </button>
@@ -168,7 +193,7 @@ export function TagCell({ values, muted, emptyLabel = '—' }: {
                             // it to "DISTRIBUTION PUBL…", which is the one thing
                             // the panel exists to avoid.
                             className="absolute left-0 top-6 z-30 flex w-max min-w-[180px] max-w-[320px] flex-col items-start gap-1
-                                       rounded-xl border border-slate-100 bg-white p-2 shadow-card-hover"
+                                       rounded-lg border border-hairline bg-white p-2 shadow-elevated"
                         >
                             {rest.map(v => <Tag key={v} label={v} muted={muted} full />)}
                         </span>
