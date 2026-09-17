@@ -11,6 +11,7 @@ import {
 import { cn, formatShortDate } from '../lib/utils';
 import type { InvoiceLinkageStatus } from '../types/database';
 import { UnmappedDepartmentsCard, QuoteCreatorCard } from '../components/settings/DataHealthCards';
+import { AdsSyncCard } from '../components/settings/AdvertisingCards';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
@@ -214,6 +215,7 @@ function QuartersViewer() {
 interface SyncResult { upserted: number; deleted?: number; voided?: number; errors: string[]; duration_ms: number; }
 
 function SyncManager() {
+    const { isAdmin } = useAuth();
     return (
         <div className="space-y-8 max-w-3xl">
             <SyncCard
@@ -236,6 +238,7 @@ function SyncManager() {
             />
             <LinkageCard />
             <QuoteCreatorCard />
+            {isAdmin && <AdsSyncCard />}
             {/* Placed last and deliberately loud when it has anything to say: this
                 card is the alarm that did not exist when ÉVÈNEMENT went missing
                 for sixteen months. */}
@@ -243,7 +246,7 @@ function SyncManager() {
             <div className="flex items-start gap-3 px-4 py-3 bg-sand rounded-md border border-hairline text-xs text-ink-mute">
                 <Calendar className="w-4 h-4 text-ink-mute shrink-0 mt-0.5" />
                 <span>
-                    Synchronisation automatique planifiée via pg_cron : <strong className="text-ink-secondary">Devis et Factures aux 5 min</strong>, <strong className="text-ink-secondary">Tâches CRM aux 20 min</strong>, <strong className="text-ink-secondary">Liaison factures aux 30 min</strong>, <strong className="text-ink-secondary">Créateurs des devis aux 3 min</strong>.
+                    Synchronisation automatique planifiée via pg_cron : <strong className="text-ink-secondary">Devis et Factures aux 5 min</strong>, <strong className="text-ink-secondary">Tâches CRM aux 20 min</strong>, <strong className="text-ink-secondary">Liaison factures aux 30 min</strong>, <strong className="text-ink-secondary">Créateurs des devis aux 3 min</strong>,{' '}<strong className="text-ink-secondary">Dépenses publicitaires aux 4 h</strong>.
                 </span>
             </div>
         </div>

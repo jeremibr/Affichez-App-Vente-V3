@@ -33,6 +33,7 @@ const ROUTE_CHUNKS: Record<string, () => Promise<unknown>> = {
     '/factures/quarterly': () => import('../pages/FQuarterlyAverages'),
     '/comptes': () => import('../pages/AccountsDashboard'),
     '/comptes/detail': () => import('../pages/AccountsDetail'),
+    '/comptes/publicite': () => import('../pages/Advertising'),
     '/portail': () => import('../pages/PortailObjectifs'),
     '/portail/devis': () => import('../pages/PortailDevis'),
     '/portail/factures': () => import('../pages/PortailFactures'),
@@ -67,6 +68,7 @@ const ROUTE_QUERIES: Record<string, () => void> = {
         p_year: null, p_exclude_ratings: null,
     }, { single: true }),
     '/taches': () => prefetchRpc('get_tasks_available_weeks', { p_year: CURRENT_YEAR }),
+    '/comptes/publicite': () => prefetchRpc('get_ad_spend_status'),
     '/portail/leads': () => prefetchRpc('get_zoho_lead_filter_options', {
         p_year: CURRENT_YEAR, p_stage: 'lead',
     }, { single: true }),

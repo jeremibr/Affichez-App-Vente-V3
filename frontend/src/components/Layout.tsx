@@ -15,6 +15,8 @@ import { Select } from './Select';
 import { Logo } from './Logo';
 import { prefetchRoute } from '../lib/prefetch';
 import { RepAvatar } from './RepAvatar';
+import { AdvertisingIcon } from './advertising/AdvertisingIcon';
+import { RouteErrorBoundary } from './RouteErrorBoundary';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -179,6 +181,10 @@ export default function Layout() {
                 { name: 'Comptes',         href: '',                    icon: Building2,       isLabel: true },
                 { name: 'Tableau de bord', href: '/comptes',            icon: LayoutDashboard, end: true },
                 { name: 'Détail comptes',  href: '/comptes/detail',     icon: List },
+                // Admin-only; see the route in App.tsx.
+                ...(isAdmin ? [
+                    { name: 'Publicité',       href: '/comptes/publicite',  icon: AdvertisingIcon },
+                ] : []),
             ],
         },
         {
@@ -350,7 +356,9 @@ export default function Layout() {
                 )}
 
                 <main className="flex-1 overflow-auto">
-                    <Outlet />
+                    <RouteErrorBoundary key={location.pathname}>
+                        <Outlet />
+                    </RouteErrorBoundary>
                 </main>
             </div>
         </div>

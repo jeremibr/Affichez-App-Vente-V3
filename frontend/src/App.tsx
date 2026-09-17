@@ -44,6 +44,7 @@ const PortailParametres = lazy(() => import('./pages/PortailParametres'));
 const ObjectifsEquipe = lazy(() => import('./pages/ObjectifsEquipe'));
 const AccountsDashboard = lazy(() => import('./pages/AccountsDashboard'));
 const AccountsDetail = lazy(() => import('./pages/AccountsDetail'));
+const Advertising = lazy(() => import('./pages/Advertising'));
 const Createurs = lazy(() => import('./pages/Createurs'));
 const PortailLeads = lazy(() => import('./pages/PortailLeads'));
 const TasksDashboard = lazy(() => import('./pages/TasksDashboard'));
@@ -111,6 +112,10 @@ function AppRoutes() {
                             leaderboard. Dominic, who asked for it: "c'est vraiment
                             juste pour moi, c'est même pas pour personne." */}
                         <Route path="createurs" element={<Createurs />} />
+
+                        {/* Publicité - listed under Comptes in the sidebar, admin-only.
+                            ad_spend_daily is also restricted to admins by RLS. */}
+                        <Route path="comptes/publicite" element={<Advertising />} />
 
                         {/* ─── Tâches CRM module (owner-only) - dashboard + weekly tabs ─── */}
                         <Route path="taches" element={<TasksDashboard />} />

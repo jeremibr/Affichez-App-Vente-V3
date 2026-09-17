@@ -656,3 +656,96 @@ export type AccountContactRow = {
     created_time: string | null;
     zoho_crm_url: string | null;
 };
+
+// ─── Publicité (Google Ads + Meta) ────────────────────────────────────────────
+//
+// Channel-level spend against the revenue of the CRM accounts attributed to each
+// channel, by month of account creation. Ratios are null when their denominator
+// is zero. `window_ends_on` is the date the period's attribution window closes;
+// null when the window is uncapped.
+
+/** Same string as `ad_spend_daily.platform`. */
+export type AdChannel = 'google' | 'meta';
+
+/** get_ad_performance - one row per channel, always both. */
+export type AdPerformanceRow = {
+    channel: AdChannel;
+    /** origine_du_client values counted as this channel. */
+    sources: string[];
+    currencies: string[];
+    spend: number;
+    impressions: number;
+    clicks: number;
+    platform_conversions: number;
+    platform_leads: number;
+    accounts_created: number;
+    accounts_invoiced: number;
+    revenue_attributed: number;
+    revenue_lifetime: number;
+    revenue_per_account: number | null;
+    cost_per_account: number | null;
+    cost_per_client: number | null;
+    roas: number | null;
+    /** Null when the period has no accounts tagged to the channel. */
+    net: number | null;
+    days_with_spend: number;
+    window_ends_on: string | null;
+    /** Creation date of the first account ever tagged with this channel's origin. */
+    source_first_used: string | null;
+};
+
+/** get_ad_monthly - one row per channel per month, all 12 months present. */
+export type AdMonthlyRow = {
+    channel: AdChannel;
+    month: number;
+    spend: number;
+    platform_conversions: number;
+    accounts_created: number;
+    accounts_invoiced: number;
+    revenue_attributed: number;
+    revenue_per_account: number | null;
+    cost_per_account: number | null;
+    roas: number | null;
+    window_ends_on: string | null;
+    source_first_used: string | null;
+};
+
+/** Campaign status normalised across platforms (ad_campaigns.status). */
+export type AdCampaignStatus = 'active' | 'paused' | 'removed' | 'unknown';
+
+/** get_ad_campaigns - platform-reported figures per campaign; no revenue. */
+export type AdCampaignRow = {
+    platform: AdChannel;
+    ad_account_id: string;
+    campaign_id: string;
+    campaign_name: string | null;
+    /** Current status from the platform's campaign list. */
+    status: AdCampaignStatus;
+    /** Raw platform value, e.g. ENABLED or ARCHIVED. */
+    platform_status: string | null;
+    currency: string | null;
+    /** Unrounded, so the table total equals the channel total. */
+    spend: number;
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    leads: number;
+    cpc: number | null;
+    cpm: number | null;
+    cost_per_conv: number | null;
+    first_date: string | null;
+    last_date: string | null;
+};
+
+/** get_ad_spend_status - sync coverage per platform. */
+export type AdSpendStatusRow = {
+    platform: AdChannel;
+    ad_accounts: string[];
+    currencies: string[];
+    campaigns: number;
+    first_date: string | null;
+    last_date: string | null;
+    days: number;
+    total_spend: number;
+    last_synced: string | null;
+};

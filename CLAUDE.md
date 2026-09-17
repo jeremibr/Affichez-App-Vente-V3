@@ -72,7 +72,7 @@ invoker helpers. A guard query:
 ```sql
 SELECT proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
 WHERE n.nspname = 'public' AND p.proconfig IS NOT NULL AND p.prosecdef = false
-  AND p.proname LIKE 'zoho_%';   -- must return zero rows
+  AND p.proname LIKE ANY (ARRAY['zoho_%', 'ad_%']);   -- must return zero rows
 ```
 
 **2. Filter dates with a RANGE, never `EXTRACT(... FROM col)`.** Wrapping the
@@ -261,6 +261,34 @@ include **"Publicité/Recherche Google" (108 accounts)** — the exact segment a
 about in the 2026-09-04 meeting. `get_zoho_account_filter_options` reads stored
 values for this reason.
 
+### Publicité: ad spend against revenue
+
+The **Publicité** module (`/comptes/publicite`, admin-only) compares Google Ads and Meta Ads spend
+with the revenue of the accounts attributed to each channel. Only those two channels. Setup and
+credentials: **`docs/ADVERTISING.md`**.
+
+- **`ad_spend_daily`** holds daily × campaign spend, written only by `ads-spend-sync` (cron every
+  4 h). Each run **re-pulls the last 35 days** instead of walking a cursor, because both platforms
+  restate recent spend; the PK `(platform, ad_account_id, campaign_id, spend_date)` makes that an
+  idempotent upsert.
+- **Admin-only at the row level** (`app_is_admin()` policy), not just hidden in the nav. The RPCs
+  are SECURITY INVOKER, so a non-admin caller gets zero spend, not an error.
+- **Channel ↔ source mapping is fixed** in `ad_channel_source_map()`:
+  `Publicité/Recherche Google` → google, `Meta Ads` → meta. There is no `Google AdWords` value on
+  Accounts (that one only exists on Leads).
+- **Attribution is by channel and month of account creation, never per lead or per campaign** —
+  the CRM stores no click identifiers. The campaign table therefore has no revenue column.
+- **Origins only exist from a date** (`Publicité/Recherche Google` from 2026-02-16, `Meta Ads`
+  regularly from 2024-08-21). `ad_source_first_used()` exposes it; `roas`/`net` are NULL when a
+  period has no tagged accounts, and the page warns when a period starts before first use.
+- **Campaign status comes from `ad_campaigns`**, refreshed from each platform's campaign list on
+  every sync — never from `ad_spend_daily`, whose older rows are not re-synced.
+- **Meta insights are requested one calendar month at a time**; a year of daily rows in one request
+  fails with HTTP 500. Meta keeps 37 months of data; the API tier is `development_access`.
+- **Open cohorts.** A month's revenue keeps accruing until its attribution window closes. Every
+  RPC returns `window_ends_on`; `isCohortOpen()` in `components/advertising/channel.ts` marks those
+  figures as provisional. Do not remove it — the most recent month is always open.
+
 ### Leads: which table is which
 
 There are two lead tables, and picking the wrong one is the easiest mistake to
@@ -346,6 +374,7 @@ the table would just be overwritten by the next sync.
 | `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
 | `/createurs` | `Createurs` | Admin-only. Who *created* each quote/invoice, vs who sold it. Never reconciles with rep figures — by design |
 | `/comptes/detail` | `AccountsDetail` | Searchable client directory; a row opens its billing history by department and year |
+| `/comptes/publicite` | `Advertising` | Admin-only. Google Ads + Meta spend against the revenue of the accounts tagged to each. Channel-level and monthly, never per lead |
 | `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |
 | `/quarterly` | `QuarterlyAverages` | YoY quarterly average deal size per rep |
