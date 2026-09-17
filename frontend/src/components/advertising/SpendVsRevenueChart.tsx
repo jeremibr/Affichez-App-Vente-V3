@@ -44,6 +44,8 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
     }, [rows, channel]);
 
     const hasAnything = data.some(d => d.spend > 0 || d.revenue > 0);
+    const hasComplete = data.some(d => d.revenue > 0 && !d.open);
+    const hasOpen = data.some(d => d.revenue > 0 && d.open);
     const max = Math.max(1, ...data.map(d => Math.max(d.spend, d.revenue)));
     const tone = CHANNEL_TONE[channel];
 
@@ -93,7 +95,7 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
             ) : (
                 <>
                     <div className="px-5 pt-4">
-                        <Legend tone={tone} />
+                        <Legend tone={tone} complete={hasComplete} open={hasOpen} />
                         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
                              className="w-full h-[260px]" role="img"
                              aria-label={`Dépense et revenus par mois pour ${CHANNEL_LABEL[channel]} en ${year}`}>
@@ -113,7 +115,7 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
                                           className="stroke-hairline" strokeWidth={1} />
                                     <text x={PAD_L - 6} y={PAD_T + plotH * (1 - f) + 3} textAnchor="end"
                                           className="fill-ink-faint" style={{ fontSize: 9 }}>
-                                        {Math.round(max * f).toLocaleString('fr-CA')}
+                                        {Math.round(max * f).toLocaleString('fr-CA')} $
                                     </text>
                                 </g>
                             ))}
@@ -208,25 +210,34 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
     );
 }
 
-function Legend({ tone }: { tone: { ink: string } }) {
+function Legend({ tone, complete, open }: { tone: { ink: string }; complete: boolean; open: boolean }) {
     return (
-        <div className="flex items-center gap-4 text-2xs font-semibold text-ink-mute mb-1" translate="no">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs font-semibold text-ink-mute mb-1" translate="no">
             <span className="flex items-center gap-1.5">
                 <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: 'var(--color-hairline-strong)' }} />
                 Dépense
             </span>
-            <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: tone.ink }} />
-                Revenus facturés
-            </span>
-            <span className="flex items-center gap-1.5">
-                <svg width="12" height="10" aria-hidden>
-                    <rect width="12" height="10" rx="2" fill="none" strokeWidth="1" style={{ stroke: tone.ink }} />
-                    <line x1="0" y1="10" x2="12" y2="-2" strokeWidth="1.5" style={{ stroke: tone.ink }} />
-                    <line x1="-4" y1="10" x2="8" y2="-2" strokeWidth="1.5" style={{ stroke: tone.ink }} />
-                </svg>
-                Fenêtre non terminée
-            </span>
+            {complete && (
+                <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: tone.ink }} />
+                    Revenus facturés
+                </span>
+            )}
+            {open && (
+                <span className="flex items-center gap-1.5">
+                    {/* The same hatch the bars use, so the swatch is recognisable. */}
+                    <svg width="12" height="10" aria-hidden>
+                        <defs>
+                            <pattern id="legend-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                                <rect width="4" height="4" style={{ fill: 'var(--color-canvas)' }} />
+                                <line x1="0" y1="0" x2="0" y2="4" strokeWidth="2" style={{ stroke: tone.ink }} />
+                            </pattern>
+                        </defs>
+                        <rect width="12" height="10" rx="2" fill="url(#legend-hatch)" strokeWidth="1" style={{ stroke: tone.ink }} />
+                    </svg>
+                    Revenus facturés — encore en cours
+                </span>
+            )}
         </div>
     );
 }
