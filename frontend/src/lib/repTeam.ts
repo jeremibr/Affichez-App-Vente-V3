@@ -13,6 +13,11 @@ import { INTERNAL_REP_NAMES } from './constants';
  *
  * The team list is fetched **once per session and shared**: this is now read by
  * table cells, so a per-component fetch would be one request per avatar.
+ *
+ * It comes from the get_sales_team() RPC, never from allowed_users directly.
+ * That table's RLS shows a member only their own row, so a rep reading it got a
+ * team of one - themselves - and saw every colleague folded into Interne. The
+ * RPC returns the names to everyone and nothing else from the table.
  */
 
 export const INTERNAL_LABEL = 'Interne';
@@ -31,16 +36,22 @@ function load(): Promise<void> {
     if (!inflight) {
         inflight = (async () => {
             const internal = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
-            const { data } = await supabase
-                .from('allowed_users')
-                .select('rep_name')
-                .not('rep_name', 'is', null);
+            const { data, error } = await supabase.rpc('get_sales_team');
             const team = [...new Set(
-                (data ?? [])
-                    .map((r: { rep_name: string }) => r.rep_name)
+                ((data as string[] | null) ?? [])
                     .filter(Boolean)
-                    .filter((n: string) => !internal.has(n.normalize('NFC'))),
-            )].sort() as string[];
+                    .filter(n => !internal.has(n.normalize('NFC'))),
+            )].sort();
+
+            // An empty team would turn every rep into Interne - the one wrong
+            // answer that looks plausible. On a failure stay "not loaded", which
+            // leaves names as they are, and let the next mount try again.
+            if (error || team.length === 0) {
+                if (error) console.error('get_sales_team failed:', error.message);
+                inflight = null;
+                return;
+            }
+
             state = { team, loaded: true };
             for (const l of listeners) l();
         })();
