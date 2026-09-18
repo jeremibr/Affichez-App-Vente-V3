@@ -115,6 +115,11 @@ Réglages. At that point the guards become
 
 ### 3. Year-over-year silently reports zero for 2025 — **PROVEN**
 
+> **Symptom fixed** by `20260918150000_fiscal_quarters_2024.sql`, which adds the
+> four 2024 quarters so 2025 has a real year to be measured against. **The
+> underlying defect is still open**: a missing calendar year still returns `0`
+> rather than "unknown". See "What is still open" at the end of this entry.
+
 `fiscal_quarters` only covers **2025-01-01 → 2026-12-31** (8 rows, no gaps or
 overlaps). The YoY functions inner-join sales to that table and select
 `fq.year = p_year - 1` for the comparison, so asking for 2025 looks for 2024
@@ -136,6 +141,22 @@ The weekly-rate normalisation itself (`SUM(amount) / weeks_completed`) is
 **sound** — both sides are per-week figures, so they are comparable. Note only
 that a quarter one day old divides by a full week, so early-quarter rates are
 noisy.
+
+The calendar is calendar quarters with `num_weeks` as a nominal 13, not a
+measured length: 2025 Q1 is 90 days, Q3 is 92, both recorded as 13. Keep that
+convention when adding a year, or the weekly rate stops being comparable across
+quarters.
+
+**What is still open.** `0` for a year that was never queried is
+indistinguishable from `0` for a year with no sales, and that is what kept this
+invisible. The fix is `previous_total = NULL` when `p_year - 1` has no
+`fiscal_quarters` rows, rendered as "—". It was not attempted with the 2024 rows
+because only two of the four functions involved are in this repo —
+`get_quarterly_yoy_totals` and `get_inv_quarterly_yoy_totals` in
+`supabase_quarterly_totals.sql`. The per-rep `get_quarterly_yoy` and
+`get_inv_quarterly_yoy` exist **only in the database**, so changing the two
+visible ones would make the team total print "—" above rep rows still printing
+`0`. **Prerequisite: pull those two functions into the repo first.**
 
 ### 4. Task `completion_rate` compares two different cohorts — **CODE**
 
