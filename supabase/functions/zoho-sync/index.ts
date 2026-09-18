@@ -28,6 +28,51 @@ const DEPT_MAP: Record<string, string> = {
   'ÉVENEMENT': 'EVENEMENT',
 };
 
+// ─── Storing every quote, not only the won ones ───────────────────────────────
+//
+// Off until QUOTES_STORE_ALL_STATUSES is set in the project's secrets, so this
+// can be deployed, dry-run and reviewed before it writes anything. A single run
+// can also opt in with `x-store-all: true` without switching it on for the cron.
+const STORE_ALL_ENV = (Deno.env.get('QUOTES_STORE_ALL_STATUSES') ?? '').toLowerCase() === 'true';
+
+// Non-won quotes are stored from this date on. Older ones are walked (so orphan
+// detection still sees them) but not written, which keeps the table to the years
+// the dashboards actually offer. Won quotes are stored whatever their age, so
+// nothing that exists today stops being refreshed.
+const BACKFILL_START = '2025-01-01';
+
+// A full walk covers every status over the whole history — roughly 20k estimates
+// across both orgs — which does not fit in one invocation. Requests are killed at
+// 150s; stopping at 110s leaves room to persist the cursor and answer. Same
+// budget zoho-lead-sync uses for the same reason.
+const FULL_SYNC_BUDGET_MS = 110_000;
+
+/**
+ * Zoho's status → our enum, or null when we do not recognise it.
+ *
+ * Null is deliberate. The observed vocabulary is draft/sent/accepted/invoiced/
+ * declined/expired, but it cannot be proven closed — `partially_invoiced` exists
+ * in the API's filter list and returns nothing today — and an unrecognised value
+ * hitting an enum column fails the INSERT, which takes the sync down. So the raw
+ * string always lands in zoho_status, the mapped value lands in status, and
+ * get_unmapped_status_summary() surfaces anything this function did not know.
+ * Same shape as DEPT_MAP above, for the same reason.
+ */
+function mapStatus(raw: string): string | null {
+  if (raw === 'accepted') return 'accepted';
+  if (raw.includes('invoiced') || raw.includes('paid')) return 'invoiced';
+  if (raw === 'declined' || raw === 'void' || raw === 'rejected') return 'declined';
+  if (raw === 'sent') return 'sent';
+  if (raw === 'draft') return 'draft';
+  if (raw === 'expired') return 'expired';
+  return null;
+}
+
+/** Won means it counts as revenue — the two statuses every revenue filter names. */
+function isWon(mapped: string | null): boolean {
+  return mapped === 'accepted' || mapped === 'invoiced';
+}
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -146,12 +191,23 @@ async function deleteBatch(zohoIds: string[]): Promise<void> {
  * filters Zoho by those two statuses — declined rows are never returned and would
  * otherwise read as orphans and be deleted on every full sync.
  */
-async function fetchOrphanCandidateIds(): Promise<string[]> {
+async function fetchOrphanCandidateIds(storeAll: boolean): Promise<string[]> {
+  // The candidate set must match what the walk actually saw, or every row it
+  // could not have seen reads as an orphan.
+  //
+  //   old behaviour  the walk asked Zoho for Accepted and Invoiced only, so only
+  //                  those two statuses can be judged. A declined row is absent
+  //                  from the walk while still existing, and deleting it loses it
+  //                  for good — no later full sync fetches it back either.
+  //   storing all    the walk asks for every status over the whole history, so
+  //                  every row is fair game and the filter would wrongly protect
+  //                  rows that really are gone.
+  const statusFilter = storeAll ? '' : '&status=in.(accepted,invoiced)';
   const ids: string[] = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/sales?select=zoho_id&status=in.(accepted,invoiced)` +
+      `${SUPABASE_URL}/rest/v1/sales?select=zoho_id${statusFilter}` +
         `&order=zoho_id.asc&limit=${pageSize}&offset=${offset}`,
       { headers: SB_HEADERS },
     );
@@ -160,6 +216,46 @@ async function fetchOrphanCandidateIds(): Promise<string[]> {
     ids.push(...rows.map((r) => r.zoho_id));
     if (rows.length < pageSize) return ids;
   }
+}
+
+// ─── Full-walk cursor ─────────────────────────────────────────────────────────
+//
+// A full walk does not fit in one 150s invocation, so it runs in slices and
+// remembers where it got to. Stored as JSON in sync_state.cursor_token — the same
+// column and the same idea zoho-lead-sync uses.
+//
+// The walk is ordered by created_time ASCENDING on purpose. Zoho's default is
+// descending, which puts new estimates on page 1 and pushes everything else down,
+// so a resumed numeric page would skip whatever shifted across the boundary.
+// Ascending appends new records at the end, leaving earlier pages stable.
+
+type WalkCursor = { org: number; page: number };
+
+async function readWalkCursor(): Promise<WalkCursor | null> {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/sync_state?key=eq.devis&select=cursor_token`,
+    { headers: SB_HEADERS },
+  );
+  if (!res.ok) return null;
+  const rows = await res.json() as Array<{ cursor_token: string | null }>;
+  const raw = rows.length > 0 ? rows[0].cursor_token : null;
+  if (!raw) return null;
+  try { return JSON.parse(raw) as WalkCursor; } catch { return null; }
+}
+
+async function writeWalkCursor(cursor: WalkCursor | null): Promise<void> {
+  // PATCH, not upsert: sync_state.last_modified_time is NOT NULL with no default,
+  // so an upsert that omits it only survives because the row happens to exist.
+  // The 'devis' row is created by readSyncState's own upsert; this only ever
+  // updates it.
+  await fetch(`${SUPABASE_URL}/rest/v1/sync_state?key=eq.devis`, {
+    method: 'PATCH',
+    headers: SB_HEADERS,
+    body: JSON.stringify({
+      cursor_token: cursor ? JSON.stringify(cursor) : null,
+      updated_at: new Date().toISOString(),
+    }),
+  });
 }
 
 /**
@@ -254,8 +350,10 @@ Deno.serve(async (req: Request) => {
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';
   const isFullSync = req.headers.get('x-full-sync') === 'true';
-  // Report which quotes orphan detection would remove, without removing them.
+  // Reports what the run WOULD write and remove, without writing or removing it.
   const isDryRun = req.headers.get('x-dry-run') === 'true';
+  // Storing every status is off until the secret is set; a single run can opt in.
+  const storeAll = STORE_ALL_ENV || req.headers.get('x-store-all') === 'true';
   const action = isManual
     ? (isFullSync ? 'sync_manual_full' : 'sync_manual')
     : 'sync_auto';
@@ -263,6 +361,9 @@ Deno.serve(async (req: Request) => {
   let totalUpserted = 0;
   let totalDeleted = 0;
   let totalDeclined = 0;
+  let totalSkippedOld = 0;
+  const byStatus: Record<string, number> = {};
+  const unmapped: Record<string, number> = {};
   const errors: string[] = [];
 
   try {
@@ -278,26 +379,60 @@ Deno.serve(async (req: Request) => {
 
     const seenZohoIds = new Set<string>();
 
-    // Full sync: filter by status to skip drafts/expired (much fewer pages).
-    // Incremental: no status filter — last_modified_time catches all status changes.
-    const statusFilters = isFullSync ? ['Accepted', 'Invoiced'] : [null];
+    // Zoho's estimates endpoint has NO working date filter. Verified against the
+    // live API: date_start and date_after are both accepted and both ignored —
+    // asking for 2026-09-01 onward, sorted ascending, returns EST-000003 dated
+    // 2015-03-23, and page_context echoes no date criterion at all. So a full
+    // walk cannot be narrowed by date; it is bounded by a deadline and resumed
+    // from a cursor instead.
+    const deadline = startTime + FULL_SYNC_BUDGET_MS;
 
-    for (const org of ORGS) {
+    // Full sync, storing everything: one ordered walk per org over every status.
+    // Full sync, won only (today): the old two status filters, far fewer pages.
+    // Incremental: no status filter — last_modified_time catches every change.
+    const statusFilters = isFullSync ? (storeAll ? [null] : ['Accepted', 'Invoiced']) : [null];
+
+    // A sliced walk resumes where the last slice stopped. Only a full walk that
+    // is storing everything is long enough to need this.
+    const useCursor = isFullSync && storeAll;
+    const startCursor = useCursor ? await readWalkCursor() : null;
+    let walkComplete = true;
+
+    for (let orgIdx = 0; orgIdx < ORGS.length; orgIdx++) {
+      const org = ORGS[orgIdx];
+      // Resuming: skip the orgs the previous slice already finished.
+      if (startCursor && orgIdx < startCursor.org) continue;
+
       for (const statusFilter of statusFilters) {
-        let page = 1;
+        let page = (startCursor && orgIdx === startCursor.org) ? startCursor.page : 1;
         let hasMore = true;
 
         while (hasMore) {
+          // Out of time. Remember where we are and let the next call continue;
+          // the walk is deliberately NOT marked complete, which is what keeps
+          // orphan detection from running against a half-seen Zoho.
+          if (useCursor && Date.now() > deadline) {
+            await writeWalkCursor({ org: orgIdx, page });
+            walkComplete = false;
+            hasMore = false;
+            break;
+          }
+
           const lastModParam = lastModified
             ? `&last_modified_time=${encodeURIComponent(toZohoTimestamp(lastModified))}`
             : '';
           const statusParam = statusFilter ? `&filter_by=Status.${statusFilter}` : '';
+          // Ascending on a full walk so numeric pages stay stable between slices:
+          // Zoho's default descending order puts new estimates on page 1 and
+          // pushes everything down, so a resumed page would skip whatever moved.
+          const sortParam = useCursor ? '&sort_column=created_time&sort_order=A' : '';
           const url = `https://www.zohoapis.com/books/v3/estimates` +
-            `?organization_id=${org.id}&page=${page}&per_page=200${statusParam}${lastModParam}`;
+            `?organization_id=${org.id}&page=${page}&per_page=200${statusParam}${lastModParam}${sortParam}`;
 
           const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
           if (!response.ok) {
             errors.push(`${org.office} p.${page}: ${await response.text()}`);
+            walkComplete = false;
             break;
           }
 
@@ -311,9 +446,53 @@ Deno.serve(async (req: Request) => {
           for (const est of estimates) {
             const rawStatus = ((est.status as string) ?? '').toLowerCase();
             const zohoId = String(est.estimate_id);
+            // Every estimate the walk saw, whether or not it is written. Orphan
+            // detection asks "did Zoho show me this?", not "did I store it?".
             seenZohoIds.add(zohoId);
 
-            if (rawStatus === 'accepted' || rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
+            const mapped = mapStatus(rawStatus);
+            if (storeAll) {
+              byStatus[mapped ?? `(unmapped:${rawStatus || 'empty'})`] =
+                (byStatus[mapped ?? `(unmapped:${rawStatus || 'empty'})`] ?? 0) + 1;
+              if (!mapped) unmapped[rawStatus || '(empty)'] = (unmapped[rawStatus || '(empty)'] ?? 0) + 1;
+            }
+
+            if (storeAll) {
+              const quoteDate = (est.date as string) || null;
+              const acceptedDate =
+                (est.cf_date_acceptation_unformatted as string) || (est.accepted_date as string) || null;
+
+              // Won quotes are stored whatever their age, so nothing that exists
+              // today stops being refreshed. Non-won ones start at BACKFILL_START:
+              // the dashboards only offer 2025 and 2026, and Zoho's estimates
+              // endpoint has no date filter to narrow the walk with, so the limit
+              // has to be applied here.
+              if (!isWon(mapped) && (!quoteDate || quoteDate < BACKFILL_START)) {
+                totalSkippedOld++;
+                continue;
+              }
+
+              const deptLabel = (est.cf_d_partement ?? est.department) as string;
+              toUpsert.push({
+                zoho_id: zohoId,
+                // Unchanged formula, and it still means "when the money happened"
+                // for a won quote. For one that was never accepted it falls back
+                // to the issue date — which is why quote_date exists rather than
+                // this column being reused as a cohort date.
+                sale_date: acceptedDate || quoteDate,
+                quote_date: quoteDate,
+                accepted_date: acceptedDate,
+                client_name: est.customer_name,
+                amount: Math.round((Number(est.total) / 1.14975) * 100) / 100,
+                quote_number: est.estimate_number,
+                rep_name: (est.salesperson_name as string)?.trim() || null,
+                zoho_department_label: deptLabel ? String(deptLabel) : null,
+                department: DEPT_MAP[deptLabel] ?? null,
+                office: org.office,
+                zoho_status: rawStatus || null,
+                status: mapped,
+              });
+            } else if (rawStatus === 'accepted' || rawStatus.includes('invoiced') || rawStatus.includes('paid')) {
               // An unrecognised department no longer throws the quote away.
               // The old `if (department)` meant an estimate whose department
               // Zoho reports under a name DEPT_MAP does not know vanished with
@@ -345,8 +524,13 @@ Deno.serve(async (req: Request) => {
             }
           }
 
-          if (toUpsert.length > 0) { await upsertBatch(toUpsert); totalUpserted += toUpsert.length; }
-          if (toDecline.length > 0) { await declineBatch(toDecline); }
+          // A dry run counts what it would have written and writes nothing, so a
+          // backfill this size can be inspected before it touches the table.
+          if (toUpsert.length > 0) {
+            if (!isDryRun) await upsertBatch(toUpsert);
+            totalUpserted += toUpsert.length;
+          }
+          if (toDecline.length > 0 && !isDryRun) { await declineBatch(toDecline); }
 
           hasMore = (data.page_context as Record<string, boolean>)?.has_more_page ?? false;
           page++;
@@ -354,14 +538,35 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // The walk finished every org and page: clear the cursor so the next full
+    // sync starts from the beginning rather than resuming a completed pass.
+    if (useCursor && walkComplete && !isDryRun) await writeWalkCursor(null);
+
     // Orphan detection: only safe on a full sync that walked every Zoho page cleanly.
     // A mid-run Zoho error leaves seenZohoIds short, which reads as mass deletion —
     // bail out instead. Same guard for an implausibly large orphan set.
     if (isFullSync) {
       if (errors.length > 0) {
         errors.push('orphan detection skipped: Zoho paging was incomplete');
+      } else if (!walkComplete) {
+        // A run cut short by the deadline has only seen part of Zoho. Every row
+        // it did not reach yet would read as an orphan, so this must wait for the
+        // slice that finishes the walk. Not an error — just not finished.
+        errors.push('orphan detection deferred: walk resumes on the next run');
+      } else if (startCursor !== null) {
+        // The slice that FINISHES a resumed walk has only the ids from its own
+        // slice in seenZohoIds — the set does not survive across invocations. So
+        // "complete" is not enough; orphan detection needs one invocation that saw
+        // all of Zoho by itself, or it would read every earlier slice's rows as
+        // orphans. The 5% ceiling below would stop the deletion, but silently, and
+        // orphan detection would simply never run again.
+        //
+        // A won-only full sync (the default) still walks everything in one pass,
+        // so this only defers while a storing-everything backfill is slicing. Run
+        // one without x-store-all afterwards to sweep orphans.
+        errors.push('orphan detection skipped: walk was resumed, so this run did not see all of Zoho by itself');
       } else {
-        const existingIds = await fetchOrphanCandidateIds();
+        const existingIds = await fetchOrphanCandidateIds(storeAll);
         const orphanIds = existingIds.filter(id => !seenZohoIds.has(id));
         const maxOrphans = Math.max(50, Math.floor(existingIds.length * 0.05));
         if (orphanIds.length > maxOrphans) {
@@ -406,6 +611,11 @@ Deno.serve(async (req: Request) => {
       declined: totalDeclined,
       orphans_found: totalDeleted,
       dry_run: isDryRun,
+      store_all: storeAll,
+      walk_complete: walkComplete,
+      seen: seenZohoIds.size,
+      ...(storeAll ? { by_status: byStatus, skipped_before_backfill: totalSkippedOld } : {}),
+      ...(Object.keys(unmapped).length > 0 ? { unmapped_statuses: unmapped } : {}),
       errors,
       duration_ms: durationMs,
     };
