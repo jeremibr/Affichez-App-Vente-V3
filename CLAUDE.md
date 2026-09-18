@@ -48,6 +48,51 @@ All data flows through `src/lib/supabase.ts` (the singleton Supabase client). Pa
 
 There is no service layer abstraction; Supabase calls are made directly inside page components using `useCallback`-wrapped async functions. Real-time subscriptions (Supabase Realtime) are set up in `useEffect` and cleaned up on unmount.
 
+### Read this before you write a statistic
+
+**No table in this app contains what its name says.** Each sync applies a filter,
+and the filter lives thousands of lines away from the SQL that aggregates it, so
+it is invisible from the query. The one that has already produced a wrong number
+on screen:
+
+> **`sales` holds only quotes that were WON.** `accepted` and `invoiced`, plus
+> `declined` *only when the quote was accepted first*. Quotes that were sent,
+> drafted or expired are **never written at all** — the sync inserts only on
+> `accepted`/`invoiced`/`paid` (`zoho-sync/index.ts:316`) and merely PATCHes
+> existing rows on decline (`:343`). Verified: 8,085 rows, 0 of them `sent`,
+> `draft` or `expired`; Zoho's QC org alone holds 3,000+ expired and 1,500+
+> declined that the database has never seen.
+
+So **you cannot compute a closing rate, win rate or conversion rate from
+`sales`** — the losing quotes are not in there. The Créé par page's `Taux` shows
+92% for this reason; the real figure is at most ~58%. Fixing it means changing
+the sync, not the SQL.
+
+Before adding or changing any statistic, the non-negotiables:
+
+1. **Prove the denominator population.** `GROUP BY status` on the source table
+   and confirm every outcome you divide by is actually present.
+2. **Narrow numerator and denominator on the same dimensions.** `objectives` and
+   `objectives_factures` have no `office` column, so filtering the dashboard by
+   office narrows the actuals and leaves the target company-wide — QC currently
+   reads 46% when it is measured against the whole company's number.
+3. **One cohort per ratio.** "Created in period" and "closed in period" are
+   different row sets (this is live in `get_tasks_kpis`, which can exceed 100%).
+4. **Count the same thing all over one page.** The Factures KPI card excludes
+   credit notes; the Sommaire table under it does not.
+5. **An inner join to `fiscal_quarters` or `objectives` is a filter.** Unmatched
+   rows vanish silently — `fiscal_quarters` only covers 2025–2026, which is why
+   YoY for 2025 reports last year as $0 against 1,868 real 2024 sales.
+6. **Never `NOT IN` a nullable subquery.** One NULL in `excluded_clients` zeroes
+   every dashboard, with no error.
+7. **Verify against Zoho, not against our mirror.** The database is a filtered
+   copy; the filter is usually the bug.
+
+Full audit, evidence, live-verification commands, and the list of things already
+checked and found sound: **[STATS-INTEGRITY.md](STATS-INTEGRITY.md)** (kept at the
+repo root on purpose — `docs/` is gitignored, so nothing filed there survives a
+clone). Read it before touching any RPC that aggregates.
+
 ### Performance: four rules that are easy to undo by accident
 
 Measured 2026-09-15. The Comptes RPCs averaged 1.2–2.7 s each and the page fires
