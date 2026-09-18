@@ -31,14 +31,26 @@ export function QuarterBlock({
     // When provided (whole-team view), the "Total équipe" last-year figure uses the
     // true company total for the year - including reps who left or had a dry quarter -
     // instead of only summing the reps shown this year. See get_quarterly_yoy_totals.
-    previousTotalOverride?: number;
+    // null means the comparison year has no fiscal calendar, so there is nothing
+    // to compare against - distinct from undefined, which means "no override given".
+    previousTotalOverride?: number | null;
 }) {
     const previousYear = currentYear - 1;
     const { sortedData, sortConfig, handleSort } = useSort(data);
 
     const totalCurrent = data.reduce((sum, row) => sum + Number(row.current_avg || 0), 0);
-    const totalPrevious = previousTotalOverride ?? data.reduce((sum, row) => sum + Number(row.previous_avg || 0), 0);
-    const totalResultat = totalCurrent - totalPrevious;
+
+    // A year nobody defined a calendar for is unknown, not zero. Printing 0 here
+    // is what let the 2025 page show four green gains against a year that was
+    // never queried - see STATS-INTEGRITY.md.
+    const prevUnavailable = previousTotalOverride === null
+        || (previousTotalOverride === undefined
+            && data.length > 0 && data.every(row => row.previous_avg === null));
+
+    const totalPrevious = prevUnavailable
+        ? null
+        : previousTotalOverride ?? data.reduce((sum, row) => sum + Number(row.previous_avg || 0), 0);
+    const totalResultat = totalPrevious === null ? null : totalCurrent - totalPrevious;
     const totalDeals = data.reduce((sum, row) => sum + Number(row.deal_count || 0), 0);
 
     const getStyle = (val: number) => {
@@ -120,7 +132,8 @@ export function QuarterBlock({
                             </tr>
                         ) : (
                             sortedData.map((row, idx) => {
-                                const res = Number(row.resultat);
+                                // null = the comparison year has no calendar. "—", not 0.
+                                const res = row.resultat === null ? null : Number(row.resultat);
                                 return (
                                     <tr key={idx} className="hover:bg-sand/60 transition-colors group">
                                         <td className="px-3 md:px-5 py-2.5 md:py-3 font-medium text-ink-secondary whitespace-nowrap sticky left-0 bg-white z-10"><RepName name={row.rep_name} size="sm" /></td>
@@ -132,12 +145,16 @@ export function QuarterBlock({
                                             {formatCurrencyCAD(row.current_avg)}
                                         </td>
                                         <td className="px-4 py-3 text-right text-ink-mute tabular-nums whitespace-nowrap">
-                                            {formatCurrencyCAD(row.previous_avg)}
+                                            {row.previous_avg === null ? '—' : formatCurrencyCAD(row.previous_avg)}
                                         </td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                                            <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums", getStyle(res))}>
-                                                {getIcon(res)}{formatCurrencyCAD(Math.abs(res))}
-                                            </span>
+                                            {res === null ? (
+                                                <span className="text-ink-mute tabular-nums">—</span>
+                                            ) : (
+                                                <span className={cn("inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tabular-nums", getStyle(res))}>
+                                                    {getIcon(res)}{formatCurrencyCAD(Math.abs(res))}
+                                                </span>
+                                            )}
                                         </td>
                                     </tr>
                                 );
@@ -152,14 +169,20 @@ export function QuarterBlock({
                                 <span className="text-2xs text-white/60 ml-1">{totalDeals > 1 && !dealLabel.endsWith('s') ? dealLabel + 's' : dealLabel}</span>
                             </td>
                             <td className="px-4 py-3.5 text-right font-bold tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalCurrent)}</td>
-                            <td className="px-4 py-3.5 text-right text-white/50 tabular-nums whitespace-nowrap">{formatCurrencyCAD(totalPrevious)}</td>
+                            <td className="px-4 py-3.5 text-right text-white/50 tabular-nums whitespace-nowrap">
+                                {totalPrevious === null ? '—' : formatCurrencyCAD(totalPrevious)}
+                            </td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                                <span className={cn(
-                                    "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold tabular-nums border border-white/20",
-                                    totalResultat >= 0 ? "bg-tone-good text-white" : "bg-tone-critical text-white"
-                                )}>
-                                    {getIcon(totalResultat)}{formatCurrencyCAD(Math.abs(totalResultat))}
-                                </span>
+                                {totalResultat === null ? (
+                                    <span className="text-white/50 tabular-nums">—</span>
+                                ) : (
+                                    <span className={cn(
+                                        "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold tabular-nums border border-white/20",
+                                        totalResultat >= 0 ? "bg-tone-good text-white" : "bg-tone-critical text-white"
+                                    )}>
+                                        {getIcon(totalResultat)}{formatCurrencyCAD(Math.abs(totalResultat))}
+                                    </span>
+                                )}
                             </td>
                         </tr>
                     </tfoot>

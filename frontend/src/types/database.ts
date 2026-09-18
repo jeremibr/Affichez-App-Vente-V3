@@ -49,8 +49,10 @@ export type YoYRow = {
     rep_name: string;
     office: string;
     current_avg: number;
-    previous_avg: number;
-    resultat: number;
+    // null when the comparison year has no fiscal_quarters rows: nothing was
+    // queried, which is not the same fact as "sold nothing". Rendered "—".
+    previous_avg: number | null;
+    resultat: number | null;
     deal_count: number;
 };
 
@@ -60,8 +62,9 @@ export type YoYRow = {
 // active in the current year.
 export type QuarterTotalsRow = {
     quarter: number;
-    current_total: number;
-    previous_total: number;
+    // Both null when that year has no fiscal_quarters rows - see YoYRow above.
+    current_total: number | null;
+    previous_total: number | null;
 };
 
 export type InvDetailRow = {
