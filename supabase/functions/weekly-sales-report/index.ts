@@ -51,10 +51,12 @@ function initials(name: string): string {
 }
 
 // Two logo variants, matching how affichez.ca actually uses them:
-// - color wordmark on white backgrounds (site header)
+// - colour wordmark on white backgrounds (site header)
 // - pure-white wordmark on the orange background (site footer)
-const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez.svg';
-const LOGO_URL_WHITE = 'https://www.affichez.ca/wp-content/uploads/2025/05/Calque_2.svg';
+// PNG, not the .svg the site serves: Gmail, Outlook and Yahoo all refuse to
+// render SVG in an email, and this goes out through Gmail.
+const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez-2026.png';
+const LOGO_URL_WHITE = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez-pied-de-page.png';
 
 const BRAND_DARK = '#000000';
 const BRAND_ORANGE = '#F5570E';
