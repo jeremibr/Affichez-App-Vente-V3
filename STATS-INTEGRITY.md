@@ -208,16 +208,26 @@ without trace.
 
 ## Security findings (found during this audit)
 
-- **Nine tables were world-readable** with `VITE_SUPABASE_ANON_KEY`, which ships
-  inside the public JS bundle — no login: `sales` (8,085 rows of client names and
-  amounts), `webhook_log` (103,170), `rep_objectives` (105, per-rep targets),
-  `objectives` and `objectives_factures` (72 each, revenue targets),
-  `fiscal_quarters`, `excluded_clients`, `excluded_reps`, `sync_state`.
-  **Closed by `20260918140000_close_anon_read_access.sql`.**
-  `invoices`, `allowed_users`, `zoho_tasks`, `zoho_leads`, `zoho_accounts` and
-  `rep_objectives_dept` were already protected.
+- **The `anon` role held `DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE,
+  UPDATE` on all 38 objects in `public`** — not SELECT, everything. That is
+  Supabase's default blanket grant, and `anon` is the role behind
+  `VITE_SUPABASE_ANON_KEY`, which ships inside the built JS bundle.
+  **Closed by `20260918140000_revoke_anon_access.sql`.**
 
-  Worth knowing for anyone doing this again: the dashboard RPCs are SECURITY
+  Seven tables had no RLS at all, so the grant was live and unguarded to any
+  unauthenticated caller: `paye_entries` (payroll), `rep_objectives` (per-rep
+  targets), `objectives_factures`, `excluded_clients`, `excluded_reps`,
+  `paye_meta`, `sync_state`. The rest had RLS on but a permissive policy that let
+  anon read regardless — 8,085 rows from `sales`, 103,170 from `webhook_log`.
+
+  **RLS alone could never have finished this**, which is why the fix is a revoke:
+  - 8 of the 13 views run with OWNER rights (no `security_invoker`), so base
+    table RLS does not reach them. `invoices` correctly returned zero rows to
+    anon while `v_inv_weekly_summary` handed over 4,270 rows of the same data —
+    the 2026-09-03 invoices fix was bypassed from the day it shipped.
+  - `zoho_service_labels` is a MATERIALIZED view. Those support no RLS at all.
+
+  Worth knowing for anyone adding RLS here: the dashboard RPCs are SECURITY
   INVOKER and read `excluded_clients` / `excluded_reps` through `NOT IN` in 22
   places each. Enabling RLS on those two without a SELECT policy for
   `authenticated` raises no error — the subquery returns zero rows, `NOT IN ()`
