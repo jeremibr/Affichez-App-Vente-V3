@@ -312,3 +312,17 @@ Recorded so nobody re-opens them:
 - **Leads.** `zoho-lead-sync` applies no status filter, so `conversion_rate` in
   `get_leads_kpis` is computed over a complete population.
 - **`sales.year`/`month`.** Consistent with `sale_date` across 1,000 sampled rows.
+
+- **A leaderboard that sums to slightly more than the KPI card above it.** Almost
+  always a refetch, not a filter mismatch. `cachedRpc` holds a result for 60 s
+  and the quotes sync runs every 5 min, so a card fetched on page load and a
+  modal fetched on click can sit either side of a sync. Seen 2026-09-18: the
+  leaderboard read 5,971,675.48 / 1,691 against a card showing
+  5,971,595.48 / 1,690 — exactly one quote apart (`SOUMQC-028590`, $80.00,
+  created 17:03:47Z between the two fetches).
+
+  Tell the two apart before investigating: a genuine filter mismatch moves a
+  *population* — `Vente interne` alone is $12,600 in 2026, and any excluded-row
+  leak shows up in thousands, not in one row. A one-row, one-quote difference is
+  the clock. Reload and open the modal inside the 60 s cache window; if they
+  agree, there is nothing to fix.
