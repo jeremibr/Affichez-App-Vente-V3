@@ -82,12 +82,15 @@ export default function Createurs() {
         setRows(((data as CreatorSummaryRow[]) ?? []).map(r => ({
             ...r,
             quotes_created: Number(r.quotes_created),
+            quotes_sent: Number(r.quotes_sent),
             quotes_won: Number(r.quotes_won),
             quotes_amount: Number(r.quotes_amount),
             quotes_won_amount: Number(r.quotes_won_amount),
             invoices_created: Number(r.invoices_created),
             invoices_amount: Number(r.invoices_amount),
-            win_rate: Number(r.win_rate),
+            // Keep null as null: Number(null) is 0, and "0 %" would read as
+            // "lost everything" for a creator who has sent nothing yet.
+            win_rate: r.win_rate === null ? null : Number(r.win_rate),
         })));
         setStatus(((st as QuoteCreatorLinkStatus[]) ?? [])[0] ?? null);
         setLoading(false);
@@ -122,10 +125,11 @@ export default function Createurs() {
 
     const totals = useMemo(() => rows.reduce((a, r) => ({
         quotes: a.quotes + r.quotes_created,
+        sent: a.sent + r.quotes_sent,
         won: a.won + r.quotes_won,
         invoices: a.invoices + r.invoices_created,
         invAmount: a.invAmount + Number(r.invoices_amount),
-    }), { quotes: 0, won: 0, invoices: 0, invAmount: 0 }), [rows]);
+    }), { quotes: 0, sent: 0, won: 0, invoices: 0, invAmount: 0 }), [rows]);
 
     // Quotes are back-filled one Zoho call at a time; until it finishes the quote
     // columns are incomplete and saying so is the difference between "we are
@@ -211,13 +215,16 @@ export default function Createurs() {
                                         hint="Qui a saisi le document dans Zoho, pas qui a fait la vente."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                     <Th col="quotes_created" label="Devis créés"
-                                        hint="Tous les devis saisis, refusés compris."
+                                        hint="Tous les devis saisis, brouillons et refusés compris."
+                                        sortConfig={sortConfig} onSort={handleSort} />
+                                    <Th col="quotes_sent" label="Devis envoyés"
+                                        hint="Devis réellement envoyés à un client : envoyés, acceptés, facturés, refusés, expirés. Les brouillons sont exclus — ils n'ont jamais été présentés, donc ce ne sont pas des occasions perdues. C'est le dénominateur du taux."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                     <Th col="quotes_won" label="Devis gagnés"
                                         hint="Devis devenus une facture. Un devis accepté mais jamais facturé ne compte pas."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                     <Th col="win_rate" label="Taux"
-                                        hint="Devis gagnés ÷ devis créés."
+                                        hint="Devis gagnés ÷ devis envoyés, sur les devis émis dans la période."
                                         sortConfig={sortConfig} onSort={handleSort} />
                                     <Th col="quotes_won_amount" label="Valeur gagnée"
                                         hint="Montant des devis gagnés seulement, avant taxes."
@@ -258,14 +265,17 @@ export default function Createurs() {
                                         <td className="td text-right tabular-nums font-semibold text-ink-secondary">
                                             {r.quotes_created.toLocaleString('fr-CA')}
                                         </td>
+                                        <td className="td text-right tabular-nums text-ink-mute">
+                                            {r.quotes_sent.toLocaleString('fr-CA')}
+                                        </td>
                                         <td className="td text-right tabular-nums text-ink-secondary">
                                             {r.quotes_won.toLocaleString('fr-CA')}
                                         </td>
                                         <td className="td text-right tabular-nums">
                                             <span className={cn('font-bold text-xs',
                                                 r.quotes_created === 0 ? 'text-ink-faint'
-                                                    : r.win_rate >= 80 ? 'text-tone-good' : 'text-ink-mute')}>
-                                                {r.quotes_created === 0 ? '—' : `${Number(r.win_rate).toFixed(0)} %`}
+                                                    : (r.win_rate ?? 0) >= 80 ? 'text-tone-good' : 'text-ink-mute')}>
+                                                {r.win_rate === null ? '—' : `${Number(r.win_rate).toFixed(0)} %`}
                                             </span>
                                         </td>
                                         <td className="td text-right tabular-nums text-ink-secondary text-xs">
@@ -352,6 +362,7 @@ const SUMMARY_CSV: CsvColumn<CreatorSummaryRow>[] = [
     { header: 'Personne',        value: r => r.creator },
     { header: 'Devis crees',     value: r => r.quotes_created },
     { header: 'Devis gagnes',    value: r => r.quotes_won },
+    { header: 'Devis envoyes',   value: r => r.quotes_sent },
     { header: 'Taux (%)',        value: r => r.win_rate },
     { header: 'Valeur devis',    value: r => r.quotes_amount },
     { header: 'Valeur gagnee',   value: r => r.quotes_won_amount },

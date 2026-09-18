@@ -591,12 +591,17 @@ export type AccountDeptRevenueRow = {
 export type CreatorSummaryRow = {
     creator: string;
     quotes_created: number;
+    // Quotes that actually reached a client: sent, accepted, invoiced, declined,
+    // expired. Drafts are counted in quotes_created but never shown to anybody,
+    // so they are not a lost opportunity. This is win_rate's denominator.
+    quotes_sent: number;
     quotes_won: number;
     quotes_amount: number;
     quotes_won_amount: number;
     invoices_created: number;
     invoices_amount: number;
-    win_rate: number;
+    // null when nothing was sent — no rate to show, which is not a rate of zero.
+    win_rate: number | null;
 };
 
 /** get_creator_detail - quotes and invoices in one list. `sold_by` is the point:
