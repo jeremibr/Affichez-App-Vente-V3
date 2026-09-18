@@ -202,29 +202,55 @@ counts diverge.
 
 ## Latent hazards — correct today, no guard tomorrow
 
-### `NOT IN (SELECT ...)` is a loaded gun
+### `NOT IN (SELECT ...)` — a loaded gun, but the safety is on
+
+**Corrected 2026-09-18.** This was written up as an open hazard on the strength of
+the *data* (`excluded_clients` = 2 rows, `excluded_reps` = 1, no NULLs) without
+checking the *constraints*. The schema settles it, and the answer is that the
+scenario cannot occur:
+
+```sql
+excluded_clients.client_name  text NOT NULL
+excluded_reps.rep_name        text NOT NULL
+sales.client_name             text NOT NULL
+invoices.client_name          text NOT NULL
+```
 
 34 occurrences across 6 files filter with
 `client_name NOT IN (SELECT client_name FROM excluded_clients)` and the
-`excluded_reps` equivalent. In SQL, if that subquery returns **even one NULL**,
-the predicate evaluates to NULL for every row and **every dashboard silently
-returns zero**. Not an error — zero.
+`excluded_reps` equivalent. In SQL, a subquery returning **even one NULL** makes
+the predicate NULL for every row, and every dashboard silently returns zero — not
+an error, zero. That is a genuinely dangerous construct, and it is worth
+recognising on sight. But here **both subqueries are NOT NULL at the column
+level**, so they can never return one.
 
-Both tables are clean today (`excluded_clients` = 2 rows, `excluded_reps` = 1).
-Nothing prevents a NULL being inserted. Prefer `NOT EXISTS`, or at minimum
-`WHERE client_name IS NOT NULL` inside the subquery.
+The mirror case — the *outer* column being NULL, since `NULL NOT IN (...)` is NULL
+rather than true — is likewise closed for `client_name` on both tables. `rep_name`
+IS nullable on `sales` and `invoices`, but every function either guards it
+explicitly (`rep_name IS NULL OR ...`) or excludes it (`rep_name IS NOT NULL`).
 
-The same construct also drops rows where the outer column is NULL
-(`NULL NOT IN (...)` is NULL, not true). `sales.client_name` currently has zero
-NULLs, so this is inert — but a NULL client name would vanish from every total
-without trace.
+**Do not spend a day converting 34 predicates to `NOT EXISTS`.** If you add a new
+exclusion table, give its column `NOT NULL` and the same guarantee carries over.
 
-### Two definitions of "which period"
+### Two definitions of "which period" — also safe
 
-`get_sommaire` filters on the stored `sales.year` / `sales.month` columns;
-`get_dashboard_kpis` uses `EXTRACT(... FROM sale_date)`. Verified consistent over
-1,000 sampled rows, so they agree today. If `year`/`month` ever stop tracking
-`sale_date`, two numbers on the same page will diverge with nothing to flag it.
+**Corrected 2026-09-18**, same way as the entry above: checked against a sample
+first, and the schema afterwards.
+
+`get_sommaire` filters on the stored `sales.year` / `sales.month` columns while
+`get_dashboard_kpis` uses `EXTRACT(... FROM sale_date)`. They cannot diverge,
+because those columns are not stored values that something has to keep in sync —
+they are generated:
+
+```sql
+month integer GENERATED ALWAYS AS ((EXTRACT(month FROM sale_date))::integer) STORED
+year  integer GENERATED ALWAYS AS ((EXTRACT(year  FROM sale_date))::integer) STORED
+```
+
+Postgres maintains them from `sale_date` on every write. The two forms are the
+same expression, so either is fine to use. (`EXTRACT` on the raw column is not
+index-friendly — see the Performance rules in CLAUDE.md — but that is a speed
+question, not a correctness one.)
 
 ---
 
