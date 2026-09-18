@@ -79,6 +79,32 @@ round leaves a window where every dashboard overstates revenue:
    the same the moment new statuses exist: 3,000+ expired quotes and every
    unanswered estimate would fold into revenue silently. Now stated explicitly.
    A provable no-op on its own.
+
+   **1b.** `20260918220000_quotes_foundation.sql` — schema, also a no-op. Three
+   things the naive version of this change would have got wrong:
+
+   - **`sale_date` means two things once non-won quotes exist.** It is built as
+     `cf_date_acceptation ?? accepted_date ?? date`, so today it is always an
+     acceptance date. Store a `sent` quote and the fallback fires and it becomes
+     an issue date for some rows — with `week_start`, `month` and `year` derived
+     from it. A rate over that column compares "accepted in 2026" with "issued in
+     2026". Hence `quote_date` and `accepted_date` as first-class columns: **a
+     closing rate is a cohort of quotes ISSUED in a period.**
+   - **`preserve_first_sale_date` would have corrupted revenue dating.** It pinned
+     `sale_date` on first insert and never let it change — correct while a row
+     only ever appears already won. Store quotes at `sent` and the pin lands on
+     the issue date, so accepting the quote later could never correct it: issued
+     28 December, won 5 January, December revenue forever. It now preserves only
+     rows that were **already won**.
+   - **An enum alone can kill the sync.** An unrecognised Zoho status fails the
+     INSERT. `zoho_status` (raw, unconstrained) plus `status` (mapped, NULL when
+     unknown) plus `get_unmapped_status_summary()` mirrors the department pattern
+     that found $142,918 of unbilled revenue.
+
+   Denominator decided with Jérémi 2026-09-18: **quotes actually sent** —
+   `sent, accepted, invoiced, declined, expired`. Drafts are stored and visible
+   but excluded from the rate, because a draft was never shown to a client.
+   Backfill starts at 2025-01-01, matching `zoho-invoice-sync`'s full-sync window.
 2. Extend `sale_status_enum` and change `zoho-sync` to write every status rather
    than only the winners.
 3. Recompute `Taux` over the denominator that finally exists.
