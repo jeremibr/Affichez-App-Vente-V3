@@ -21,7 +21,7 @@ const CORS_HEADERS = {
 // - pure-white wordmark on the orange background (site footer)
 // PNG, not the .svg the site serves: Gmail, Outlook and Yahoo all refuse to
 // render SVG in an email, and this goes out through Gmail.
-const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez-2026.png';
+const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2026/09/Untitled-design-53.png';
 const LOGO_URL_WHITE = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez-pied-de-page.png';
 
 const BRAND_DARK = '#000000';
