@@ -5,7 +5,7 @@ import { SortIcon } from '../SortIcon';
 import { DEPARTMENTS } from '../../lib/constants';
 import { ExportButton } from '../ExportButton';
 import type { CsvColumn } from '../../lib/csv';
-import { RepAvatar } from '../../components/RepAvatar';
+import { RepName } from '../../components/RepAvatar';
 
 // Shorter display names for table headers
 const DEPT_SHORT: Record<string, string> = {
@@ -89,7 +89,7 @@ export function ZoneAPivotTable({
                         ) : (
                             sortedData.map((row) => (
                                 <tr key={String(row.repName)} className="hover:bg-sand/60 transition-colors">
-                                    <td className="px-5 py-3 font-medium text-ink whitespace-nowrap"><span className="inline-flex items-center gap-2"><RepAvatar name={String(row.repName)} size="sm" />{String(row.repName)}</span></td>
+                                    <td className="px-5 py-3 font-medium text-ink whitespace-nowrap"><RepName name={String(row.repName)} size="sm" /></td>
                                     <td className="px-4 py-3 text-right font-bold text-ink tabular-nums whitespace-nowrap">
                                         {formatCurrencyCAD(Number(row["Total"]))}
                                     </td>

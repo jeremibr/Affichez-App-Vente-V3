@@ -3,7 +3,7 @@ import { cachedRpc } from '../lib/rpcCache';
 import { Loader2, ClipboardList, FileText, Wallet, User, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { INTERNAL_REP_NAMES } from '../lib/constants';
+import { useRepTeam } from '../lib/repTeam';
 import PortailDevis from './PortailDevis';
 import PortailFactures from './PortailFactures';
 import PortailPaye from './PortailPaye';
@@ -43,7 +43,7 @@ function RepPicker({ reps, selected, onChange }: {
                 className="flex items-center gap-2.5 px-4 py-2.5 bg-white border border-hairline-strong rounded-md text-sm font-semibold text-ink-secondary hover:border-primary hover:text-primary-press transition-all shadow-xs min-w-[200px]"
             >
                 {selected
-                    ? <RepAvatar name={selected} size="md" />
+                    ? <RepAvatar name={selected} size="md" literal />
                     : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center shrink-0">
                           <User className="w-3.5 h-3.5" />
                       </div>}
@@ -70,7 +70,7 @@ function RepPicker({ reps, selected, onChange }: {
                                         : "text-ink-secondary hover:bg-sand font-medium"
                                 )}
                             >
-                                <RepAvatar name={rep} size="md" />
+                                <RepAvatar name={rep} size="md" literal />
                                 {rep}
                             </button>
                         ))}
@@ -91,24 +91,28 @@ export default function AdminReps() {
     const [activeTab, setActiveTab] = useState<Tab>('devis');
     const [loadingReps, setLoadingReps] = useState(true);
 
-    // Load rep list once from the leaderboard RPC
+    const repTeam = useRepTeam();
+
+    // Load rep list once from the leaderboard RPC. It waits for the team list:
+    // before that arrives every name looks off-team, and the picker would offer
+    // billing entities.
     const loadReps = useCallback(async () => {
+        if (!repTeam.loaded) return;
         setLoadingReps(true);
         const { data } = await cachedRpc('get_inv_rep_leaderboard', {
             p_year: 2026, p_office: null, p_status: null,
             p_month: null, p_dept: null, p_rep: null,
         });
         if (data && Array.isArray(data) && data.length > 0) {
-            const internalSet = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
             const names = (data as { rep_name: string }[])
                 .map(r => r.rep_name)
-                .filter(n => !internalSet.has(n.normalize('NFC')))
+                .filter(n => !repTeam.isInternal(n))
                 .sort();
             setAllReps(names);
             setSelectedRep(names[0] ?? '');
         }
         setLoadingReps(false);
-    }, []);
+    }, [repTeam]);
 
     useEffect(() => { loadReps(); }, [loadReps]);
 
@@ -130,7 +134,7 @@ export default function AdminReps() {
                     {/* Rep identity + picker */}
                     <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
                         <div className="flex items-center gap-4">
-                            <RepAvatar name={selectedRep} size="lg" square />
+                            <RepAvatar name={selectedRep} size="lg" square literal />
                             <div>
                                 <h1 className="text-xl font-semibold text-ink tracking-tight">
                                     {selectedRep || '—'}

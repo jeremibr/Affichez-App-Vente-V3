@@ -18,7 +18,8 @@ import { useSort } from '../hooks/useSort';
 import { useRepList } from '../hooks/useRepList';
 import { ExportButton } from '../components/ExportButton';
 import { autoColumns } from '../lib/csv';
-import { RepAvatar } from '../components/RepAvatar';
+import { RepName } from '../components/RepAvatar';
+import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 
 const STATUS_LABELS: Record<string, string> = Object.fromEntries(TASK_STATUSES.map(s => [s.value, s.label]));
 
@@ -64,6 +65,19 @@ function addDaysStr(dateStr: string, days: number): string {
     return `${dt.getFullYear()}-${mm}-${dd}`;
 }
 
+/**
+ * The average delay of two merged rows, weighted by the tasks each actually
+ * closed - averaging the two averages would give a rep who closed one task the
+ * same weight as one who closed two hundred.
+ */
+function weightedDays(a: TasksByRepRow, b: TasksByRepRow): number | null {
+    if (a.avg_days_to_close === null) return b.avg_days_to_close;
+    if (b.avg_days_to_close === null) return a.avg_days_to_close;
+    const n = a.nb_completed + b.nb_completed;
+    if (n === 0) return null;
+    return Math.round(((a.avg_days_to_close * a.nb_completed + b.avg_days_to_close * b.nb_completed) / n) * 10) / 10;
+}
+
 export default function TasksDashboard() {
     const [tab, setTab] = useUrlState('tab', 'dashboard'); // 'dashboard' | 'hebdo'
     const isWeekly = tab === 'hebdo';
@@ -78,10 +92,10 @@ export default function TasksDashboard() {
     const [availableWeeks, setAvailableWeeks] = useState<TasksAvailableWeek[]>([]);
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState<TaskKPIs | null>(null);
-    const [byRep, setByRep] = useState<TasksByRepRow[]>([]);
+    const [rawByRep, setRawByRep] = useState<TasksByRepRow[]>([]);
     const [byStatus, setByStatus] = useState<TasksByStatusRow[]>([]);
     const [weekly, setWeekly] = useState<TasksWeeklyRow[]>([]);
-    const [wow, setWow] = useState<TasksWoWRow[]>([]);
+    const [rawWow, setRawWow] = useState<TasksWoWRow[]>([]);
 
     const repList = useRepList();
 
@@ -118,10 +132,10 @@ export default function TasksDashboard() {
         ]);
 
         setKpis(kpiData?.[0] ?? null);
-        setByRep(repData ?? []);
+        setRawByRep(repData ?? []);
         setByStatus(statusData ?? []);
         setWeekly(weeklyData ?? []);
-        setWow(wowData ?? []);
+        setRawWow(wowData ?? []);
         setLoading(false);
     }, [isWeekly, year, selectedMonth, selectedRep, selectedWeek]);
 
@@ -142,6 +156,42 @@ export default function TasksDashboard() {
             .subscribe();
         return () => { supabase.removeChannel(sub); };
     }, []);
+
+    const repTeam = useRepTeam();
+
+    /**
+     * Everyone off the sales team is one Interne line. The two rates are
+     * recomputed from the summed counts - a completion rate is not the average
+     * of rates, and the average delay is weighted by tasks actually closed.
+     */
+    const byRep = useMemo(() => mergeInternalRows(
+        rawByRep, repTeam, r => r.rep_name,
+        r => ({ ...r, rep_name: INTERNAL_LABEL }),
+        (acc, r) => ({
+            ...acc,
+            nb_created: acc.nb_created + r.nb_created,
+            nb_completed: acc.nb_completed + r.nb_completed,
+            nb_touched: acc.nb_touched + r.nb_touched,
+            nb_open: acc.nb_open + r.nb_open,
+            nb_overdue: acc.nb_overdue + r.nb_overdue,
+            avg_days_to_close: weightedDays(acc, r),
+        }),
+    ).map(r => ({
+        ...r,
+        completion_rate: r.nb_created > 0 ? Math.round((r.nb_completed / r.nb_created) * 100) : 0,
+    })), [rawByRep, repTeam]);
+
+    const wow = useMemo(() => mergeInternalRows(
+        rawWow, repTeam, r => r.rep_name,
+        r => ({ ...r, rep_name: INTERNAL_LABEL }),
+        (acc, r) => ({
+            ...acc,
+            created_this_week: acc.created_this_week + r.created_this_week,
+            created_last_week: acc.created_last_week + r.created_last_week,
+            completed_this_week: acc.completed_this_week + r.completed_this_week,
+            completed_last_week: acc.completed_last_week + r.completed_last_week,
+        }),
+    ), [rawWow, repTeam]);
 
     const { sortedData: sortedReps, sortConfig, handleSort } = useSort<TasksByRepRow>(byRep, 'nb_completed', 'desc');
 
@@ -270,9 +320,7 @@ export default function TasksDashboard() {
                                             return (
                                                 <tr key={r.rep_name} className="hover:bg-sand/60 transition-colors">
                                                     <td className="px-4 py-3 font-semibold text-ink-secondary whitespace-nowrap">
-                                                        <span className="flex items-center gap-2">
-                                                            <RepAvatar name={r.rep_name} size="sm" />{r.rep_name}
-                                                        </span>
+                                                        <RepName name={r.rep_name} size="sm" />
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-bold text-ink-secondary tabular-nums">{r.nb_created}</td>
                                                     <td className="px-4 py-3 text-right tabular-nums"><span className="font-bold text-tone-good-ink">{r.nb_completed}</span></td>
@@ -378,9 +426,7 @@ function WeekOverWeekPanel({ rows }: { rows: TasksWoWRow[] }) {
                             return (
                                 <tr key={r.rep_name} className="hover:bg-sand/60 transition-colors">
                                     <td className="px-4 py-2.5 font-semibold text-ink-secondary">
-                                        <span className="flex items-center gap-2">
-                                            <RepAvatar name={r.rep_name} size="sm" />{r.rep_name}
-                                        </span>
+                                        <RepName name={r.rep_name} size="sm" />
                                     </td>
                                     <td className="px-4 py-2.5 text-right text-ink-mute tabular-nums">{r.completed_last_week}</td>
                                     <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{r.completed_this_week}</td>

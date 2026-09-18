@@ -18,7 +18,8 @@ import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { TagCell } from '../components/TagCell';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import type { CsvColumn } from '../lib/csv';
-import { RepAvatar } from '../components/RepAvatar';
+import { RepName } from '../components/RepAvatar';
+import { useRepTeam } from '../lib/repTeam';
 import {
     formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, cn,
 } from '../lib/utils';
@@ -301,10 +302,15 @@ export default function AccountsDetail() {
 
     /** The export runs the same filters with no LIMIT, so what lands in Excel is
      *  the whole filtered set - not the 100 rows that happen to be on screen. */
+    const repTeam = useRepTeam();
+
     const exportRows = useCallback(async () => {
         const { data } = await buildQuery(true).range(0, EXPORT_MAX - 1);
-        return (data as ZohoAccountRow[]) ?? [];
-    }, [buildQuery]);
+        // The export says what the screen says: a rep off the sales team is
+        // Interne there too.
+        return ((data as ZohoAccountRow[]) ?? [])
+            .map(a => ({ ...a, rep_name: repTeam.display(a.rep_name) }));
+    }, [buildQuery, repTeam]);
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
@@ -491,7 +497,7 @@ export default function AccountsDetail() {
                                             </td>
                                             <td className="td whitespace-nowrap text-ink-mute">{formatPhone(a.phone) ?? '—'}</td>
                                             <td className="td text-ink-mute">{a.billing_city ?? '—'}</td>
-                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{a.rep_name ? <><RepAvatar name={a.rep_name} size="sm" />{a.rep_name}</> : '—'}</span></td>
+                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{a.rep_name ? <RepName name={a.rep_name} size="sm" /> : '—'}</span></td>
                                             <td className="td">
                                                 <span className="inline-flex items-center gap-1.5">
                                                     {a.is_bulk_import && (
@@ -692,6 +698,7 @@ const INVOICE_CSV: CsvColumn<LeadInvoiceRow>[] = [
  * invoices is exactly the work this page exists to remove.
  */
 function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onClose: () => void }) {
+    const repTeam = useRepTeam();
     const [invoices, setInvoices] = useState<LeadInvoiceRow[]>([]);
     const [deptRows, setDeptRows] = useState<AccountDeptRevenueRow[]>([]);
     const [contacts, setContacts] = useState<AccountContactRow[]>([]);
@@ -894,7 +901,7 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                                             </td>
                                             <td className="td text-ink-mute">{inv.department ?? '—'}</td>
                                             <td className="td text-ink-mute">{inv.office ?? '—'}</td>
-                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{inv.rep_name ? <><RepAvatar name={inv.rep_name} size="sm" />{inv.rep_name}</> : '—'}</span></td>
+                                            <td className="td text-ink-mute"><span className="inline-flex items-center gap-2">{inv.rep_name ? <RepName name={inv.rep_name} size="sm" /> : '—'}</span></td>
                                             <td className="td">
                                                 <span className={cn('badge', INVOICE_STATUS_COLORS[key])}>
                                                     {INVOICE_STATUS_LABELS[key] ?? key}
@@ -936,7 +943,9 @@ function AccountDetailModal({ account, onClose }: { account: ZohoAccountRow; onC
                     </span>
                     <div className="flex items-center gap-4">
                         <ExportButton
-                            rows={invoices} columns={INVOICE_CSV}
+                            // Interne in the file, as on screen.
+                            rows={invoices.map(i => ({ ...i, rep_name: repTeam.display(i.rep_name) }))}
+                            columns={INVOICE_CSV}
                             filename={`factures_${(account.account_name ?? 'compte').replace(/[^\w-]+/g, '_').slice(0, 40)}`}
                             disabled={invoices.length === 0}
                         />

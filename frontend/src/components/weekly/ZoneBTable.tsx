@@ -5,7 +5,7 @@ import { useSort } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
 import { ExportButton } from '../ExportButton';
 import type { CsvColumn } from '../../lib/csv';
-import { RepAvatar } from '../../components/RepAvatar';
+import { RepName } from '../../components/RepAvatar';
 
 type AnyDetailRow = ZoneB_DetailRow | InvDetailRow;
 
@@ -146,7 +146,7 @@ export function ZoneBTable({ lineItems, module = 'devis' }: ZoneBTableProps) {
                                         {formatCurrencyCAD(item.amount)}
                                     </td>
                                     <td className="px-3 md:px-5 py-2.5 md:py-3.5 font-mono text-2xs text-ink-mute whitespace-nowrap">{getNumber(item)}</td>
-                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-ink-secondary whitespace-nowrap font-medium"><span className="inline-flex items-center gap-2"><RepAvatar name={item.rep_name} size="sm" />{item.rep_name}</span></td>
+                                    <td className="px-3 md:px-5 py-2.5 md:py-3.5 text-ink-secondary whitespace-nowrap font-medium"><RepName name={item.rep_name} size="sm" /></td>
                                     <td className="px-3 md:px-5 py-2.5 md:py-3.5">
                                         <span className={cn(
                                             "inline-flex items-center px-2 py-0.5 rounded-md text-2xs font-bold whitespace-nowrap border",

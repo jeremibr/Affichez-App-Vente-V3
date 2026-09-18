@@ -121,7 +121,7 @@ export default function PortailLeads({ propRepName }: Props) {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Mes Leads</h1>
-                    <p className="text-xs md:text-sm text-ink-mute mt-0.5 inline-flex items-center gap-2"><RepAvatar name={repName} size="sm" />{repName}</p>
+                    <p className="text-xs md:text-sm text-ink-mute mt-0.5 inline-flex items-center gap-2"><RepAvatar name={repName} size="sm" literal />{repName}</p>
                 </div>
                 {/* Tab switcher */}
                 <div className="flex items-center gap-1 bg-stone rounded-md p-1">

@@ -16,7 +16,7 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { ChannelCard } from '../components/advertising/ChannelCard';
 import { SpendVsRevenueChart } from '../components/advertising/SpendVsRevenueChart';
 import { CampaignTable } from '../components/advertising/CampaignTable';
-import { CHANNELS, CHANNEL_LABEL, isCohortOpen } from '../components/advertising/channel';
+import { CHANNEL_LABEL, isCohortOpen } from '../components/advertising/channel';
 import { ChannelLogo, ChannelLogoTile } from '../components/advertising/ChannelLogo';
 import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
 
@@ -155,15 +155,6 @@ export default function Advertising() {
                             Ce que la publicité coûte, et ce que les comptes qu&rsquo;elle a ramenés ont facturé
                         </p>
                     </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    {CHANNELS.map(c => (
-                        <span key={c}
-                              className="inline-flex items-center gap-2 rounded-full bg-white shadow-card pl-2 pr-3 py-1.5 text-xs font-semibold text-ink-secondary">
-                            <ChannelLogo channel={c} size="sm" />
-                            {CHANNEL_LABEL[c]}
-                        </span>
-                    ))}
                 </div>
             </div>
 

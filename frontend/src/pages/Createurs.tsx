@@ -252,7 +252,7 @@ export default function Createurs() {
                                                    focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
                                     >
                                         <td className="td">
-                                            <span className="inline-flex items-center gap-2 font-semibold text-ink"><RepAvatar name={r.creator} size="sm" />{r.creator}</span>
+                                            <span className="inline-flex items-center gap-2 font-semibold text-ink"><RepAvatar name={r.creator} size="sm" literal />{r.creator}</span>
                                         </td>
                                         <td className="td text-right tabular-nums font-semibold text-ink-secondary">
                                             {r.quotes_created.toLocaleString('fr-CA')}

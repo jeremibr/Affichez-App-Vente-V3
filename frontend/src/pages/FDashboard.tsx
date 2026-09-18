@@ -5,7 +5,8 @@ import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, Unlink } from 'lucide-react';
 import type { SommaireRow, InvoiceUnassignedSummary, UnassignedInvoiceRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
-import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES, INTERNAL_REP_NAMES } from '../lib/constants';
+import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES } from '../lib/constants';
+import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
@@ -14,7 +15,7 @@ import { useRepFilter, REP_DEFAULT, REP_ALL } from '../hooks/useRepFilter';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useAuth } from '../contexts/AuthContext';
-import { RepAvatar } from '../components/RepAvatar';
+import { RepAvatar, RepName } from '../components/RepAvatar';
 
 interface InvDashboardKPIs {
     ytd_total: number;
@@ -74,7 +75,28 @@ export default function FDashboard() {
     const [unassigned, setUnassigned] = useState<InvoiceUnassignedSummary | null>(null);
     const [showUnassigned, setShowUnassigned] = useState(false);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
-    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [rawLeaderboard, setRawLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const repTeam = useRepTeam();
+    /**
+     * Internal reps are one line, named Interne.
+     *
+     * Membership is "not on the current sales team", the same rule the rep
+     * filter uses, so the leaderboard and the filter can never disagree. It is
+     * recomputed here rather than when the rows are fetched because the team
+     * list arrives on its own schedule.
+     */
+    const leaderboard = useMemo(() => mergeInternalRows(
+        rawLeaderboard, repTeam, r => r.rep_name,
+        r => ({ ...r, rep_name: INTERNAL_LABEL, office: '—' }),
+        (acc, r) => ({
+            ...acc,
+            total_amount: Number(acc.total_amount) + Number(r.total_amount),
+            deal_count: Number(acc.deal_count) + Number(r.deal_count),
+        }),
+    )
+        .map(r => ({ ...r, avg_deal: Number(r.deal_count) > 0 ? Number(r.total_amount) / Number(r.deal_count) : 0 }))
+        .sort((a, b) => Number(b.total_amount) - Number(a.total_amount))
+        .map((r, i) => ({ ...r, rank: i + 1 })), [rawLeaderboard, repTeam]);
     /**
      * Every rep who billed anything this year, fetched WITHOUT a rep filter.
      *
@@ -92,7 +114,7 @@ export default function FDashboard() {
     /**
      * The rep filter, rebuilt 2026-09-08.
      *
-     * THE BUG being fixed: 'Tous' and 'Vente Interne' BOTH resolved to
+     * THE BUG being fixed: 'Tous' and the since-renamed internal group BOTH resolved to
      * repParam = null, so they sent an identical query - switching between them
      * changed nothing on screen. repParam was also the effect dependency, so
      * nothing even refetched.
@@ -161,21 +183,6 @@ export default function FDashboard() {
         ]);
 
         setUnassigned((unassignedData as InvoiceUnassignedSummary[])?.[0] ?? null);
-
-        // NFC-normalize both sides to handle é/è/etc. encoding differences between DB and JS strings
-        const internalNamesNFC = new Set(
-            (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
-        );
-        const isInternal = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
-
-        // Split internal reps: those already included in RPC results vs the one excluded at DB level
-        // Only 'Vente interne' is in excluded_reps - the other 4 are already in RPC numbers
-        const internalFromLeader: LeaderboardEntry[] = (leaderData || []).filter(
-            (r: LeaderboardEntry) => isInternal(r.rep_name)
-        );
-        const baseLeader: LeaderboardEntry[] = (leaderData || []).filter(
-            (r: LeaderboardEntry) => !isInternal(r.rep_name)
-        );
 
         setTopClients(clientData || []);
 
@@ -294,27 +301,20 @@ export default function FDashboard() {
                 setKpis(null);
             }
 
-            // Leaderboard - combine Vente interne (from supplementary) with the other 4 internal reps (from leaderboard)
-            const suppTotal   = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
-            const suppCount   = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
-            const leaderTotal = internalFromLeader.reduce((s, r) => s + Number(r.total_amount), 0);
-            const leaderCount = internalFromLeader.reduce((s, r) => s + Number(r.deal_count), 0);
-            const intTotal = suppTotal + leaderTotal;
-            const intCount = suppCount + leaderCount;
-            const withInternal: LeaderboardEntry[] = (intTotal !== 0 || intCount !== 0)
-                ? [...baseLeader, { rep_name: 'Vente Interne', office: '—', total_amount: intTotal, deal_count: intCount, avg_deal: intCount > 0 ? intTotal / intCount : 0, rank: 0 }]
-                : baseLeader;
-            const lb = withInternal
-                .sort((a, b) => b.total_amount - a.total_amount)
-                .map((r, i) => ({ ...r, rank: i + 1 }));
-            setLeaderboard(lb);
+            // 'Vente interne' is the one name excluded at DB level, so it is
+            // added back as its own row and folded into Interne with the rest.
+            const suppTotal = [...intMonthly.values()].reduce((s, v) => s + v.amount, 0);
+            const suppCount = [...intMonthly.values()].reduce((s, v) => s + v.count, 0);
+            setRawLeaderboard((suppTotal !== 0 || suppCount !== 0)
+                ? [...((leaderData as LeaderboardEntry[]) || []), { rep_name: 'Vente interne', office: '—', total_amount: suppTotal, deal_count: suppCount, avg_deal: suppCount > 0 ? suppTotal / suppCount : 0, rank: 0 }]
+                : ((leaderData as LeaderboardEntry[]) || []));
         } else {
             setGrandTotalData(grandData || []);
             setDeptData(dData || []);
             setPrevGrandTotalData(prevGrandData || []);
             setPrevDeptData(prevDData || []);
             setKpis(kpiData?.[0] || null);
-            setLeaderboard(baseLeader);
+            setRawLeaderboard((leaderData as LeaderboardEntry[]) || []);
         }
 
         setLoading(false);
@@ -430,18 +430,13 @@ export default function FDashboard() {
                             </div>
                             <div className="divide-y divide-hairline">
                                 {(() => {
-                                    const top5 = leaderboard.slice(0, 5);
-                                    const venteInterne = leaderboard.find(r => r.rep_name === 'Vente Interne');
-                                    const inTop5 = top5.some(r => r.rep_name === 'Vente Interne');
-                                    const display = inTop5 || !venteInterne ? top5 : [...top5, venteInterne];
-                                    return display.map((rep, idx) => (
+                                    return leaderboard.slice(0, 5).map((rep, idx) => (
                                         <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                             <div className="flex items-center gap-3">
                                                 <span className={cn(
                                                     "w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold",
-                                                    rep.rep_name === 'Vente Interne' ? "bg-hairline-strong text-ink-secondary" :
                                                     idx === 0 ? "bg-ink text-white" : "bg-stone text-ink-secondary"
-                                                )}>{rep.rep_name === 'Vente Interne' ? '—' : idx + 1}</span>
+                                                )}>{idx + 1}</span>
                                                 <RepAvatar name={rep.rep_name} size="md" />
                                                 <div className="min-w-0">
                                                     <p className="text-sm font-semibold text-ink-secondary truncate">{rep.rep_name}</p>
@@ -523,9 +518,7 @@ export default function FDashboard() {
                             <tr key={rep.rep_name} className="hover:bg-sand/60 transition-colors">
                                 <td className="px-4 py-2.5"><span className={cn("w-6 h-6 rounded-full flex items-center justify-center text-2xs font-bold", idx === 0 ? "bg-ink text-white" : idx === 1 ? "bg-stone text-ink-secondary" : idx === 2 ? "bg-sand text-ink-mute" : "bg-sand text-ink-faint")}>{idx + 1}</span></td>
                                 <td className="px-4 py-2.5 font-semibold text-ink-secondary">
-                                    <span className="flex items-center gap-2">
-                                        <RepAvatar name={rep.rep_name} size="sm" />{rep.rep_name}
-                                    </span>
+                                    <RepName name={rep.rep_name} size="sm" />
                                 </td>
                                 <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{rep.office}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
@@ -572,7 +565,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
-            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-4xl max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">
                     <h3 className="text-sm font-semibold text-ink">{title}</h3>
                     <button onClick={onClose} className="p-1.5 rounded-md text-ink-mute hover:text-ink-secondary hover:bg-stone transition-all"><X className="w-4 h-4" /></button>

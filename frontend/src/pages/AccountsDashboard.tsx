@@ -18,6 +18,7 @@ import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import type { CsvColumn } from '../lib/csv';
 import { RepAvatar } from '../components/RepAvatar';
+import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 
 /**
  * Comptes - tableau de bord.
@@ -76,7 +77,7 @@ export default function AccountsDashboard() {
 
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState<ZohoAccountKPIs | null>(null);
-    const [byRep, setByRep] = useState<ZohoAccountBreakdownRow[]>([]);
+    const [rawByRep, setRawByRep] = useState<ZohoAccountBreakdownRow[]>([]);
     const [bySource, setBySource] = useState<ZohoAccountBreakdownRow[]>([]);
     const [byService, setByService] = useState<ZohoAccountBreakdownRow[]>([]);
     const [byDomaine, setByDomaine] = useState<ZohoAccountBreakdownRow[]>([]);
@@ -179,7 +180,7 @@ export default function AccountsDashboard() {
         ]);
 
         setKpis((kpiData as ZohoAccountKPIs[])?.[0] ?? null);
-        setByRep((repData as ZohoAccountBreakdownRow[]) ?? []);
+        setRawByRep((repData as ZohoAccountBreakdownRow[]) ?? []);
         setBySource((srcData as ZohoAccountBreakdownRow[]) ?? []);
         setByService((svcData as ZohoAccountBreakdownRow[]) ?? []);
         setByDomaine((domData as ZohoAccountBreakdownRow[]) ?? []);
@@ -224,6 +225,29 @@ export default function AccountsDashboard() {
             supabase.removeChannel(sub);
         };
     }, []);
+
+    const repTeam = useRepTeam();
+
+    /**
+     * Everyone off the sales team is one Interne line, the same membership the
+     * rep filter uses. revenue_per_account is recomputed rather than averaged:
+     * it is revenue divided by accounts CREATED, so summing the two components
+     * is the only way to keep that meaning.
+     */
+    const byRep = useMemo(() => mergeInternalRows(
+        rawByRep, repTeam, r => r.label,
+        r => ({ ...r, label: INTERNAL_LABEL, is_bulk_import: false }),
+        (acc, r) => ({
+            ...acc,
+            nb_accounts: acc.nb_accounts + r.nb_accounts,
+            nb_invoiced: acc.nb_invoiced + r.nb_invoiced,
+            total_amount: acc.total_amount + r.total_amount,
+        }),
+    )
+        .map(r => ({ ...r, revenue_per_account: r.nb_accounts > 0 ? Math.round((r.total_amount / r.nb_accounts) * 100) / 100 : 0 }))
+        // The RPC orders by revenue then account count; keep that after merging.
+        .sort((a, b) => b.total_amount - a.total_amount || b.nb_accounts - a.nb_accounts),
+        [rawByRep, repTeam]);
 
     const yearOptions = useMemo(() => [
         { value: 'Toutes', label: 'Toutes les années' },

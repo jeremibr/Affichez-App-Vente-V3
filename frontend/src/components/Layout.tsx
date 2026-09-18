@@ -3,9 +3,8 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
-    DollarSign, ChevronDown, UserCircle,
-    Target, Eye, Building2, BarChart2, Users, UserPlus, List,
-    CheckSquare, FileSignature,
+    ChevronDown, Target, Eye, Building2, BarChart2, Users, UserPlus,
+    CheckSquare, FileSignature, Receipt, BookUser, HandCoins, PenLine,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,90 +19,124 @@ import { RouteErrorBoundary } from './RouteErrorBoundary';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface NavItem {
+/** A screen. */
+interface NavLeaf {
     name: string;
     href: string;
     icon: React.ElementType;
+    /** Match the path exactly. A module's own dashboard needs it: its path is a
+     *  prefix of every other screen in the module. */
     end?: boolean;
-    isLabel?: boolean; // renders as a non-clickable group header
+}
+
+/** A module - Devis, Factures, Comptes - holding the screens that belong to it. */
+interface NavGroup {
+    key: string;
+    name: string;
+    icon: React.ElementType;
+    items: NavLeaf[];
+}
+
+type NavNode = NavLeaf | NavGroup;
+
+function isGroup(node: NavNode): node is NavGroup {
+    return 'items' in node;
 }
 
 interface Section {
     key: string;
     label: string;
-    icon: React.ElementType;
-    activeColor: string;
-    items: NavItem[];
+    items: NavNode[];
 }
 
-// ─── Route → section mapping ──────────────────────────────────────────────────
+function leafMatches(item: NavLeaf, pathname: string): boolean {
+    return item.end ? pathname === item.href : pathname.startsWith(item.href);
+}
+
+// ─── Route → section / module mapping ─────────────────────────────────────────
 
 function getSectionKey(pathname: string): string {
+    if (pathname.startsWith('/portail/parametres')) return 'admin';
     if (pathname.startsWith('/portail')) return 'portail';
     if (pathname.startsWith('/leads') || pathname.startsWith('/comptes')) return 'ensemble';
     if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
-    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches') || pathname.startsWith('/createurs')) return 'admin';
+    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches') || pathname.startsWith('/createurs') || pathname.startsWith('/objectifs')) return 'admin';
     return 'ensemble';
 }
+
+/**
+ * Which module a path belongs to, so arriving on a screen opens the module it
+ * lives in. Spelled out rather than derived from the tree because the tree is
+ * rebuilt every render and depends on who is signed in.
+ */
+function getGroupKey(pathname: string): string | null {
+    if (pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'devis';
+    if (pathname.startsWith('/factures')) return 'factures';
+    if (pathname.startsWith('/comptes') || pathname.startsWith('/leads')) return 'comptes';
+    if (pathname.startsWith('/paye')) return 'commissions';
+    if (pathname.startsWith('/objectifs') || pathname.startsWith('/portail/parametres')) return 'objectifs';
+    return null;
+}
+
+/** The module that opens on a first visit, before anything has been clicked. */
+const DEFAULT_GROUP = 'devis';
 
 // ─── Module-level components (must NOT be defined inside Layout) ──────────────
 // Defining components inside a parent causes React to see a new type on every
 // render, which unmounts/remounts the subtree and kills CSS transitions.
 
-function SubItems({ items, open }: { items: NavItem[]; open: boolean }) {
+/** Height animation. grid-template-rows 0fr→1fr animates to the content's own
+ *  height, which `height: auto` cannot. */
+function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
     return (
         <div style={{
             display: 'grid',
             gridTemplateRows: open ? '1fr' : '0fr',
             transition: 'grid-template-rows 300ms ease-in-out',
         }}>
-            <div className="overflow-hidden">
-                <div className="ml-3 pl-3 border-l-2 border-hairline mt-0.5 mb-1 space-y-0.5">
-                    {items.map((item, i) =>
-                        item.isLabel ? (
-                            <p key={`label-${i}`} className="px-3 pt-2.5 pb-1 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow first:pt-1">
-                                {item.name}
-                            </p>
-                        ) : (
-                            <NavLink
-                                key={item.href}
-                                to={item.href}
-                                end={item.end}
-                                // The screen's chunk and its first query start
-                                // loading while the pointer is still travelling.
-                                onMouseEnter={() => prefetchRoute(item.href)}
-                                onFocus={() => prefetchRoute(item.href)}
-                                onTouchStart={() => prefetchRoute(item.href)}
-                                className={({ isActive }) => cn(
-                                    "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all",
-                                    isActive
-                                        ? "bg-primary text-white shadow-xs"
-                                        : "text-ink-mute hover:text-ink hover:bg-sand"
-                                )}
-                            >
-                                {({ isActive }) => (
-                                    <>
-                                        <item.icon className={cn(
-                                            "w-4 h-4 shrink-0",
-                                            isActive ? "text-white" : "text-ink-mute"
-                                        )} />
-                                        {item.name}
-                                    </>
-                                )}
-                            </NavLink>
-                        )
-                    )}
-                </div>
-            </div>
+            <div className="overflow-hidden">{children}</div>
         </div>
     );
 }
 
-function SectionHeader({ label, icon: Icon, activeColor, items, open, active, onToggle }: {
-    label: string;
-    icon: React.ElementType;
-    activeColor: string;
-    items: NavItem[];
+function LeafLink({ item }: { item: NavLeaf }) {
+    return (
+        <NavLink
+            to={item.href}
+            end={item.end}
+            // The screen's chunk and its first query start loading while the
+            // pointer is still travelling.
+            onMouseEnter={() => prefetchRoute(item.href)}
+            onFocus={() => prefetchRoute(item.href)}
+            onTouchStart={() => prefetchRoute(item.href)}
+            className={({ isActive }) => cn(
+                "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-all",
+                isActive
+                    ? "bg-primary text-white shadow-xs"
+                    : "text-ink-mute hover:text-ink hover:bg-sand"
+            )}
+        >
+            {({ isActive }) => (
+                <>
+                    <item.icon className={cn(
+                        "w-4 h-4 shrink-0",
+                        isActive ? "text-white" : "text-ink-mute"
+                    )} />
+                    {item.name}
+                </>
+            )}
+        </NavLink>
+    );
+}
+
+/**
+ * A module row: its icon and name, and its screens underneath.
+ *
+ * The icon of the open module stays ink, never orange - the active screen's
+ * orange fill is the one orange on the screen.
+ */
+function GroupRow({ group, open, active, onToggle }: {
+    group: NavGroup;
     open: boolean;
     active: boolean;
     onToggle: () => void;
@@ -112,19 +145,88 @@ function SectionHeader({ label, icon: Icon, activeColor, items, open, active, on
         <div>
             <button
                 onClick={onToggle}
+                onMouseEnter={() => group.items[0] && prefetchRoute(group.items[0].href)}
+                aria-expanded={open}
+                className={cn(
+                    "w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-semibold transition-all select-none",
+                    active ? "text-ink" : "text-ink-mute hover:text-ink-secondary hover:bg-sand"
+                )}
+            >
+                <group.icon className={cn("w-4 h-4 shrink-0 transition-colors", active ? "text-ink" : "text-ink-mute")} />
+                <span className="flex-1 text-left">{group.name}</span>
+                <ChevronDown className={cn(
+                    "w-3 h-3 shrink-0 text-ink-faint transition-transform duration-300",
+                    open && "rotate-180"
+                )} />
+            </button>
+            <Collapse open={open}>
+                <div className="ml-2.5 pl-3 border-l border-hairline mt-0.5 mb-1 space-y-0.5">
+                    {group.items.map(item => <LeafLink key={item.href} item={item} />)}
+                </div>
+            </Collapse>
+        </div>
+    );
+}
+
+function SubItems({ items, open, openGroups, onToggleGroup, pathname }: {
+    items: NavNode[];
+    open: boolean;
+    openGroups: Set<string>;
+    onToggleGroup: (key: string) => void;
+    pathname: string;
+}) {
+    return (
+        <Collapse open={open}>
+            <div className="ml-3 pl-3 border-l-2 border-hairline mt-0.5 mb-1 space-y-0.5">
+                {items.map(node => isGroup(node) ? (
+                    <GroupRow
+                        key={node.key}
+                        group={node}
+                        open={openGroups.has(node.key)}
+                        active={node.items.some(i => leafMatches(i, pathname))}
+                        onToggle={() => onToggleGroup(node.key)}
+                    />
+                ) : (
+                    <LeafLink key={node.href} item={node} />
+                ))}
+            </div>
+        </Collapse>
+    );
+}
+
+function SectionHeader({ label, items, open, active, openGroups, onToggleGroup, onToggle, pathname }: {
+    label: string;
+    items: NavNode[];
+    open: boolean;
+    active: boolean;
+    openGroups: Set<string>;
+    onToggleGroup: (key: string) => void;
+    onToggle: () => void;
+    pathname: string;
+}) {
+    return (
+        <div>
+            <button
+                onClick={onToggle}
+                aria-expanded={open}
                 className={cn(
                     "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm font-semibold transition-all select-none",
                     active ? "text-ink" : "text-ink-mute hover:text-ink-secondary hover:bg-sand"
                 )}
             >
-                <Icon className={cn("w-4 h-4 shrink-0 transition-colors", active ? activeColor : "text-ink-mute")} />
                 <span className="flex-1 text-left">{label}</span>
                 <ChevronDown className={cn(
                     "w-3.5 h-3.5 shrink-0 text-ink-faint transition-transform duration-300",
                     open && "rotate-180"
                 )} />
             </button>
-            <SubItems items={items} open={open} />
+            <SubItems
+                items={items}
+                open={open}
+                openGroups={openGroups}
+                onToggleGroup={onToggleGroup}
+                pathname={pathname}
+            />
         </div>
     );
 }
@@ -141,10 +243,17 @@ export default function Layout() {
     const [openSections, setOpenSections] = useState<Set<string>>(
         () => new Set([getSectionKey(location.pathname)])
     );
-    // Auto-open section on navigation
+    // Devis is the module the app opens on, so its screens are one click away
+    // from a cold start rather than two.
+    const [openGroups, setOpenGroups] = useState<Set<string>>(
+        () => new Set([getGroupKey(location.pathname) ?? DEFAULT_GROUP])
+    );
+    // Auto-open the section and the module a navigation lands in
     useEffect(() => {
         const key = getSectionKey(location.pathname);
         setOpenSections(prev => prev.has(key) ? prev : new Set([...prev, key]));
+        const group = getGroupKey(location.pathname);
+        if (group) setOpenGroups(prev => prev.has(group) ? prev : new Set([...prev, group]));
     }, [location.pathname]);
 
     // Close mobile menu on route change
@@ -160,38 +269,48 @@ export default function Layout() {
         {
             key: 'ensemble',
             label: 'Équipe Affichez',
-            icon: Building2,
-            activeColor: 'text-ink',
             items: [
-                { name: 'Devis',           href: '',                    icon: ClipboardList,   isLabel: true },
-                { name: 'Tableau de bord', href: '/',                   icon: LayoutDashboard, end: true },
-                { name: 'Par semaine',     href: '/weekly',             icon: CalendarDays },
-                { name: 'Par trimestre',   href: '/quarterly',          icon: LineChart },
-                ...(canAccessFactures ? [
-                    { name: 'Factures',        href: '',                    icon: FileText,        isLabel: true },
-                    { name: 'Tableau de bord', href: '/factures',           icon: LayoutDashboard, end: true },
-                    { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
-                    { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
-                ] : []),
+                {
+                    key: 'devis', name: 'Devis', icon: FileSignature,
+                    items: [
+                        { name: 'Tableau de bord', href: '/',          icon: LayoutDashboard, end: true },
+                        { name: 'Par semaine',     href: '/weekly',    icon: CalendarDays },
+                        { name: 'Par trimestre',   href: '/quarterly', icon: LineChart },
+                    ],
+                },
+                ...(canAccessFactures ? [{
+                    key: 'factures', name: 'Factures', icon: Receipt,
+                    items: [
+                        { name: 'Tableau de bord', href: '/factures',           icon: LayoutDashboard, end: true },
+                        { name: 'Par semaine',     href: '/factures/weekly',    icon: CalendarDays },
+                        { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
+                    ],
+                }] : []),
+                {
+                    key: 'comptes', name: 'Comptes', icon: Building2,
+                    items: [
+                        { name: 'Tableau de bord', href: '/comptes',        icon: LayoutDashboard, end: true },
+                        { name: 'Détail comptes',  href: '/comptes/detail', icon: BookUser },
+                        // Admin-only; see the route in App.tsx.
+                        ...(isAdmin ? [
+                            { name: 'Publicité', href: '/comptes/publicite', icon: AdvertisingIcon },
+                        ] : []),
+                    ],
+                },
                 // Leads - hidden while the Comptes module replaces it. Routes are
                 // commented out in App.tsx; leaving these visible would 404.
-                // { name: 'Leads',           href: '',                    icon: UserPlus,        isLabel: true },
-                // { name: 'Tableau de bord', href: '/leads',              icon: LayoutDashboard, end: true },
-                // { name: 'Détail leads',    href: '/leads/detail',       icon: List },
-                { name: 'Comptes',         href: '',                    icon: Building2,       isLabel: true },
-                { name: 'Tableau de bord', href: '/comptes',            icon: LayoutDashboard, end: true },
-                { name: 'Détail comptes',  href: '/comptes/detail',     icon: List },
-                // Admin-only; see the route in App.tsx.
-                ...(isAdmin ? [
-                    { name: 'Publicité',       href: '/comptes/publicite',  icon: AdvertisingIcon },
-                ] : []),
+                // {
+                //     key: 'leads', name: 'Leads', icon: UserPlus,
+                //     items: [
+                //         { name: 'Tableau de bord', href: '/leads',        icon: LayoutDashboard, end: true },
+                //         { name: 'Détail leads',    href: '/leads/detail', icon: BookUser },
+                //     ],
+                // },
             ],
         },
         {
             key: 'portail',
             label: 'Mon Portail',
-            icon: UserCircle,
-            activeColor: 'text-ink',
             items: [
                 { name: 'Mes Objectifs',   href: '/portail',             icon: Target,             end: true },
                 { name: 'Mes Devis',       href: '/portail/devis',       icon: ClipboardList },
@@ -202,19 +321,24 @@ export default function Layout() {
         },
     ];
 
-    const adminItems: NavItem[] = [
-        { name: 'Commissions',     href: '',                    icon: DollarSign,   isLabel: true },
-        { name: 'Vue ensemble',    href: '/paye',               icon: BarChart2,  end: true },
-        { name: 'Paramètres reps', href: '/paye/settings',      icon: Users },
-        { name: 'Objectifs',        href: '',                     icon: Target,       isLabel: true },
-        { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Target,       end: true },
-        { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
-        { name: 'Créé par',         href: '',                    icon: FileSignature, isLabel: true },
-        { name: 'Devis et factures', href: '/createurs',         icon: FileSignature, end: true },
-        { name: 'Tâches CRM',       href: '',                    icon: CheckSquare,  isLabel: true },
-        { name: 'Tableau de bord', href: '/taches',             icon: LayoutDashboard, end: true },
-        { name: 'Système',         href: '',                    icon: Settings,     isLabel: true },
-        { name: 'Paramètres',      href: '/settings',           icon: Settings },
+    const adminItems: NavNode[] = [
+        {
+            key: 'commissions', name: 'Commissions', icon: HandCoins,
+            items: [
+                { name: 'Vue ensemble',    href: '/paye',          icon: BarChart2, end: true },
+                { name: 'Paramètres reps', href: '/paye/settings', icon: Users },
+            ],
+        },
+        {
+            key: 'objectifs', name: 'Objectifs', icon: Target,
+            items: [
+                { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Users, end: true },
+                { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
+            ],
+        },
+        { name: 'Créé par',   href: '/createurs', icon: PenLine,     end: true },
+        { name: 'Tâches CRM', href: '/taches',    icon: CheckSquare, end: true },
+        { name: 'Paramètres', href: '/settings',  icon: Settings },
     ];
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -222,15 +346,21 @@ export default function Layout() {
     const toggle = (key: string) =>
         setOpenSections(prev => {
             const next = new Set(prev);
-            next.has(key) ? next.delete(key) : next.add(key);
+            if (next.has(key)) next.delete(key); else next.add(key);
             return next;
         });
 
-    const isSectionActive = (items: NavItem[]) =>
-        items.some(item =>
-            !item.isLabel && item.href &&
-            (item.end ? location.pathname === item.href : location.pathname.startsWith(item.href))
-        );
+    const toggleGroup = (key: string) =>
+        setOpenGroups(prev => {
+            const next = new Set(prev);
+            if (next.has(key)) next.delete(key); else next.add(key);
+            return next;
+        });
+
+    const isSectionActive = (items: NavNode[]) =>
+        items.some(node => isGroup(node)
+            ? node.items.some(i => leafMatches(i, location.pathname))
+            : leafMatches(node, location.pathname));
 
 
     // ─── Sidebar content ──────────────────────────────────────────────────────
@@ -249,12 +379,13 @@ export default function Layout() {
                     <SectionHeader
                         key={s.key}
                         label={s.label}
-                        icon={s.icon}
-                        activeColor={s.activeColor}
                         items={s.items}
                         open={openSections.has(s.key)}
                         active={isSectionActive(s.items)}
+                        openGroups={openGroups}
+                        onToggleGroup={toggleGroup}
                         onToggle={() => toggle(s.key)}
+                        pathname={location.pathname}
                     />
                 ))}
             </nav>
@@ -266,12 +397,13 @@ export default function Layout() {
                 {isAdmin && !viewAsRep && (
                     <SectionHeader
                         label="Administration"
-                        icon={Settings}
-                        activeColor="text-ink"
                         items={adminItems}
                         open={openSections.has('admin')}
                         active={isSectionActive(adminItems)}
+                        openGroups={openGroups}
+                        onToggleGroup={toggleGroup}
                         onToggle={() => toggle('admin')}
+                        pathname={location.pathname}
                     />
                 )}
 
@@ -281,7 +413,7 @@ export default function Layout() {
                       * allowed_users, so an admin with no rep row falls through
                       * to the initial of their email handle, as before. */}
                     {repName
-                        ? <RepAvatar name={repName} size="md" />
+                        ? <RepAvatar name={repName} size="md" literal />
                         : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center text-xs font-bold shrink-0">
                               {displayName.charAt(0)}
                           </div>}

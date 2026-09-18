@@ -395,7 +395,7 @@ export default function PortailParametres({ propRepName }: Props) {
                         <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8">
                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                 {adminPickedRep
-                                    ? <RepAvatar name={adminPickedRep} size="lg" square className="w-14 h-14 ring-2 ring-white/70 shadow-lg shadow-black/10" />
+                                    ? <RepAvatar name={adminPickedRep} size="lg" square className="w-14 h-14 ring-2 ring-white/70 shadow-lg shadow-black/10" literal />
                                     : <div className="w-14 h-14 rounded-xl bg-black/15 text-white flex items-center justify-center shrink-0">
                                           <Users className="w-6 h-6" />
                                       </div>}

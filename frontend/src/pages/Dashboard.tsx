@@ -5,7 +5,8 @@ import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
 import type { SommaireRow } from '../types/database';
 import { SommaireTable } from '../components/dashboard/SommaireTable';
-import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES, INTERNAL_REP_NAMES } from '../lib/constants';
+import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES } from '../lib/constants';
+import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
@@ -13,7 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
-import { RepAvatar } from '../components/RepAvatar';
+import { RepAvatar, RepName } from '../components/RepAvatar';
 
 interface DashboardKPIs {
     ytd_total: number;
@@ -80,7 +81,28 @@ export default function Dashboard() {
     const [prevDeptData, setPrevDeptData] = useState<SommaireRow[]>([]);
     const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
     const [topClients, setTopClients] = useState<TopClient[]>([]);
-    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const [rawLeaderboard, setRawLeaderboard] = useState<LeaderboardEntry[]>([]);
+    const repTeam = useRepTeam();
+    /**
+     * Internal reps are one line, named Interne.
+     *
+     * Membership is "not on the current sales team", the same rule the rep
+     * filter uses, so the leaderboard and the filter can never disagree. It is
+     * recomputed here rather than when the rows are fetched because the team
+     * list arrives on its own schedule.
+     */
+    const leaderboard = useMemo(() => mergeInternalRows(
+        rawLeaderboard, repTeam, r => r.rep_name,
+        r => ({ ...r, rep_name: INTERNAL_LABEL, office: '—' }),
+        (acc, r) => ({
+            ...acc,
+            total_amount: Number(acc.total_amount) + Number(r.total_amount),
+            deal_count: Number(acc.deal_count) + Number(r.deal_count),
+        }),
+    )
+        .map(r => ({ ...r, avg_deal: Number(r.deal_count) > 0 ? Number(r.total_amount) / Number(r.deal_count) : 0 }))
+        .sort((a, b) => Number(b.total_amount) - Number(a.total_amount))
+        .map((r, i) => ({ ...r, rank: i + 1 })), [rawLeaderboard, repTeam]);
     /**
      * Every rep who quoted anything this year, read WITHOUT a rep filter.
      *
@@ -99,7 +121,7 @@ export default function Dashboard() {
      * team by name plus two groups, and everyone else (former staff, internal
      * billing) sits behind "Interne" instead of adding 20 rows nobody scrolls.
      *
-     * THE BUG this replaced: 'Tous' and 'Vente Interne' BOTH resolved to
+     * THE BUG this replaced: 'Tous' and the since-renamed internal group BOTH resolved to
      * repParam = null, so the two sent an identical query and switching between
      * them changed nothing. repParam was also the effect dependency, so the page
      * did not even refetch.
@@ -161,19 +183,7 @@ export default function Dashboard() {
         setKpis(kpiData?.[0] || null);
         setTopClients(clientData || []);
 
-        // Group internal reps into a single "Vente Interne" leaderboard entry
-        const internalNamesNFC = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
-        const isInt = (name: string | null) => !!name && internalNamesNFC.has(name.normalize('NFC'));
-        const baseLeader: LeaderboardEntry[] = (leaderData || []).filter((r: LeaderboardEntry) => !isInt(r.rep_name));
-        const internalRows: LeaderboardEntry[] = (leaderData || []).filter((r: LeaderboardEntry) => isInt(r.rep_name));
-        if (internalRows.length > 0) {
-            const totalAmount = internalRows.reduce((s, r) => s + Number(r.total_amount), 0);
-            const dealCount   = internalRows.reduce((s, r) => s + Number(r.deal_count), 0);
-            baseLeader.push({ rep_name: 'Vente Interne', office: '—', total_amount: totalAmount, deal_count: dealCount, avg_deal: dealCount > 0 ? totalAmount / dealCount : 0, rank: 0 });
-        }
-        baseLeader.sort((a, b) => Number(b.total_amount) - Number(a.total_amount));
-        baseLeader.forEach((r, i) => { r.rank = i + 1; });
-        setLeaderboard(baseLeader);
+        setRawLeaderboard((leaderData as LeaderboardEntry[]) || []);
         setLoading(false);
     }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam, repsParam]);
 
@@ -300,7 +310,7 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             <div className="divide-y divide-hairline">
-                                {((): LeaderboardEntry[] => { const t5 = leaderboard.slice(0, 5); const vi = leaderboard.find(r => r.rep_name === 'Vente Interne'); return t5.some(r => r.rep_name === 'Vente Interne') || !vi ? t5 : [...t5, vi]; })().map((rep, idx) => (
+                                {leaderboard.slice(0, 5).map((rep, idx) => (
                                     <div key={rep.rep_name} className="px-5 py-3 flex items-center justify-between hover:bg-sand transition-colors">
                                         <div className="flex items-center gap-3">
                                             <span className={cn(
@@ -395,9 +405,7 @@ export default function Dashboard() {
                                     )}>{idx + 1}</span>
                                 </td>
                                 <td className="px-4 py-2.5 font-semibold text-ink-secondary">
-                                    <span className="flex items-center gap-2">
-                                        <RepAvatar name={rep.rep_name} size="sm" />{rep.rep_name}
-                                    </span>
+                                    <RepName name={rep.rep_name} size="sm" />
                                 </td>
                                 <td className="px-4 py-2.5 text-2xs font-semibold text-ink-mute uppercase">{rep.office}</td>
                                 <td className="px-4 py-2.5 text-right font-bold text-ink tabular-nums">{formatCurrencyCAD(rep.total_amount)}</td>
@@ -446,7 +454,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="absolute inset-0 bg-ink/40 backdrop-blur-xs" />
             <div
-                className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+                className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] md:max-w-4xl max-h-[80vh] flex flex-col overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
                 <div className="px-5 py-4 border-b border-hairline flex items-center justify-between shrink-0">

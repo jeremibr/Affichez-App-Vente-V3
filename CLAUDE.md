@@ -382,6 +382,15 @@ the table would just be overwritten by the next sync.
 
 All routes are children of `Layout`, which provides the sidebar navigation.
 
+The sidebar is two levels deep: a **section** (Équipe Affichez, Mon Portail,
+Administration — text only, no icon) holds **modules** (Devis, Factures,
+Comptes, Commissions, Objectifs), each with its own icon and its screens
+underneath; a module with a single screen is a plain link instead. Both levels
+collapse, `getSectionKey` / `getGroupKey` in `Layout.tsx` open the one a
+navigation lands in, and Devis is open on a cold start. When you add a route,
+add it to the tree, to `getGroupKey` if it belongs to a module, and to
+`ROUTE_CHUNKS` in `src/lib/prefetch.ts`.
+
 ### Key Shared Abstractions
 
 - **`src/lib/utils.ts`**: `cn()` (Tailwind class merger), `formatCurrencyCAD()`, `formatShortDate()`, `formatLongDate()`, `formatPercentage()`
@@ -487,6 +496,47 @@ for something drawn between 20px and 48px.
 Avatars are **not** lazy-loaded, on purpose: nine files totalling 23 KB are all
 in cache after the first screen, and `loading="lazy"` only bought a visible
 pop-in every time a dropdown opened.
+
+### A rep off the sales team is "Interne", by name and by row
+
+`src/lib/repTeam.ts` holds the one membership rule: the team is `allowed_users`
+minus `INTERNAL_REP_NAMES`, and **every other name in the data is Interne** —
+former staff, billing entities, CRM task owners. `useRepTeam()` exposes
+`isInternal`, `display` (the name, or `Interne`) and `mergeInternalRows`, and
+the list is fetched **once per session and shared** through
+`useSyncExternalStore`, because table cells read it now and a per-component
+fetch would be one request per avatar.
+
+There used to be two definitions of "internal" and they disagreed on screen:
+the rep filter's dynamic one, and a fixed six-name list each page grouped under
+"Vente Interne" of its own accord. The Dashboard card also pinned that row as a
+sixth entry numbered 6 while the "Voir tout" modal ranked it by amount — the
+same group at two different ranks, with two reps missing from the card. Pages
+now store the RPC's rows unchanged and merge in a `useMemo`:
+
+```ts
+const leaderboard = useMemo(() => mergeInternalRows(
+    rawLeaderboard, repTeam, r => r.rep_name,
+    r => ({ ...r, rep_name: INTERNAL_LABEL, office: '—' }),
+    (acc, r) => ({ ...acc, total_amount: … , deal_count: … }),
+).map(recomputeDerived).sort(…).map(rerank), [rawLeaderboard, repTeam]);
+```
+
+Merge the counts, **recompute** everything derived from them (`avg_deal`,
+`completion_rate`, `revenue_per_account`, an average delay weighted by what
+each row actually closed) — an average of averages is not the group's average —
+then re-sort and re-rank, because one merged row lands in a different place.
+
+`RepName` applies `display()` for you, so a name and its face can never
+disagree; CSV exports map through `display()` too, since the file has to say
+what the screen says.
+
+**Three screens pass `literal` and name the person**: `/createurs` (its whole
+subject is who typed a document, and most of those names are admin staff and
+former employees — merging them would collapse the page into one line), Ma Paye
+(a commission line belongs to one person and is keyed by that name), and the
+signed-in user's own row and the rep pickers. Everywhere a rep's *numbers* are
+reported, the merge applies.
 
 ### Component Patterns
 

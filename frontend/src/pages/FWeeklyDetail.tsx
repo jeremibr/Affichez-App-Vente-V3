@@ -10,7 +10,7 @@ import { ZoneBTable } from '../components/weekly/ZoneBTable';
 import { cn } from '../lib/utils';
 import { Select } from '../components/Select';
 import { useRepList } from '../hooks/useRepList';
-import { INTERNAL_REP_NAMES } from '../lib/constants';
+import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
 
 // ─── Week label helpers ───────────────────────────────────────────────────────
@@ -88,10 +88,7 @@ export default function FWeeklyDetail() {
     const prevWeekObj = currentIdx < availableWeeks.length - 1 ? availableWeeks[currentIdx + 1] : null;
     const nextWeekObj = currentIdx > 0 ? availableWeeks[currentIdx - 1] : null;
 
-    const internalNamesNFC = new Set(
-        (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
-    );
-    const isInternalRep = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
+    const repTeam = useRepTeam();
 
     const filteredSummary = useMemo(() => {
         return summaryData.filter(r => repFilter.matches(r.rep_name));
@@ -121,8 +118,8 @@ export default function FWeeklyDetail() {
     const repPivotRows = useMemo(() => {
         const repsMap = new Map<string, Record<string, number>>();
         filteredSummary.forEach(row => {
-            // Group all internal reps under a single "Vente Interne" row
-            const displayName = isInternalRep(row.rep_name) ? 'Vente Interne' : row.rep_name;
+            // Everyone off the sales team shares one Interne row.
+            const displayName = repTeam.isInternal(row.rep_name) ? INTERNAL_LABEL : row.rep_name;
             if (!repsMap.has(displayName)) repsMap.set(displayName, { "Total": 0 });
             const r = repsMap.get(displayName)!;
             r[row.department] = (r[row.department] || 0) + Number(row.total_amount);
@@ -130,7 +127,7 @@ export default function FWeeklyDetail() {
         });
         return Array.from(repsMap.entries()).map(([repName, depts]) => ({ repName, ...depts }))
             .sort((a, b) => a.repName.localeCompare(b.repName));
-    }, [filteredSummary]);
+    }, [filteredSummary, repTeam]);
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">

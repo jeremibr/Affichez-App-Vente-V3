@@ -5,11 +5,12 @@ import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2 } from 'lucide-react';
 import type { YoYRow, QuarterTotalsRow } from '../types/database';
 import { QuarterBlock } from '../components/quarterly/QuarterBlock';
-import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
+import { OFFICES } from '../lib/constants';
+import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { useRepFilter, REP_DEFAULT, REP_ALL, REP_INTERNAL } from '../hooks/useRepFilter';
 
 export default function FQuarterlyAverages() {
     const { isAdmin, repName: authRepName } = useAuth();
@@ -21,19 +22,17 @@ export default function FQuarterlyAverages() {
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
     const [teamTotals, setTeamTotals] = useState<QuarterTotalsRow[]>([]);
 
-    // When "Vente Interne" is selected, fetch all reps and group on the frontend
+    // A group needs every rep's rows, so it is fetched unfiltered and grouped here.
     const repParam = isAdmin
-        ? (selectedRep === 'Tous' || selectedRep === 'Vente Interne' ? null : selectedRep)
+        ? (selectedRep === REP_ALL || selectedRep === REP_INTERNAL ? null : selectedRep)
         : (authRepName ?? null);
 
-    // Merge all internal rep rows into a single "Vente Interne" entry per quarter
+    const repTeam = useRepTeam();
+
+    /** Everyone off the sales team is one Interne line per quarter. */
     const groupedYoyData = useMemo((): YoYRow[] => {
-        const internalNamesNFC = new Set(
-            (INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC'))
-        );
-        const isInt = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
-        const internals = yoyData.filter(r => isInt(r.rep_name));
-        const others = yoyData.filter(r => !isInt(r.rep_name));
+        const internals = yoyData.filter(r => repTeam.isInternal(r.rep_name));
+        const others = yoyData.filter(r => !repTeam.isInternal(r.rep_name));
         if (internals.length === 0) return yoyData;
 
         const byQuarter = new Map<number, YoYRow[]>();
@@ -51,7 +50,7 @@ export default function FQuarterlyAverages() {
             const previous_avg = rows.reduce((s, r) => s + Number(r.previous_avg), 0);
             venteInterneRows.push({
                 quarter,
-                rep_name: 'Vente Interne',
+                rep_name: INTERNAL_LABEL,
                 office: '—',
                 current_avg,
                 previous_avg,
@@ -60,7 +59,7 @@ export default function FQuarterlyAverages() {
             });
         }
         return [...others, ...venteInterneRows];
-    }, [yoyData]);
+    }, [yoyData, repTeam]);
 
     const uniqueReps = useMemo(() => {
         const reps = new Set<string>();

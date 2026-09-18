@@ -17,7 +17,8 @@ const YOY_CSV: CsvColumn<YoYRow>[] = [
     { header: 'Moyenne an dernier', value: r => r.previous_avg },
     { header: 'Ecart (%)',        value: r => r.resultat },
 ];
-import { OFFICES, INTERNAL_REP_NAMES } from '../lib/constants';
+import { OFFICES } from '../lib/constants';
+import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
@@ -30,11 +31,12 @@ export default function QuarterlyAverages() {
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
     const [teamTotals, setTeamTotals] = useState<QuarterTotalsRow[]>([]);
 
+    const repTeam = useRepTeam();
+
+    /** Everyone off the sales team is one Interne line per quarter. */
     const groupedYoyData = useMemo((): YoYRow[] => {
-        const internalNamesNFC = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
-        const isInt = (name: string) => internalNamesNFC.has(name.normalize('NFC'));
-        const internals = yoyData.filter(r => isInt(r.rep_name));
-        const others    = yoyData.filter(r => !isInt(r.rep_name));
+        const internals = yoyData.filter(r => repTeam.isInternal(r.rep_name));
+        const others = yoyData.filter(r => !repTeam.isInternal(r.rep_name));
         if (internals.length === 0) return yoyData;
 
         const byQuarter = new Map<number, YoYRow[]>();
@@ -49,10 +51,10 @@ export default function QuarterlyAverages() {
             const totalCount   = rows.reduce((s, r) => s + Number(r.deal_count), 0);
             const current_avg  = rows.reduce((s, r) => s + Number(r.current_avg), 0);
             const previous_avg = rows.reduce((s, r) => s + Number(r.previous_avg), 0);
-            venteInterneRows.push({ quarter, rep_name: 'Vente Interne', office: '—', current_avg, previous_avg, resultat: current_avg - previous_avg, deal_count: totalCount });
+            venteInterneRows.push({ quarter, rep_name: INTERNAL_LABEL, office: '—', current_avg, previous_avg, resultat: current_avg - previous_avg, deal_count: totalCount });
         }
         return [...others, ...venteInterneRows];
-    }, [yoyData]);
+    }, [yoyData, repTeam]);
 
     const uniqueReps = useMemo(() => {
         const reps = new Set<string>();

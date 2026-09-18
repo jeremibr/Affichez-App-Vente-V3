@@ -10,7 +10,7 @@ import type {
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { RepAvatar } from '../components/RepAvatar';
+import { RepName } from '../components/RepAvatar';
 import {
     formatShortDate, formatCurrencyCAD, formatPhone, phoneSearchPattern, clipServices, cn,
 } from '../lib/utils';
@@ -514,10 +514,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                                         </td>
                                         <td className="td">
                                             {(r.rep_name ?? r.owner_name)
-                                                ? <span className="inline-flex items-center gap-2">
-                                                      <RepAvatar name={r.rep_name ?? r.owner_name} size="sm" />
-                                                      {r.rep_name ?? r.owner_name}
-                                                  </span>
+                                                ? <RepName name={r.rep_name ?? r.owner_name} size="sm" />
                                                 : '—'}
                                         </td>
                                         <td className="td"><SourceCell row={r} /></td>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { repIdentity } from '../lib/reps';
+import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 
 /**
  * A rep's face, wherever their name appears.
@@ -10,6 +11,10 @@ import { repIdentity } from '../lib/reps';
  * dropdown option that stands for several people ("Tous les reps", "Interne");
  * a building glyph for a billing entity that is not a person ("Vente interne",
  * "Magasin Affichez"); otherwise their initials on a stable colour.
+ *
+ * A name that is not on the current sales team belongs to the Interne group, so
+ * it is drawn as that group - the same glyph the filter shows - rather than as
+ * the person. The rule lives here so every screen follows it (see lib/repTeam).
  *
  * The colour comes from the same hash the service and source badges use, so a
  * rep without a photo is the same colour on the leaderboard, in the filter and
@@ -42,19 +47,29 @@ const TONE_FILL = [
     'bg-data-10 text-data-10-ink',
 ] as const;
 
-export function RepAvatar({ name, size = 'sm', className, square }: {
+export function RepAvatar({ name, size = 'sm', className, square, literal }: {
     name: string | null | undefined;
     size?: RepAvatarSize;
     className?: string;
     /** Rounded square instead of a circle, for the large picker headers that
      *  already use that shape. */
     square?: boolean;
+    /**
+     * Draw this person, not the group they belong to.
+     *
+     * For the few screens whose subject IS the individual - the signed-in user,
+     * a rep picker, who typed a document, whose commission line this is. Every
+     * screen that reports a rep's numbers leaves it off, so off-team names
+     * collapse into Interne there.
+     */
+    literal?: boolean;
 }) {
     // A portrait that 404s - a slug renamed, a file not deployed - must fall
     // back to initials rather than leave a broken-image box in the table.
     const [failed, setFailed] = useState(false);
 
-    const id = repIdentity(name);
+    const { isInternal } = useRepTeam();
+    const id = repIdentity(!literal && isInternal(name) ? INTERNAL_LABEL : name);
     const s = SIZES[size];
     const shape = square ? 'rounded-lg' : 'rounded-full';
     const base = cn('shrink-0 flex items-center justify-center overflow-hidden select-none', s.box, shape, className);
@@ -105,21 +120,24 @@ export function RepAvatar({ name, size = 'sm', className, square }: {
  * The avatar is aria-hidden and the name carries the meaning, so a screen
  * reader says the name once rather than describing a picture of it.
  */
-export function RepName({ name, size = 'sm', className, nameClassName, fallback = '—' }: {
+export function RepName({ name, size = 'sm', className, nameClassName, fallback = '—', literal }: {
     name: string | null | undefined;
     size?: RepAvatarSize;
     className?: string;
     nameClassName?: string;
     /** Shown when there is no name at all; no avatar is drawn for it. */
     fallback?: string;
+    /** See RepAvatar: name the person rather than the group. */
+    literal?: boolean;
 }) {
+    const { display } = useRepTeam();
     if (!name || !name.trim()) {
         return <span className={cn('text-ink-faint', className)}>{fallback}</span>;
     }
     return (
         <span className={cn('inline-flex items-center gap-2 min-w-0', className)}>
-            <RepAvatar name={name} size={size} />
-            <span className={cn('truncate', nameClassName)}>{name}</span>
+            <RepAvatar name={name} size={size} literal={literal} />
+            <span className={cn('truncate', nameClassName)}>{literal ? name : display(name)}</span>
         </span>
     );
 }

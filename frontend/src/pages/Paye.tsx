@@ -409,6 +409,10 @@ export default function Paye() {
                                                     <RepAvatar
                                                         name={rep.rep_name}
                                                         size="md"
+                                                        // A pay line belongs to one person, so it is
+                                                        // named and keyed by that person - the Interne
+                                                        // group has no commission rate to edit.
+                                                        literal
                                                         // Paid reps keep the green they had when this
                                                         // was a letter circle - as a ring, so the state
                                                         // survives putting a photo inside it.

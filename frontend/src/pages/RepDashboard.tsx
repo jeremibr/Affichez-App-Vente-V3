@@ -11,7 +11,8 @@ import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { MONTHS, INTERNAL_REP_NAMES } from '../lib/constants';
+import { MONTHS } from '../lib/constants';
+import { useRepTeam } from '../lib/repTeam';
 import { RepAvatar } from '../components/RepAvatar';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,7 +71,7 @@ function RepPicker({ reps, selected, onChange }: {
                 className="flex items-center gap-2 px-4 py-2.5 bg-white border border-hairline-strong rounded-md text-sm font-semibold text-ink-secondary hover:border-primary hover:text-primary-press transition-all shadow-xs"
             >
                 {selected
-                    ? <RepAvatar name={selected} size="md" />
+                    ? <RepAvatar name={selected} size="md" literal />
                     : <div className="w-8 h-8 rounded-full bg-primary-wash text-primary-press flex items-center justify-center shrink-0">
                           <User className="w-3.5 h-3.5" />
                       </div>}
@@ -98,7 +99,7 @@ function RepPicker({ reps, selected, onChange }: {
                                             : "text-ink-secondary hover:bg-sand font-medium"
                                     )}
                                 >
-                                    <RepAvatar name={rep} size="md" />
+                                    <RepAvatar name={rep} size="md" literal />
                                     {rep}
                                 </button>
                             ))
@@ -200,24 +201,26 @@ export default function RepDashboard() {
     const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
     const repParam = selectedRep || null;
 
-    // Load rep list once
+    const repTeam = useRepTeam();
+
+    // Load rep list once. It waits for the team list: before that arrives every
+    // name looks off-team, and the picker would offer billing entities.
     const loadReps = useCallback(async () => {
-        if (repsLoadedRef.current) return;
+        if (repsLoadedRef.current || !repTeam.loaded) return;
         const { data } = await cachedRpc('get_inv_rep_leaderboard', {
             p_year: 2026, p_office: null, p_status: null,
             p_month: null, p_dept: null, p_rep: null,
         });
         if (data && data.length > 0) {
-            const internalSet = new Set((INTERNAL_REP_NAMES as readonly string[]).map(n => n.normalize('NFC')));
             const names = (data as LeaderboardEntry[])
                 .map(r => r.rep_name)
-                .filter(n => !internalSet.has(n.normalize('NFC')))
+                .filter(n => !repTeam.isInternal(n))
                 .sort();
             setAllReps(names);
             if (!selectedRep) setSelectedRep(names[0] ?? '');
             repsLoadedRef.current = true;
         }
-    }, [selectedRep]);
+    }, [selectedRep, repTeam]);
 
     useEffect(() => { loadReps(); }, [loadReps]);
 
@@ -287,7 +290,7 @@ export default function RepDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                     {/* Rep avatar */}
-                    <RepAvatar name={selectedRep} size="lg" square />
+                    <RepAvatar name={selectedRep} size="lg" square literal />
                     <div>
                         <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                             {selectedRep || 'Choisir un représentant'}
