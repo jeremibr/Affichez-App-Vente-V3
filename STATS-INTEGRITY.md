@@ -70,6 +70,19 @@ What it actually measures: *of the quotes already won, the share that got
 invoiced.* Fixing it requires changing the sync to store every status, not
 changing the SQL.
 
+**In progress, in three steps.** The order matters, because doing it the other way
+round leaves a window where every dashboard overstates revenue:
+
+1. `20260918180000_revenue_statuses_explicit.sql` — **done.** 18 objects (11
+   functions, 7 views) asked "is this row *not* declined". With only three enum
+   values that was the same as "is it accepted or invoiced", but it stops being
+   the same the moment new statuses exist: 3,000+ expired quotes and every
+   unanswered estimate would fold into revenue silently. Now stated explicitly.
+   A provable no-op on its own.
+2. Extend `sale_status_enum` and change `zoho-sync` to write every status rather
+   than only the winners.
+3. Recompute `Taux` over the denominator that finally exists.
+
 ### 2. `% of target` is wrong whenever an office or rep-group filter is applied — **PROVEN**
 
 > **Office half fixed** by `20260918130000_objectives_office_scope.sql`: with an
