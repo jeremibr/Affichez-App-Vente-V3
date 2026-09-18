@@ -1,16 +1,12 @@
 // supabase/functions/weekly-sales-report/index.ts
 //
-// Generates the weekly sales recap email ("Rapport des ventes de la semaine").
-// Called by the n8n workflow every Friday at 17:00 (Schedule -> HTTP -> Gmail).
-// Returns JSON { subject, html, ...stats } so the Gmail node can map the subject
-// and HTML body directly.
+// Generates the weekly sales recap email. Called by the n8n workflow every
+// Friday at 17:00 (Schedule -> HTTP -> Gmail). Returns JSON { subject, html,
+// ...stats } so the Gmail node can map the subject and HTML body directly.
 //
-// Auth: pass header  x-report-secret: <REPORT_SECRET>  (set REPORT_SECRET as a
-// function secret to enforce it; if REPORT_SECRET is unset the endpoint is open).
-//
-// Optional query/body params:
-//   week_start=YYYY-MM-DD   -> report a specific week (defaults to latest week)
-//   preview=1               -> return raw HTML (Content-Type text/html) for eyeballing
+// Auth: header  x-report-secret: <REPORT_SECRET>  (enforced if that secret is set).
+//   week_start=YYYY-MM-DD   -> report a specific week (defaults to latest)
+//   preview=1               -> return raw HTML for eyeballing
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -19,8 +15,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info, x-report-secret',
 };
 
-// Reps grouped into a single "Vente Interne" line, mirroring the app
-// (frontend/src/lib/constants.ts INTERNAL_REP_NAMES).
+// Reps grouped into a single "Vente Interne" line, mirroring the app.
 const INTERNAL_REP_NAMES = [
   'Simon Fortin Massé',
   'Magasin Affichez',
@@ -55,12 +50,15 @@ function initials(name: string): string {
   return (a + b).toUpperCase();
 }
 
-const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/Logo-affichez-1.png';
-const BRAND_GREEN = '#154633';
-const BRAND_ORANGE = '#e38800';
-const HIGHLIGHT_THRESHOLD = 25000; // "Semaine à plus de 25 000 $"
+// Two logo variants, matching how affichez.ca actually uses them:
+// - color wordmark on white backgrounds (site header)
+// - pure-white wordmark on the orange background (site footer)
+const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez.svg';
+const LOGO_URL_WHITE = 'https://www.affichez.ca/wp-content/uploads/2025/05/Calque_2.svg';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const BRAND_DARK = '#000000';
+const BRAND_ORANGE = '#F5570E';
+const HIGHLIGHT_THRESHOLD = 25000;
 
 const cad0 = new Intl.NumberFormat('fr-CA', {
   style: 'currency', currency: 'CAD', maximumFractionDigits: 0,
@@ -73,10 +71,9 @@ function escapeHtml(s: string): string {
   ));
 }
 
-// Convert every non-ASCII code point (accents, emoji, arrows, non-breaking
-// spaces) to an HTML numeric entity so the email renders correctly no matter
-// what charset the client assumes — Gmail strips <meta charset>, so we cannot
-// rely on it. Iterating the string yields whole code points (emoji included).
+// Convert every non-ASCII code point to an HTML numeric entity so the email
+// renders correctly no matter what charset the client assumes (Gmail strips
+// <meta charset>). Iterating the string yields whole code points (emoji too).
 function toAsciiEntities(s: string): string {
   let out = '';
   for (const ch of s) {
@@ -91,7 +88,6 @@ const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
 
 function parseISO(d: string): Date { return new Date(d + 'T00:00:00'); }
 
-// "du 6 au 12 juillet 2026"  /  "du 29 juin au 5 juillet 2026"
 function frenchWeekRange(startISO: string, endISO: string): string {
   const s = parseISO(startISO);
   const e = parseISO(endISO);
@@ -121,8 +117,6 @@ function aggregateByRep(rows: SummaryRow[]): RepStat[] {
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
-// ─── HTML email ───────────────────────────────────────────────────────────────
-
 function renderEmail(opts: {
   weekStart: string;
   weekRange: string;
@@ -147,11 +141,11 @@ function renderEmail(opts: {
     const photo = photoFor(r.rep_name);
     const avatar = photo
       ? `<div style="width:46px; height:46px; border-radius:50%; overflow:hidden; border:2px solid ${BRAND_ORANGE}; line-height:0; font-size:0; box-sizing:border-box;"><img src="${photo}" alt="${escapeHtml(r.rep_name)}" width="46" height="46" style="display:block; width:100%; height:100%; object-fit:cover; object-position:center center;"></div>`
-      : `<div style="width:46px; height:46px; border-radius:50%; background:${BRAND_GREEN}; color:#ffffff; font-size:15px; font-weight:700; line-height:46px; text-align:center;">${escapeHtml(initials(r.rep_name))}</div>`;
+      : `<div style="width:46px; height:46px; border-radius:50%; background:${BRAND_DARK}; color:#ffffff; font-size:15px; font-weight:700; line-height:46px; text-align:center;">${escapeHtml(initials(r.rep_name))}</div>`;
     return `
       <tr>
         <td width="58" style="padding:5px 12px 5px 0; vertical-align:middle;">${avatar}</td>
-        <td style="padding:5px 0; vertical-align:middle; font-size:14px; font-weight:600; color:${BRAND_GREEN};">${escapeHtml(r.rep_name)}</td>
+        <td style="padding:5px 0; vertical-align:middle; font-size:14px; font-weight:600; color:${BRAND_DARK};">${escapeHtml(r.rep_name)}</td>
         <td style="padding:5px 0; vertical-align:middle; text-align:right; font-size:14px; font-weight:700; color:${BRAND_ORANGE}; white-space:nowrap;">${fmtMoney(r.total)}</td>
       </tr>`;
   }).join('');
@@ -180,12 +174,12 @@ function renderEmail(opts: {
     return `
       <tr>
         <td style="padding:12px 8px 12px 0; border-bottom:1px solid #eef2f0; width:34px;
-                   font-size:14px; font-weight:700; color:${BRAND_GREEN}; text-align:center;">${medal}</td>
-        <td style="padding:12px 8px; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_GREEN}; font-weight:600;">
+                   font-size:14px; font-weight:700; color:${BRAND_DARK}; text-align:center;">${medal}</td>
+        <td style="padding:12px 8px; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_DARK}; font-weight:600;">
           ${escapeHtml(r.rep_name)}
           ${isTop ? `<span style="display:inline-block; margin-left:6px; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:700; background:${BRAND_ORANGE}; color:#ffffff; vertical-align:middle;">25K+</span>` : ''}
         </td>
-        <td style="padding:12px 0 12px 8px; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_GREEN}; font-weight:700; text-align:right; white-space:nowrap;">
+        <td style="padding:12px 0 12px 8px; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_DARK}; font-weight:700; text-align:right; white-space:nowrap;">
           ${fmtMoney(r.total)}
         </td>
         <td style="padding:12px 0 12px 12px; border-bottom:1px solid #eef2f0; font-size:12px; color:#7a8c83; text-align:right; white-space:nowrap;">
@@ -201,7 +195,7 @@ function renderEmail(opts: {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>Rapport des ventes – Affichez</title>
+<title>Rapport des ventes - Affichez</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root { color-scheme: light only; }
@@ -232,7 +226,6 @@ function renderEmail(opts: {
     <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="email-container"
            style="max-width:600px; width:100%; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(21,70,51,0.10);">
 
-      <!-- HEADER -->
       <tr>
         <td class="pad-sides" style="background:#ffffff; padding:32px 48px 24px; text-align:center;">
           <img src="${LOGO_URL}" alt="Affichez" width="160"
@@ -241,22 +234,20 @@ function renderEmail(opts: {
       </tr>
       <tr><td style="background:${BRAND_ORANGE}; height:5px; font-size:0; line-height:0;">&nbsp;</td></tr>
 
-      <!-- HERO -->
       <tr>
         <td class="pad-hero" style="background:#ffffff; padding:36px 48px 8px; text-align:center;">
           <p style="margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_ORANGE};">
             Rapport hebdomadaire des ventes
           </p>
-          <h1 class="h1-title" style="margin:0 0 4px; font-size:22px; font-weight:700; color:${BRAND_GREEN}; line-height:1.3;">
+          <h1 class="h1-title" style="margin:0 0 4px; font-size:22px; font-weight:700; color:${BRAND_DARK}; line-height:1.3;">
             Semaine ${weekRange}
           </h1>
         </td>
       </tr>
 
-      <!-- BIG STAT -->
       <tr>
         <td style="background:#ffffff; padding:16px 48px 20px; text-align:center;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND_GREEN}; border-radius:12px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND_DARK}; border-radius:12px;">
             <tr>
               <td style="padding:26px 20px; text-align:center;">
                 <p style="margin:0 0 4px; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#a9c6b7;">
@@ -277,10 +268,9 @@ function renderEmail(opts: {
 
       ${topCallout}
 
-      <!-- LEADERBOARD -->
       <tr>
         <td class="pad-section" style="background:#ffffff; padding:16px 48px 8px;">
-          <p style="margin:0 0 4px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_GREEN};">
+          <p style="margin:0 0 4px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_DARK};">
             🏆 &nbsp;Classement de l'équipe
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:6px;">
@@ -289,7 +279,6 @@ function renderEmail(opts: {
         </td>
       </tr>
 
-      <!-- CTA -->
       <tr>
         <td style="background:#ffffff; padding:20px 48px 40px; text-align:center;">
           <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
@@ -297,7 +286,7 @@ function renderEmail(opts: {
               <td style="border-radius:8px; background:${BRAND_ORANGE};">
                 <a href="${appUrl}/weekly?week=${weekStart}" target="_blank"
                    style="display:inline-block; padding:14px 34px; font-size:14px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:8px;">
-                  Voir le rapport complet &nbsp;→
+                  Voir le rapport complet &nbsp;&#8594;
                 </a>
               </td>
             </tr>
@@ -306,30 +295,24 @@ function renderEmail(opts: {
         </td>
       </tr>
 
-      <!-- FOOTER -->
       <tr>
-        <td class="pad-footer" style="background:#ffffff; padding:28px 48px 32px; text-align:center; border-top:1px solid #e8ede9;">
-          <img src="${LOGO_URL}" alt="Affichez" class="logo-footer" width="120"
-               style="display:block; margin:0 auto 16px; width:120px; border:none;">
-          <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 16px;">
-            <tr>
-              <td style="padding:0 6px;"><a href="https://www.facebook.com/affichez"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphwbsa.png" alt="Facebook" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.instagram.com/affichez.agence"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphwns0.png" alt="Instagram" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.linkedin.com/company/affichez/"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphx2ty.png" alt="LinkedIn" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.tiktok.com/@affichez"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphx71p.png" alt="TikTok" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-            </tr>
-          </table>
-          <p class="footer-phones" style="margin:0 0 6px; font-size:12px; color:#555555; line-height:2;">
-            <a href="tel:4188002211" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">418 800-2211</a> &nbsp;|&nbsp;
-            <a href="tel:5143601634" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">514 360-1634</a> &nbsp;|&nbsp;
-            <a href="tel:18885822184" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">1 888 582-2184</a>
+        <td class="pad-footer" style="background:${BRAND_ORANGE}; padding:28px 48px 32px; text-align:center;">
+          <img src="${LOGO_URL_WHITE}" alt="Affichez" class="logo-footer" width="120"
+               style="display:block; margin:0 auto 24px; width:120px; border:none;">
+          <p class="footer-phones" style="margin:0 0 4px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:4188002211" style="color:#ffffff; text-decoration:none; font-weight:600;">Québec : 418 800-2211</a>
           </p>
-          <p style="margin:0 0 12px; font-size:12px; color:#555555;">
-            <a href="https://www.affichez.ca" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">www.affichez.ca</a> &nbsp;|&nbsp;
-            <a href="https://promotionnel.ca" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">www.promotionnel.ca</a>
+          <p class="footer-phones" style="margin:0 0 4px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:5143601634" style="color:#ffffff; text-decoration:none; font-weight:600;">Laval : 514 360-1634</a>
           </p>
-          <p style="margin:0; font-size:10px; color:#888888; line-height:1.6;">
-            Rapport interne automatisé — Affichez. Envoyé chaque vendredi en fin de journée.
+          <p class="footer-phones" style="margin:0 0 16px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:8193032944" style="color:#ffffff; text-decoration:none; font-weight:600;">Gatineau : 819 303-2944</a>
+          </p>
+          <p style="margin:0 0 14px; font-size:12px; color:#ffffff;">
+            <a href="https://www.affichez.ca" style="color:#ffffff; text-decoration:none; font-weight:600;">www.affichez.ca</a>
+          </p>
+          <p style="margin:0; font-size:10px; color:#ffe9de; line-height:1.6;">
+            Rapport interne automatisé - Affichez. Envoyé chaque vendredi en fin de journée.
           </p>
         </td>
       </tr>
@@ -341,12 +324,9 @@ function renderEmail(opts: {
 </html>`;
 }
 
-// ─── Handler ──────────────────────────────────────────────────────────────────
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
 
-  // Shared-secret auth (enforced only if REPORT_SECRET is configured)
   const secret = Deno.env.get('REPORT_SECRET');
   if (secret && req.headers.get('x-report-secret') !== secret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -368,7 +348,6 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Available weeks (newest first) to resolve target + previous week
     const year = new Date().getFullYear();
     const { data: weeksData, error: weeksErr } = await supabase
       .rpc('get_available_weeks', { p_year: year, p_office: null, p_status: null });
@@ -384,7 +363,6 @@ Deno.serve(async (req: Request) => {
     const target = weeks[idx];
     const prev = weeks[idx + 1] ?? null;
 
-    // Per-rep breakdown for the target week
     const { data: sumData, error: sumErr } = await supabase
       .from('v_weekly_summary')
       .select('rep_name, total_amount, num_sales')
@@ -397,9 +375,7 @@ Deno.serve(async (req: Request) => {
     const prevTotal = prev ? Number(prev.total_amount) || 0 : null;
     const weekRange = frenchWeekRange(target.week_start, target.week_end);
 
-    // Pure-ASCII HTML (entities) so it renders correctly through any mail client.
     const html = toAsciiEntities(renderEmail({ weekStart: target.week_start, weekRange, total, deals, prevTotal, leaderboard, appUrl }));
-    // Subject is sent as a MIME header (encoded by Gmail), so plain UTF-8 text is fine here.
     const subject = `Rapport des ventes - Semaine ${weekRange}`;
 
     if (preview) {

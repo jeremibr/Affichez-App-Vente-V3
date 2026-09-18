@@ -1,10 +1,9 @@
 // supabase/functions/weekly-mandates-report/index.ts
 //
 // Team-wide "Mandats signés" weekly email — sent right after the sales report
-// (same n8n workflow, Friday 17:00), but to the ENTIRE team rather than just reps.
-// Lists clients who signed this week (won = accepted OR invoiced, QC + MTL combined)
-// and the department(s) each touched, plus new clients. Revenue is intentionally
-// not shown (whole company sees this) — it leads with collective, non-$ wins.
+// (same n8n workflow, Friday 17:00), to the ENTIRE team. Lists clients who signed
+// this week (won = accepted OR invoiced, QC + MTL combined) and the department(s)
+// each touched, plus new clients. Revenue is intentionally not shown.
 //
 // Auth: header  x-report-secret: <REPORT_SECRET>  (enforced if that secret is set).
 //   week_start=YYYY-MM-DD  -> specific week (defaults to latest)
@@ -17,11 +16,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info, x-report-secret',
 };
 
-const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/Logo-affichez-1.png';
-const BRAND_GREEN = '#154633';
-const BRAND_ORANGE = '#e38800';
+// Two logo variants, matching how affichez.ca actually uses them:
+// - color wordmark on white backgrounds (site header)
+// - pure-white wordmark on the orange background (site footer)
+const LOGO_URL = 'https://www.affichez.ca/wp-content/uploads/2025/05/logo-affichez.svg';
+const LOGO_URL_WHITE = 'https://www.affichez.ca/wp-content/uploads/2025/05/Calque_2.svg';
 
-// Department display config: friendly French label + chip colours.
+const BRAND_DARK = '#000000';
+const BRAND_ORANGE = '#F5570E';
+
 const DEPT_STYLE: Record<string, { label: string; bg: string; fg: string }> = {
   'PROMOTIONNEL':            { label: 'Promotionnel',     bg: '#fff1e0', fg: '#b45f06' },
   'NUMERIQUE':               { label: 'Numérique',        bg: '#e5efff', fg: '#1d4ed8' },
@@ -34,15 +37,12 @@ function deptStyle(d: string) {
   return DEPT_STYLE[d] ?? { label: d, bg: '#eef2f0', fg: '#475b52' };
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string
   ));
 }
 
-// Pure-ASCII output (Gmail strips <meta charset>). Iterates whole code points.
 function toAsciiEntities(s: string): string {
   let out = '';
   for (const ch of s) {
@@ -74,20 +74,16 @@ function chip(label: string, bg: string, fg: string): string {
   return `<span style="display:inline-block; padding:3px 9px; border-radius:12px; font-size:11px; font-weight:600; background:${bg}; color:${fg}; margin:2px 0 2px 5px; white-space:nowrap;">${escapeHtml(label)}</span>`;
 }
 
-// ─── HTML email ───────────────────────────────────────────────────────────────
-
 function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients: number | null }): string {
   const { weekRange, rows, prevClients } = opts;
 
   const totalClients = rows.length;
   const newClients = rows.filter((r) => r.is_new).length;
 
-  // Distinct clients per department
   const deptCounts = new Map<string, number>();
   for (const r of rows) for (const d of r.departments) deptCounts.set(d, (deptCounts.get(d) ?? 0) + 1);
   const deptsSorted = [...deptCounts.entries()].sort((a, b) => b[1] - a[1]);
 
-  // WoW pill on client count
   const delta = prevClients && prevClients > 0 ? totalClients - prevClients : null;
   const deltaUp = (delta ?? 0) >= 0;
   const wowPill = delta === null ? '' : `
@@ -96,7 +92,6 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
       ${deltaUp ? '▲' : '▼'} ${deltaUp ? '+' : ''}${delta} vs semaine précédente
     </span>`;
 
-  // Department cards
   const deptCards = deptsSorted.map(([d, n]) => {
     const st = deptStyle(d);
     return `
@@ -110,7 +105,6 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
       </td>`;
   }).join('');
 
-  // Client rows
   const clientRows = rows.map((r) => {
     const chips = r.departments.map((d) => { const s = deptStyle(d); return chip(s.label, s.bg, s.fg); }).join('');
     const badge = r.is_new
@@ -118,7 +112,7 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
       : '';
     return `
       <tr>
-        <td style="padding:10px 8px 10px 0; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_GREEN}; vertical-align:middle;">
+        <td style="padding:10px 8px 10px 0; border-bottom:1px solid #eef2f0; font-size:14px; color:${BRAND_DARK}; vertical-align:middle;">
           <span style="font-weight:600;">${escapeHtml(r.client_name)}</span>${badge}
         </td>
         <td style="padding:10px 0 10px 8px; border-bottom:1px solid #eef2f0; text-align:right; vertical-align:middle;">${chips}</td>
@@ -132,7 +126,7 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light">
 <meta name="supported-color-schemes" content="light">
-<title>Mandats signés – Affichez</title>
+<title>Mandats signés - Affichez</title>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root { color-scheme: light only; }
@@ -163,7 +157,6 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
     <table width="600" cellpadding="0" cellspacing="0" role="presentation" class="email-container"
            style="max-width:600px; width:100%; border-radius:12px; overflow:hidden; box-shadow:0 4px 24px rgba(21,70,51,0.10);">
 
-      <!-- HEADER -->
       <tr>
         <td class="pad-sides" style="background:#ffffff; padding:32px 48px 24px; text-align:center;">
           <img src="${LOGO_URL}" alt="Affichez" width="160" style="display:block; margin:0 auto; width:160px; max-width:100%; border:none;">
@@ -171,18 +164,16 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
       </tr>
       <tr><td style="background:${BRAND_ORANGE}; height:5px; font-size:0; line-height:0;">&nbsp;</td></tr>
 
-      <!-- HERO (même structure que le rapport des ventes) -->
       <tr>
         <td class="pad-hero" style="background:#ffffff; padding:36px 48px 8px; text-align:center;">
           <p style="margin:0 0 6px; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_ORANGE};">Mandats signés</p>
-          <h1 class="h1-title" style="margin:0 0 4px; font-size:22px; font-weight:700; color:${BRAND_GREEN}; line-height:1.3;">Semaine ${weekRange}</h1>
+          <h1 class="h1-title" style="margin:0 0 4px; font-size:22px; font-weight:700; color:${BRAND_DARK}; line-height:1.3;">Semaine ${weekRange}</h1>
         </td>
       </tr>
 
-      <!-- BIG STAT -->
       <tr>
         <td style="background:#ffffff; padding:16px 48px 12px; text-align:center;">
-          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND_GREEN}; border-radius:12px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${BRAND_DARK}; border-radius:12px;">
             <tr><td style="padding:26px 20px; text-align:center;">
               <p style="margin:0 0 4px; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; color:#a9c6b7;">Mandats signés cette semaine</p>
               <p class="stat-big" style="margin:0; font-size:48px; font-weight:700; color:#ffffff; line-height:1;">${totalClients}</p>
@@ -193,76 +184,64 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
         </td>
       </tr>
 
-      <!-- POURQUOI (court) -->
       <tr>
         <td class="pad-section" style="background:#ffffff; padding:16px 48px 4px; text-align:center;">
           <p style="margin:0; font-size:13px; color:#4a6155; line-height:1.7;">
-            Chaque semaine, voici les mandats signés — pour que <strong style="color:${BRAND_GREEN};">toute l'équipe</strong> ait une vue d'ensemble de notre progression collective.
+            Chaque semaine, voici les mandats signés — pour que <strong style="color:${BRAND_DARK};">toute l'équipe</strong> ait une vue d'ensemble de notre progression collective.
           </p>
         </td>
       </tr>
 
-      <!-- Divider (avant les départements) -->
       <tr>
         <td style="background:#ffffff; padding:8px 48px;">
           <div style="height:1px; background:#e8ede9; font-size:0; line-height:0;">&nbsp;</div>
         </td>
       </tr>
 
-      <!-- DÉPARTEMENTS -->
       <tr>
         <td class="pad-section" style="background:#ffffff; padding:12px 48px 6px;">
-          <p style="margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_GREEN};">Mandats par département</p>
+          <p style="margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_DARK};">Mandats par département</p>
           <table cellpadding="0" cellspacing="0" role="presentation"><tr>${deptCards}</tr></table>
         </td>
       </tr>
 
-      <!-- Divider (après les départements) -->
       <tr>
         <td style="background:#ffffff; padding:8px 48px;">
           <div style="height:1px; background:#e8ede9; font-size:0; line-height:0;">&nbsp;</div>
         </td>
       </tr>
 
-      <!-- LISTE DES CLIENTS -->
       <tr>
         <td class="pad-section" style="background:#ffffff; padding:18px 48px 8px;">
-          <p style="margin:0 0 2px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_GREEN};">Les clients qui ont signé cette semaine</p>
+          <p style="margin:0 0 2px; font-size:11px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:${BRAND_DARK};">Les clients qui ont signé cette semaine</p>
           <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:6px;">
             ${clientRows}
           </table>
         </td>
       </tr>
 
-      <!-- CLÔTURE -->
       <tr>
         <td style="background:#ffffff; padding:14px 48px 40px; text-align:center;">
-          <p style="margin:0; font-size:14px; color:#4a6155; line-height:1.7;">Merci à tous pour votre implication.<br><strong style="color:${BRAND_GREEN};">Bon week-end à toute l'équipe ! 🎉</strong></p>
+          <p style="margin:0; font-size:14px; color:#4a6155; line-height:1.7;">Merci à tous pour votre implication.<br><strong style="color:${BRAND_DARK};">Bon week-end à toute l'équipe ! 🎉</strong></p>
         </td>
       </tr>
 
-      <!-- FOOTER -->
       <tr>
-        <td class="pad-footer" style="background:#ffffff; padding:28px 48px 32px; text-align:center; border-top:1px solid #e8ede9;">
-          <img src="${LOGO_URL}" alt="Affichez" class="logo-footer" width="120" style="display:block; margin:0 auto 16px; width:120px; border:none;">
-          <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 16px;">
-            <tr>
-              <td style="padding:0 6px;"><a href="https://www.facebook.com/affichez"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphwbsa.png" alt="Facebook" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.instagram.com/affichez.agence"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphwns0.png" alt="Instagram" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.linkedin.com/company/affichez/"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphx2ty.png" alt="LinkedIn" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-              <td style="padding:0 6px;"><a href="https://www.tiktok.com/@affichez"><img src="https://cdn.signaturehound.com/users/18is732lm834h8p8/horynlmbphx71p.png" alt="TikTok" width="26" height="26" style="width:26px;height:26px;display:inline-block;border:none;"></a></td>
-            </tr>
-          </table>
-          <p class="footer-phones" style="margin:0 0 6px; font-size:12px; color:#555555; line-height:2;">
-            <a href="tel:4188002211" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">418 800-2211</a> &nbsp;|&nbsp;
-            <a href="tel:5143601634" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">514 360-1634</a> &nbsp;|&nbsp;
-            <a href="tel:18885822184" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">1 888 582-2184</a>
+        <td class="pad-footer" style="background:${BRAND_ORANGE}; padding:28px 48px 32px; text-align:center;">
+          <img src="${LOGO_URL_WHITE}" alt="Affichez" class="logo-footer" width="120" style="display:block; margin:0 auto 24px; width:120px; border:none;">
+          <p class="footer-phones" style="margin:0 0 4px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:4188002211" style="color:#ffffff; text-decoration:none; font-weight:600;">Québec : 418 800-2211</a>
           </p>
-          <p style="margin:0 0 12px; font-size:12px; color:#555555;">
-            <a href="https://www.affichez.ca" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">www.affichez.ca</a> &nbsp;|&nbsp;
-            <a href="https://promotionnel.ca" style="color:${BRAND_GREEN}; text-decoration:none; font-weight:600;">www.promotionnel.ca</a>
+          <p class="footer-phones" style="margin:0 0 4px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:5143601634" style="color:#ffffff; text-decoration:none; font-weight:600;">Laval : 514 360-1634</a>
           </p>
-          <p style="margin:0; font-size:10px; color:#888888; line-height:1.6;">Rapport interne automatisé — Affichez. Envoyé chaque vendredi en fin de journée.</p>
+          <p class="footer-phones" style="margin:0 0 16px; font-size:12px; color:#ffffff; line-height:1.9;">
+            <a href="tel:8193032944" style="color:#ffffff; text-decoration:none; font-weight:600;">Gatineau : 819 303-2944</a>
+          </p>
+          <p style="margin:0 0 14px; font-size:12px; color:#ffffff;">
+            <a href="https://www.affichez.ca" style="color:#ffffff; text-decoration:none; font-weight:600;">www.affichez.ca</a>
+          </p>
+          <p style="margin:0; font-size:10px; color:#ffe9de; line-height:1.6;">Rapport interne automatisé - Affichez. Envoyé chaque vendredi en fin de journée.</p>
         </td>
       </tr>
 
@@ -272,8 +251,6 @@ function renderEmail(opts: { weekRange: string; rows: MandateRow[]; prevClients:
 </body>
 </html>`;
 }
-
-// ─── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
