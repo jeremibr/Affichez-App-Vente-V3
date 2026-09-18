@@ -78,9 +78,11 @@ export default function QuarterlyAverages() {
 
     // True per-quarter last-year total (whole team, incl. departed reps). Only applied
     // to the "Total équipe" row when no single rep is filtered.
+    // Keep null as null: it means the comparison year has no fiscal calendar, and
+    // Number(null) would turn that into a 0 the page then reads as a real figure.
     const previousTotalByQuarter = useMemo(() => {
-        const m = new Map<number, number>();
-        teamTotals.forEach(t => m.set(t.quarter, Number(t.previous_total)));
+        const m = new Map<number, number | null>();
+        teamTotals.forEach(t => m.set(t.quarter, t.previous_total === null ? null : Number(t.previous_total)));
         return m;
     }, [teamTotals]);
 

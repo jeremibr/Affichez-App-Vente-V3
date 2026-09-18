@@ -147,20 +147,17 @@ measured length: 2025 Q1 is 90 days, Q3 is 92, both recorded as 13. Keep that
 convention when adding a year, or the weekly rate stops being comparable across
 quarters.
 
-**What is still open.** `0` for a year that was never queried is
-indistinguishable from `0` for a year with no sales, and that is what kept this
-invisible. The fix is `previous_total = NULL` when `p_year - 1` has no
-`fiscal_quarters` rows, rendered as "—". It was not attempted with the 2024 rows
-because only two of the four functions involved are in this repo —
-`get_quarterly_yoy_totals` and `get_inv_quarterly_yoy_totals` in
-`supabase_quarterly_totals.sql`. The per-rep `get_quarterly_yoy` and
-`get_inv_quarterly_yoy` exist **only in the database**, so changing the two
-visible ones would make the team total print "—" above rep rows still printing
-`0`.
+**The cause is fixed too**, by `20260918160000_yoy_unknown_not_zero.sql`. `0` for
+a year that was never queried was indistinguishable from `0` for a year with no
+sales, and that is what kept this invisible from 2025-01-01 until it was found.
+All four functions now return `NULL` when the year in question has no
+`fiscal_quarters` rows, and the UI prints "—". A defined year with no sales still
+returns `0`, because that zero is a real measurement.
 
-**That prerequisite is now met**: `supabase/schema.sql` is a snapshot of the live
-schema and contains both. The follow-up is writing a migration that redefines all
-four consistently, based on those definitions.
+All four had to change together: the per-rep `get_quarterly_yoy` and
+`get_inv_quarterly_yoy` were database-only until `supabase/schema.sql` captured
+them, and fixing only the two team-total functions already in the repo would have
+printed "—" on the Total équipe row above rep rows still printing `0`.
 
 ### 4. Task `completion_rate` compares two different cohorts — **CODE**
 
