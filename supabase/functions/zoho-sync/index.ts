@@ -398,12 +398,20 @@ Deno.serve(async (req: Request) => {
     const startCursor = useCursor ? await readWalkCursor() : null;
     let walkComplete = true;
 
-    for (let orgIdx = 0; orgIdx < ORGS.length; orgIdx++) {
+    // Set when the budget runs out. Without it the deadline `break` below only
+    // leaves the page loop, control falls through to the next org, that org
+    // immediately re-checks the deadline and overwrites the cursor with its own
+    // position — so the org that actually ran out of time is never resumed and
+    // the walk reports complete having skipped its tail.
+    let outOfTime = false;
+
+    for (let orgIdx = 0; orgIdx < ORGS.length && !outOfTime; orgIdx++) {
       const org = ORGS[orgIdx];
       // Resuming: skip the orgs the previous slice already finished.
       if (startCursor && orgIdx < startCursor.org) continue;
 
       for (const statusFilter of statusFilters) {
+        if (outOfTime) break;
         let page = (startCursor && orgIdx === startCursor.org) ? startCursor.page : 1;
         let hasMore = true;
 
@@ -418,6 +426,7 @@ Deno.serve(async (req: Request) => {
             // ever reports its first slice.
             if (!isDryRun) await writeWalkCursor({ org: orgIdx, page });
             walkComplete = false;
+            outOfTime = true;
             hasMore = false;
             break;
           }
