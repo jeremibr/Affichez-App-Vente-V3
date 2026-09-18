@@ -208,10 +208,22 @@ without trace.
 
 ## Security findings (found during this audit)
 
-- **`sales` is world-readable.** The entire table — 8,085 rows with client names
-  and amounts — is retrievable with `VITE_SUPABASE_ANON_KEY`, which ships inside
-  the public JS bundle. No login. `invoices`, `zoho_tasks` and `zoho_leads` are
-  correctly protected by RLS, so the mechanism exists and simply was not applied.
+- **Nine tables were world-readable** with `VITE_SUPABASE_ANON_KEY`, which ships
+  inside the public JS bundle — no login: `sales` (8,085 rows of client names and
+  amounts), `webhook_log` (103,170), `rep_objectives` (105, per-rep targets),
+  `objectives` and `objectives_factures` (72 each, revenue targets),
+  `fiscal_quarters`, `excluded_clients`, `excluded_reps`, `sync_state`.
+  **Closed by `20260918140000_close_anon_read_access.sql`.**
+  `invoices`, `allowed_users`, `zoho_tasks`, `zoho_leads`, `zoho_accounts` and
+  `rep_objectives_dept` were already protected.
+
+  Worth knowing for anyone doing this again: the dashboard RPCs are SECURITY
+  INVOKER and read `excluded_clients` / `excluded_reps` through `NOT IN` in 22
+  places each. Enabling RLS on those two without a SELECT policy for
+  `authenticated` raises no error — the subquery returns zero rows, `NOT IN ()`
+  is true for everything, and every excluded client plus the internal rep
+  silently reappears in every total. A security fix would have become a
+  reporting defect.
 - **Revenue RPCs are granted to `anon`**: `get_dashboard_kpis`,
   `get_rep_leaderboard`, `get_sommaire`, `get_sommaire_grand_total`,
   `get_top_clients`, `get_quarterly_yoy_totals`. All were called anonymously
