@@ -105,9 +105,35 @@ round leaves a window where every dashboard overstates revenue:
    `sent, accepted, invoiced, declined, expired`. Drafts are stored and visible
    but excluded from the rate, because a draft was never shown to a client.
    Backfill starts at 2025-01-01, matching `zoho-invoice-sync`'s full-sync window.
-2. Extend `sale_status_enum` and change `zoho-sync` to write every status rather
-   than only the winners.
-3. Recompute `Taux` over the denominator that finally exists.
+2. `20260918220000` + the `zoho-sync` backfill — **done.** Every status is stored,
+   with `zoho_status` raw beside the mapped enum, and `quote_date`/`accepted_date`
+   separated so a cohort date exists. The table went 8,088 → 16,263 rows and zero
+   statuses came back unmapped across ~27,000 estimates.
+3. `20260918230000_creator_taux_real_denominator.sql` — **done.** `win_rate` now
+   divides by `quotes_sent` (sent, accepted, invoiced, declined, expired) instead
+   of by every row, and the period filter moves from `sale_date` to `quote_date`,
+   making it a cohort of quotes **issued** in the period. Drafts count in
+   `quotes_created` but not in the rate. `quotes_won` deliberately stays
+   `invoiced`, matching the Devis gagnés column beside it — a rate whose numerator
+   disagrees with the number printed next to it is how pages stop adding up. The
+   page gains a **Devis envoyés** column so the arithmetic is visible.
+
+**Measured after the backfill:** 1,683 won ÷ 3,507 sent for quotes issued in 2026
+= **48.0%**, against the 92% the page used to show. Revenue did not move by a cent
+through any of it — 5,987,507.91 / 1,695 deals / 71.0% before, during and after —
+which is the whole reason step 1 shipped on its own.
+
+**Reading the page while the creator back-fill runs:** it can only show quotes
+whose creator has been resolved, and `zoho-quote-creator-sync` resolves them one
+Zoho call at a time. Until it finishes, the newly-stored non-won quotes are missing
+from the denominator and the Taux reads high. `get_quote_creator_link_status()`
+reports progress.
+
+**Still open from this work:** orphan sweeping can no longer run. With
+`QUOTES_STORE_ALL_STATUSES` on, every full walk needs slicing, and orphan
+detection correctly refuses to run on a resumed walk — so it needs a dedicated
+won-only sweep mode. Nothing is being deleted, which is the safe direction to
+fail, but four rows Zoho has already deleted are still in the table.
 
 ### 2. `% of target` is wrong whenever an office or rep-group filter is applied — **PROVEN**
 
