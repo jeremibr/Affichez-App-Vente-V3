@@ -399,6 +399,16 @@ verify_jwt = false
 [functions.ads-spend-sync]
 verify_jwt = false
 
+# Called by n8n every Friday with only an x-report-secret header and no JWT, so
+# these need the same pin as the cron-driven functions. They survive today only
+# because the CLI leaves an unlisted function's setting alone — undocumented
+# behaviour, and exactly how zoho-sync went dark for 22 hours on 2026-08-24.
+[functions.weekly-sales-report]
+verify_jwt = false
+
+[functions.weekly-mandates-report]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
