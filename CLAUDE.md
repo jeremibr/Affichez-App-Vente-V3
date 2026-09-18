@@ -83,8 +83,10 @@ Before adding or changing any statistic, the non-negotiables:
 5. **An inner join to `fiscal_quarters` or `objectives` is a filter.** Unmatched
    rows vanish silently — `fiscal_quarters` only covers 2025–2026, which is why
    YoY for 2025 reports last year as $0 against 1,868 real 2024 sales.
-6. **Never `NOT IN` a nullable subquery.** One NULL in `excluded_clients` zeroes
-   every dashboard, with no error.
+6. **Never `NOT IN` a nullable subquery.** One NULL in the subquery makes the
+   predicate NULL for every row and zeroes the dashboard with no error. The
+   existing exclusion tables are safe — their columns are `NOT NULL` — so give any
+   new one the same constraint rather than rewriting the 34 call sites.
 7. **Verify against Zoho, not against our mirror.** The database is a filtered
    copy; the filter is usually the bug.
 
