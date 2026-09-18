@@ -412,7 +412,11 @@ Deno.serve(async (req: Request) => {
           // the walk is deliberately NOT marked complete, which is what keeps
           // orphan detection from running against a half-seen Zoho.
           if (useCursor && Date.now() > deadline) {
-            await writeWalkCursor({ org: orgIdx, page });
+            // A dry run must not persist the cursor. Leaving one behind would make
+            // the first real run resume from it and never see the pages before it,
+            // which is the opposite of what a rehearsal is for. So a dry run only
+            // ever reports its first slice.
+            if (!isDryRun) await writeWalkCursor({ org: orgIdx, page });
             walkComplete = false;
             hasMore = false;
             break;
