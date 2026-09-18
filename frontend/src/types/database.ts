@@ -243,7 +243,11 @@ export type LeadsMonthlySummaryRow = {
 export type TaskKPIs = {
     total_created: number;
     total_completed: number;
+    // Throughput: closed in period / created in period. Different cohorts, so it
+    // can legitimately exceed 100% when backlog is cleared. Do not clamp it.
     completion_rate: number;
+    // One cohort: of the tasks created in the period, the share now closed.
+    cohort_rate: number;
     total_touched: number;
     total_open: number;
     total_overdue: number;
@@ -254,8 +258,12 @@ export type TasksByRepRow = {
     rep_name: string;
     nb_created: number;
     nb_completed: number;
+    // cohort_rate's numerator, so merged rows can recompute it: a rate cannot be
+    // re-averaged across reps.
+    nb_created_closed: number;
     nb_touched: number;
     completion_rate: number;
+    cohort_rate: number;
     avg_days_to_close: number | null;
     nb_open: number;
     nb_overdue: number;

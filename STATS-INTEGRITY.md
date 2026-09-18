@@ -206,7 +206,26 @@ year boundaries.
 
 Last week is now measured over the same elapsed slice, and the column says so.
 
-### 4. Task `completion_rate` compares two different cohorts — **CODE**
+### 4. Task `completion_rate` compares two different cohorts — **FIXED**
+
+> Fixed by `20260918200000_tasks_cohort_rate.sql`, by returning **both** readings
+> instead of one confused one. It had been known to exceed 100%: the dashboard
+> clamped it with `Math.min(..., 100)`, which hid the symptom and kept the wrong
+> number. Both clamps are removed.
+>
+> - `completion_rate` — unchanged meaning: closed in period ÷ created in period.
+>   **Throughput.** >100% means backlog was cleared, which is information.
+> - `cohort_rate` — new: of the tasks *created* in the period, the share now
+>   closed. One cohort, cannot exceed 100%, answers "do we finish what we start".
+>
+> `cohort_rate` counts a task closed at any later date, not only within the same
+> period — bounding it would recreate the same confusion one level down. So a
+> recent month's figure climbs for a while after the month ends. That is correct,
+> and worth knowing when reading it.
+>
+> `get_tasks_by_rep` also returns `nb_created_closed`, the raw numerator, because
+> the UI merges the internal reps into one row and **a rate cannot be
+> re-averaged** — it has to be recomputed from summed counts.
 
 [supabase_tasks.sql:96](supabase_tasks.sql#L96) and
 [:135](supabase_tasks.sql#L135):
