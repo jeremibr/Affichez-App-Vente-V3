@@ -171,6 +171,7 @@ export default function TasksDashboard() {
             ...acc,
             nb_created: acc.nb_created + r.nb_created,
             nb_completed: acc.nb_completed + r.nb_completed,
+            nb_created_closed: acc.nb_created_closed + r.nb_created_closed,
             nb_touched: acc.nb_touched + r.nb_touched,
             nb_open: acc.nb_open + r.nb_open,
             nb_overdue: acc.nb_overdue + r.nb_overdue,
@@ -178,7 +179,9 @@ export default function TasksDashboard() {
         }),
     ).map(r => ({
         ...r,
+        // Both rates are recomputed from the summed counts, never averaged.
         completion_rate: r.nb_created > 0 ? Math.round((r.nb_completed / r.nb_created) * 100) : 0,
+        cohort_rate: r.nb_created > 0 ? Math.round((r.nb_created_closed / r.nb_created) * 100) : 0,
     })), [rawByRep, repTeam]);
 
     const wow = useMemo(() => mergeInternalRows(
@@ -276,10 +279,13 @@ export default function TasksDashboard() {
             ) : (
                 <>
                     {/* KPI strip */}
-                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 md:gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-7 gap-3 md:gap-4">
                         <KPICard title="Créées"        value={String(kpis?.total_created ?? 0)}   subText={isWeekly ? 'Cette semaine' : 'Sur la période'} icon={FilePlus2} />
                         <KPICard title="Complétées"    value={String(kpis?.total_completed ?? 0)} subText={isWeekly ? 'Cette semaine' : 'Sur la période'} icon={CheckCircle2} />
-                        <KPICard title="Taux compl."   value={`${Math.min(Math.round(kpis?.completion_rate ?? 0), 100)}%`} subText="Complétées / créées" icon={Percent} highlight={(kpis?.completion_rate ?? 0) >= 80} />
+                        {/* Two different questions, so two numbers. The old single "taux"
+                            mixed them and was clamped to 100 % in the display to hide it. */}
+                        <KPICard title="Taux compl."   value={`${Math.round(kpis?.cohort_rate ?? 0)}%`} subText="Des créées, % fermées" icon={Percent} highlight={(kpis?.cohort_rate ?? 0) >= 80} />
+                        <KPICard title="Débit"         value={`${Math.round(kpis?.completion_rate ?? 0)}%`} subText="Complétées / créées" icon={Activity} />
                         <KPICard title="Traitées"      value={String(kpis?.total_touched ?? 0)}   subText="Modifiées" icon={Activity} />
                         <KPICard title="Ouvertes"      value={String(kpis?.total_open ?? 0)}      subText="État actuel" icon={Inbox} />
                         <KPICard title="En retard"     value={String(kpis?.total_overdue ?? 0)}   subText="Échéance dépassée" icon={AlertTriangle} danger={(kpis?.total_overdue ?? 0) > 0} />
@@ -307,7 +313,8 @@ export default function TasksDashboard() {
                                             <SortTh label="Représentant" col="rep_name" align="left" sortConfig={sortConfig} onSort={handleSort} />
                                             <SortTh label="Créées"      col="nb_created"        sortConfig={sortConfig} onSort={handleSort} />
                                             <SortTh label="Complétées"  col="nb_completed"      sortConfig={sortConfig} onSort={handleSort} />
-                                            <SortTh label="Taux compl." col="completion_rate"   sortConfig={sortConfig} onSort={handleSort} />
+                                            <SortTh label="Taux compl." col="cohort_rate"       sortConfig={sortConfig} onSort={handleSort} />
+                                            <SortTh label="Débit"       col="completion_rate"   sortConfig={sortConfig} onSort={handleSort} />
                                             <SortTh label="Traitées"    col="nb_touched"        sortConfig={sortConfig} onSort={handleSort} />
                                             <SortTh label="Délai moyen" col="avg_days_to_close" sortConfig={sortConfig} onSort={handleSort} />
                                             <SortTh label="Ouvertes"    col="nb_open"           sortConfig={sortConfig} onSort={handleSort} />
@@ -316,7 +323,10 @@ export default function TasksDashboard() {
                                     </thead>
                                     <tbody className="divide-y divide-hairline">
                                         {sortedReps.map(r => {
-                                            const rate = Number(r.completion_rate) || 0;
+                                            // The bar shows the bounded cohort rate; throughput sits
+                                            // beside it unclamped, because >100 % is real information.
+                                            const rate = Number(r.cohort_rate) || 0;
+                                            const throughput = Number(r.completion_rate) || 0;
                                             return (
                                                 <tr key={r.rep_name} className="hover:bg-sand/60 transition-colors">
                                                     <td className="px-4 py-3 font-semibold text-ink-secondary whitespace-nowrap">
@@ -329,9 +339,10 @@ export default function TasksDashboard() {
                                                             <div className="h-1.5 rounded-full bg-stone w-16 shrink-0">
                                                                 <div className={cn('h-1.5 rounded-full', pctBar(rate))} style={{ width: `${Math.min(rate, 100)}%` }} />
                                                             </div>
-                                                            <span className={cn('text-xs font-bold tabular-nums w-9 text-right', pctText(rate))}>{Math.min(Math.round(rate), 100)}%</span>
+                                                            <span className={cn('text-xs font-bold tabular-nums w-9 text-right', pctText(rate))}>{Math.round(rate)}%</span>
                                                         </div>
                                                     </td>
+                                                    <td className="px-4 py-3 text-right text-ink-mute tabular-nums">{Math.round(throughput)}%</td>
                                                     <td className="px-4 py-3 text-right text-ink-mute tabular-nums">{r.nb_touched}</td>
                                                     <td className="px-4 py-3 text-right text-ink-mute tabular-nums">
                                                         {r.avg_days_to_close != null ? `${Number(r.avg_days_to_close).toFixed(1)} j` : <span className="text-ink-faint">—</span>}
@@ -513,7 +524,9 @@ function WeeklyTrend({ rows }: { rows: TasksWeeklyRow[] }) {
                         {active.map(w => {
                             const label = fmtShort(w.week_start);
                             const range = fmtWeekRange(w.week_start, addDaysStr(w.week_start, 6));
-                            const rate = w.nb_created > 0 ? Math.min(Math.round((w.nb_completed / w.nb_created) * 100), 100) : 0;
+                            // Throughput for the week: completed / created. Different cohorts,
+                            // so >100 % means backlog was cleared. Not clamped.
+                            const rate = w.nb_created > 0 ? Math.round((w.nb_completed / w.nb_created) * 100) : 0;
                             return (
                                 <div key={w.week_start} className="group relative flex flex-col items-center gap-1.5 shrink-0 rounded-md px-0.5 pt-1 hover:bg-sand transition-colors">
                                     {/* Hover tooltip */}
