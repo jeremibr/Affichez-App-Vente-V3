@@ -172,6 +172,40 @@ All four had to change together: the per-rep `get_quarterly_yoy` and
 them, and fixing only the two team-total functions already in the repo would have
 printed "—" on the Total équipe row above rep rows still printing `0`.
 
+### 3b. Tâches counted on the wrong calendar — **FIXED**
+
+Every date predicate in the Tâches module resolved in the session time zone,
+which for PostgREST is **UTC**. A task created 31 January at 20:00 in Montréal is
+1 February 01:00 UTC, so it was counted in February. The last four to five hours
+of every local day were attributed to the next day, week, month and year.
+
+Not house style — an inconsistency. Leads and accounts already count locally
+through `zoho_local_date` / `zoho_lead_local_date`, and `America/Toronto` appears
+in nine other objects. Tâches used none of them, so "Janvier" meant one thing on
+one page and something else on another.
+
+`20260915150000` found this and deliberately left it, rather than smuggle a
+behaviour change into a performance migration. Fixed on its own terms by
+`20260918190000_tasks_local_time_and_wow.sql`, which also converts
+`get_tasks_kpis` and `get_tasks_by_rep` from `EXTRACT(YEAR FROM ...)` to range
+predicates — the two that migration never reached — so the correctness fix
+removes two sequential scans as well.
+
+Boundaries are built as local wall-clock timestamps and converted with
+`AT TIME ZONE`, which is DST-aware. Adding an interval to a `timestamptz` would
+resolve in the session zone and drift an hour across a DST change.
+
+### 3c. Week-over-week compared a partial week to a whole one — **FIXED**
+
+`get_tasks_wow` counted "this week" Monday-to-now and "last week" as a complete
+Monday-to-Monday, and `TasksDashboard` rendered the raw difference. On a Monday
+morning every rep showed a large negative: three days of work against somebody's
+full previous week. Wrong for most of every week, which made it the most
+frequently-wrong number in the app — unlike the YoY defects, which only bit at
+year boundaries.
+
+Last week is now measured over the same elapsed slice, and the column says so.
+
 ### 4. Task `completion_rate` compares two different cohorts — **CODE**
 
 [supabase_tasks.sql:96](supabase_tasks.sql#L96) and
