@@ -207,6 +207,11 @@ export default function Dashboard() {
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
     const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
+
+    // objectives is keyed (year, month, department) with no office dimension, so
+    // an office-filtered view has no target to be measured against and the RPC
+    // returns 0. Show "—", not 0 % — see STATS-INTEGRITY.md.
+    const hasTarget = Number(kpis?.annual_target ?? 0) > 0;
     const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
@@ -255,12 +260,14 @@ export default function Dashboard() {
                 <>
                     {/* KPI Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+                        {/* trend only when a target exists for this scope: 0 % would read
+                            as zero attainment rather than "rien à comparer". */}
                         <KPICard
                             title="Total Devis YTD"
                             value={formatCurrencyCAD(kpis?.ytd_total || 0)}
                             subText="Revenus cumulés"
                             icon={TrendingUp}
-                            trend={kpis?.pct_of_target}
+                            trend={hasTarget ? kpis?.pct_of_target : undefined}
                             trendLabel="de l'objectif"
                         />
                         <KPICard
@@ -277,8 +284,8 @@ export default function Dashboard() {
                         />
                         <KPICard
                             title="Objectif Annuel"
-                            value={formatCurrencyCAD(kpis?.annual_target || 0)}
-                            subText="Planifié pour l'année"
+                            value={hasTarget ? formatCurrencyCAD(kpis!.annual_target) : '—'}
+                            subText={hasTarget ? "Planifié pour l'année" : 'Aucun objectif pour ce filtre'}
                             icon={Target}
                         />
                         <KPICard
