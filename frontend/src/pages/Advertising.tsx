@@ -149,7 +149,7 @@ export default function Advertising() {
                     </span>
                     <div className="min-w-0">
                         <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
-                            Comptes · Publicité
+                            Publicité
                         </h1>
                         <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                             Ce que la publicité coûte, et ce que les comptes qu&rsquo;elle a ramenés ont facturé

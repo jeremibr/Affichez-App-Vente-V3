@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AdminViewProvider } from './contexts/AdminViewContext';
@@ -107,15 +107,20 @@ function AppRoutes() {
                         <Route path="paye/settings" element={<PayeRepSettings />} />
                         <Route path="objectifs/equipe" element={<ObjectifsEquipe />} />
 
-                        {/* "Créé par" - admin-only on purpose. These numbers overlap
+                        {/* "Documents créés" - admin-only on purpose. These numbers overlap
                             the rep figures by design and would be misread as a second
                             leaderboard. Dominic, who asked for it: "c'est vraiment
                             juste pour moi, c'est même pas pour personne." */}
                         <Route path="createurs" element={<Createurs />} />
 
-                        {/* Publicité - listed under Comptes in the sidebar, admin-only.
+                        {/* Publicité - a screen of its own, admin-only.
                             ad_spend_daily is also restricted to admins by RLS. */}
-                        <Route path="comptes/publicite" element={<Advertising />} />
+                        <Route path="publicite" element={<Advertising />} />
+
+                        {/* Moved out of the Comptes module on 2026-09-18. Links
+                            people have bookmarked or pasted into Slack carry the
+                            filters in the query string, so keep them. */}
+                        <Route path="comptes/publicite" element={<RedirectToPublicite />} />
 
                         {/* ─── Tâches CRM module (owner-only) - dashboard + weekly tabs ─── */}
                         <Route path="taches" element={<TasksDashboard />} />
@@ -126,6 +131,12 @@ function AppRoutes() {
         </Routes>
         </Suspense>
     );
+}
+
+/** `/comptes/publicite` -> `/publicite`, filters and all. */
+function RedirectToPublicite() {
+    const { search, hash } = useLocation();
+    return <Navigate to={{ pathname: '/publicite', search, hash }} replace />;
 }
 
 function RouteFallback() {

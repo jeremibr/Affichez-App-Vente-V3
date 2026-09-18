@@ -308,7 +308,7 @@ values for this reason.
 
 ### Publicité: ad spend against revenue
 
-The **Publicité** module (`/comptes/publicite`, admin-only) compares Google Ads and Meta Ads spend
+The **Publicité** module (`/publicite`, admin-only) compares Google Ads and Meta Ads spend
 with the revenue of the accounts attributed to each channel. Only those two channels. Setup and
 credentials: **`docs/ADVERTISING.md`**.
 
@@ -417,24 +417,63 @@ the table would just be overwritten by the next sync.
 | Route | Page | Purpose |
 |---|---|---|
 | `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
-| `/createurs` | `Createurs` | Admin-only. Who *created* each quote/invoice, vs who sold it. Never reconciles with rep figures — by design |
+| `/createurs` | `Createurs` | **Documents créés** in the nav. Admin-only. Who *created* each quote/invoice, vs who sold it — a rep who builds a quote and hands it to another still gets the credit here. Never reconciles with rep figures, by design |
 | `/comptes/detail` | `AccountsDetail` | Searchable client directory; a row opens its billing history by department and year |
-| `/comptes/publicite` | `Advertising` | Admin-only. Google Ads + Meta spend against the revenue of the accounts tagged to each. Channel-level and monthly, never per lead |
+| `/publicite` | `Advertising` | Admin-only. Google Ads + Meta spend against the revenue of the accounts tagged to each. Channel-level and monthly, never per lead |
 | `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |
 | `/quarterly` | `QuarterlyAverages` | YoY quarterly average deal size per rep |
+| `/taches` | `TasksDashboard` | Admin-only. CRM task completion per rep, by week |
 | `/settings` | `Settings` | Manage reps, monthly objectives, fiscal quarters, webhook logs |
 
 All routes are children of `Layout`, which provides the sidebar navigation.
 
-The sidebar is two levels deep: a **section** (Équipe Affichez, Mon Portail,
-Administration — text only, no icon) holds **modules** (Devis, Factures,
-Comptes, Commissions, Objectifs), each with its own icon and its screens
-underneath; a module with a single screen is a plain link instead. Both levels
-collapse, `getSectionKey` / `getGroupKey` in `Layout.tsx` open the one a
+The sidebar is two levels deep: a **section** (text only, no icon) holds
+**modules** (Devis, Factures, Comptes), each with its own icon and its
+screens underneath; a module with a single screen is a plain link instead. Both
+levels collapse, `getSectionKey` / `getGroupKey` in `Layout.tsx` open the one a
 navigation lands in, and Devis is open on a cold start. When you add a route,
 add it to the tree, to `getGroupKey` if it belongs to a module, and to
 `ROUTE_CHUNKS` in `src/lib/prefetch.ts`.
+
+**A screen is filed by its subject; whether you can see it is a separate
+question.** Reorganised 2026-09-18, because the two had been conflated:
+`Administration` meant both "settings" and "admin-only", so every restricted
+screen was filed there no matter what it was about, and neither Publicité (ad
+spend) nor Tâches CRM is a setting.
+
+| section | holds | who sees it |
+|---|---|---|
+| **Ventes Affichez** | Devis, Factures, Comptes, Publicité | everyone (Factures needs `canAccessFactures`, Publicité admin) |
+| **Notre équipe** | Tâches CRM, Commissions, Objectifs d'équipe | admin only, today |
+| **Mon Portail** | the signed-in rep's own numbers | everyone |
+| **Administration** | Documents créés, then Objectifs des reps, Taux de commission, Paramètres — screens that **change** something | admin only |
+
+Consequences worth knowing before you edit the tree:
+
+- **Every screen in Notre équipe is admin-only right now**, so a rep sees two
+  sections, not four. The nav drops a module with no visible screens and a
+  section with no visible modules, so nothing renders as an empty chevron. The
+  day one of those screens opens to reps, a flag changes and nothing moves —
+  that is the point of filing by subject.
+- **`showAdminNav` is `isAdmin && !viewAsRep`**: an admin previewing a rep's
+  view sees what that rep sees. The routes stay reachable by URL — the guards in
+  `App.tsx` are `isAdmin`, not `viewAsRep`.
+- **`Documents créés` (`/createurs`) stays in Administration** even though it is
+  a view, not a setting. It is Dominic's own back-office check on who keyed a
+  document in — *"c'est vraiment juste pour moi"* — and he asked for it there
+  on 2026-09-18. Do not "fix" it into Notre équipe.
+- **Notre équipe holds three plain links, not modules.** Tâches CRM is the first
+  screen of what will become an **Activité** module — rep actions: tasks, then
+  conversations (SMS, courriels) and calls. A module wrapping one screen is a
+  chevron that opens onto a single item, so it stays a link until the second
+  screen lands; then wrap the links and add the prefix to `getGroupKey`.
+- **The nav tree is not the URL tree.** A screen does not need a path prefix
+  matching its section — `getGroupKey` and `getSectionKey` map paths explicitly,
+  which is why they are spelled out rather than derived. `/comptes/publicite`
+  was the exception that had to move: `getSectionKey` files by prefix, so that
+  URL made the page a child of Comptes. It is now `/publicite`, with a redirect
+  preserving the query string.
 
 ### Key Shared Abstractions
 

@@ -18,7 +18,8 @@ import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
 import { RepAvatar } from '../components/RepAvatar';
 
 /**
- * Créé par - who keyed a quote or an invoice in, as opposed to who sold it.
+ * Documents créés - who keyed a quote or an invoice in, as opposed to who sold
+ * it. Named "Créé par" until 2026-09-18.
  *
  * Asked for on 2026-09-04. Dominic wants to see the quotes Morgane Owczarzak and
  * Guillaume Montambeault put through, "même si c'est pas les autres
@@ -137,7 +138,7 @@ export default function Createurs() {
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6">
             <div>
-                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Créé par</h1>
+                <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">Documents créés</h1>
                 <p className="text-xs md:text-sm text-ink-mute mt-0.5">
                     Qui a <em>saisi</em> le devis ou la facture, peu importe à quel représentant la vente est attribuée
                 </p>

@@ -3,7 +3,7 @@ import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, CalendarDays, LineChart, Settings,
     Menu, LogOut, FileText, ClipboardList, Wallet,
-    ChevronDown, Target, Eye, Building2, BarChart2, Users, UserPlus,
+    ChevronDown, Target, Eye, Building2, UserPlus, Percent,
     CheckSquare, FileSignature, Receipt, BookUser, HandCoins, PenLine,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -55,13 +55,35 @@ function leafMatches(item: NavLeaf, pathname: string): boolean {
 
 // ─── Route → section / module mapping ─────────────────────────────────────────
 
+/**
+ * A screen is filed by its SUBJECT, and hidden by a permission - the two are
+ * decided separately. `Administration` therefore means configuration, not
+ * "admin-only": Publicite, Taches and Documents crees are all restricted and
+ * none of them belongs there. The day one of them opens up to reps, a flag
+ * changes and nothing moves.
+ *
+ *   ventes  - what came in, and what it cost to get it
+ *   equipe  - the people: what they did, what they earn, what they aim at
+ *   portail - me
+ *   admin   - screens that CHANGE a setting
+ *
+ * The settings tests come first: `/portail/parametres` and `/paye/settings`
+ * live under a URL whose prefix belongs to another section.
+ */
 function getSectionKey(pathname: string): string {
     if (pathname.startsWith('/portail/parametres')) return 'admin';
+    if (pathname.startsWith('/paye/settings')) return 'admin';
+    if (pathname.startsWith('/settings')) return 'admin';
+    if (pathname.startsWith('/reps')) return 'admin';
+    if (pathname.startsWith('/createurs')) return 'admin';
+
     if (pathname.startsWith('/portail')) return 'portail';
-    if (pathname.startsWith('/leads') || pathname.startsWith('/comptes')) return 'ensemble';
-    if (pathname.startsWith('/factures') || pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'ensemble';
-    if (pathname.startsWith('/reps') || pathname.startsWith('/paye') || pathname.startsWith('/settings') || pathname.startsWith('/taches') || pathname.startsWith('/createurs') || pathname.startsWith('/objectifs')) return 'admin';
-    return 'ensemble';
+
+    if (pathname.startsWith('/taches') || pathname.startsWith('/paye')
+        || pathname.startsWith('/objectifs')) return 'equipe';
+
+    // '/', /weekly, /quarterly, /factures, /comptes, /leads, /publicite
+    return 'ventes';
 }
 
 /**
@@ -73,8 +95,8 @@ function getGroupKey(pathname: string): string | null {
     if (pathname === '/' || pathname.startsWith('/weekly') || pathname.startsWith('/quarterly')) return 'devis';
     if (pathname.startsWith('/factures')) return 'factures';
     if (pathname.startsWith('/comptes') || pathname.startsWith('/leads')) return 'comptes';
-    if (pathname.startsWith('/paye')) return 'commissions';
-    if (pathname.startsWith('/objectifs') || pathname.startsWith('/portail/parametres')) return 'objectifs';
+    // Publicite, Taches, Commissions, Objectifs d'equipe and Documents crees are
+    // all single-screen leaves.
     return null;
 }
 
@@ -178,7 +200,7 @@ function SubItems({ items, open, openGroups, onToggleGroup, pathname }: {
     return (
         <Collapse open={open}>
             <div className="ml-3 pl-3 border-l-2 border-hairline mt-0.5 mb-1 space-y-0.5">
-                {items.map(node => isGroup(node) ? (
+                {items.filter(n => !isGroup(n) || n.items.length > 0).map(node => isGroup(node) ? (
                     <GroupRow
                         key={node.key}
                         group={node}
@@ -265,10 +287,14 @@ export default function Layout() {
 
     // ─── Section definitions ─────────────────────────────────────────────────
 
+    // Admin-only entries follow the rule the Administration section already
+    // used: while an admin previews a rep's view, they see what that rep sees.
+    const showAdminNav = isAdmin && !viewAsRep;
+
     const sections: Section[] = [
         {
-            key: 'ensemble',
-            label: 'Équipe Affichez',
+            key: 'ventes',
+            label: 'Ventes Affichez',
             items: [
                 {
                     key: 'devis', name: 'Devis', icon: FileSignature,
@@ -291,12 +317,16 @@ export default function Layout() {
                     items: [
                         { name: 'Tableau de bord', href: '/comptes',        icon: LayoutDashboard, end: true },
                         { name: 'Détail comptes',  href: '/comptes/detail', icon: BookUser },
-                        // Admin-only; see the route in App.tsx.
-                        ...(isAdmin ? [
-                            { name: 'Publicité', href: '/comptes/publicite', icon: AdvertisingIcon },
-                        ] : []),
                     ],
                 },
+                // Publicite sits beside the revenue it is measured against: it
+                // owns ad_spend_daily and its own syncs, and Comptes is a lens
+                // it looks through, not its parent. A leaf until a second
+                // screen exists - a module wrapping one screen is a collapse
+                // level that buys nothing.
+                ...(showAdminNav ? [
+                    { name: 'Publicité', href: '/publicite', icon: AdvertisingIcon, end: true },
+                ] : []),
                 // Leads - hidden while the Comptes module replaces it. Routes are
                 // commented out in App.tsx; leaving these visible would 404.
                 // {
@@ -307,6 +337,21 @@ export default function Layout() {
                 //     ],
                 // },
             ],
+        },
+        {
+            key: 'equipe',
+            label: 'Notre équipe',
+            // Every screen here is admin-only today, so a rep sees no section
+            // at all rather than an empty header (see the filter in the nav).
+            items: showAdminNav ? [
+                // What a rep DID, as opposed to what they were credited with.
+                // A plain link while Tâches is the only screen; when
+                // Conversations (SMS, courriels) and Appels arrive, wrap these
+                // in an `activite` module and add the prefix to getGroupKey.
+                { name: 'Tâches CRM',         href: '/taches',           icon: CheckSquare, end: true },
+                { name: 'Commissions',        href: '/paye',             icon: HandCoins,   end: true },
+                { name: "Objectifs d'équipe", href: '/objectifs/equipe', icon: Target,      end: true },
+            ] : [],
         },
         {
             key: 'portail',
@@ -321,24 +366,15 @@ export default function Layout() {
         },
     ];
 
+    // Administration is configuration - plus Documents créés, which is here
+    // because the owner put it here: it is his own back-office view of who
+    // keyed what in, not a team figure. Leave it. Everything else in this list
+    // CHANGES something.
     const adminItems: NavNode[] = [
-        {
-            key: 'commissions', name: 'Commissions', icon: HandCoins,
-            items: [
-                { name: 'Vue ensemble',    href: '/paye',          icon: BarChart2, end: true },
-                { name: 'Paramètres reps', href: '/paye/settings', icon: Users },
-            ],
-        },
-        {
-            key: 'objectifs', name: 'Objectifs', icon: Target,
-            items: [
-                { name: 'Objectifs Équipe', href: '/objectifs/equipe',   icon: Users, end: true },
-                { name: 'Objectifs Reps',   href: '/portail/parametres', icon: Target },
-            ],
-        },
-        { name: 'Créé par',   href: '/createurs', icon: PenLine,     end: true },
-        { name: 'Tâches CRM', href: '/taches',    icon: CheckSquare, end: true },
-        { name: 'Paramètres', href: '/settings',  icon: Settings },
+        { name: 'Documents créés',    href: '/createurs',          icon: PenLine, end: true },
+        { name: 'Objectifs des reps', href: '/portail/parametres', icon: Target },
+        { name: 'Taux de commission', href: '/paye/settings',      icon: Percent },
+        { name: 'Paramètres',         href: '/settings',           icon: Settings },
     ];
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -375,7 +411,7 @@ export default function Layout() {
 
             {/* Main nav */}
             <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
-                {sections.map(s => (
+                {sections.filter(s => s.items.length > 0).map(s => (
                     <SectionHeader
                         key={s.key}
                         label={s.label}
