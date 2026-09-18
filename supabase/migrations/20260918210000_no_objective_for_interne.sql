@@ -77,7 +77,7 @@ AS $function$
          ELSE ROUND((agg.ytd_total/obj.annual_target*100)::numeric,1) END,
     agg.invoiced_total, agg.accepted_total
   FROM agg, obj;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_inv_dashboard_kpis(p_year integer, p_office text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_month integer DEFAULT NULL::integer, p_dept text DEFAULT NULL::text, p_rep text DEFAULT NULL::text, p_reps text[] DEFAULT NULL::text[])
  RETURNS TABLE(ytd_total numeric, ytd_count bigint, avg_deal_size numeric, annual_target numeric, pct_of_target numeric, paid_total numeric, partial_total numeric, avoir_total numeric)
@@ -128,7 +128,7 @@ AS $function$
          ELSE ROUND((agg.ytd_total/obj.annual_target*100)::numeric,1) END,
     agg.paid_total, agg.partial_total, agg.avoir_total
   FROM agg, obj;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_inv_sommaire(p_year integer, p_office text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_rep text DEFAULT NULL::text, p_reps text[] DEFAULT NULL::text[])
  RETURNS TABLE(month integer, department text, objectif numeric, actual_amount numeric, pct_atteint numeric, deal_count bigint)
@@ -172,7 +172,7 @@ BEGIN
   LEFT JOIN inv_agg ia ON ia.i_month=ac.m AND ia.i_dept=ac.d
   ORDER BY ac.m, ac.d;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_inv_sommaire_grand_total(p_year integer, p_office text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_rep text DEFAULT NULL::text, p_reps text[] DEFAULT NULL::text[])
  RETURNS TABLE(month integer, objectif numeric, actual_amount numeric, pct_atteint numeric, deal_count bigint)
@@ -219,7 +219,7 @@ BEGIN
   LEFT JOIN inv_agg ia ON ia.i_month = am.m
   ORDER BY am.m;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.get_sommaire_grand_total(p_year integer, p_office text DEFAULT NULL::text, p_status text DEFAULT NULL::text, p_rep text DEFAULT NULL::text, p_reps text[] DEFAULT NULL::text[])
  RETURNS TABLE(month integer, objectif numeric, actual_amount numeric, pct_atteint numeric, deal_count bigint)
@@ -266,4 +266,4 @@ BEGIN
   LEFT JOIN sales_agg sa ON sa.s_month = am.m
   ORDER BY am.m;
 END;
-$function$
+$function$;
