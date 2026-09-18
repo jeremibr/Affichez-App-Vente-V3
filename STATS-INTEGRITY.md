@@ -180,6 +180,11 @@ but it means a KPI strip headed "Janvier" mixes January flow with today's backlo
 
 ### 5. "Number of invoices" has two different definitions on one page — **CODE**
 
+> **Fixed** by `20260918170000_inv_count_excludes_avoirs.sql`: both Sommaire
+> functions now count with `FILTER (WHERE NOT i.is_avoir)`, matching the KPI card.
+> Amounts are untouched and stay net of credit notes — see below for why that
+> asymmetry is the correct one.
+
 - `get_inv_dashboard_kpis` → `COUNT(*) FILTER (WHERE NOT is_avoir)` (excludes credit notes)
 - `get_inv_sommaire` / `get_inv_sommaire_grand_total` → plain `COUNT(*)` (includes them)
 
