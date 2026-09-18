@@ -115,11 +115,16 @@ both sides.
 Affected `get_dashboard_kpis`, `get_sommaire`, `get_sommaire_grand_total`, and all
 three `get_inv_*` equivalents.
 
-**Why the rep-group half is still open.** For "Équipe entière" the team objective
-*is* the right target; for "Interne" it is not. The two need different answers
-and choosing between them is a product decision, not a bug fix, so it was left
-alone rather than settled quietly. Note the codebase is already inconsistent
-here: `get_sommaire` suppresses the objective on `p_reps`, the other five do not.
+**The rep-group half is fixed too**, by `20260918210000_no_objective_for_interne.sql`.
+It turned out simpler than it looked. There is deliberately no "Équipe entière"
+option in the filter (see `useRepFilter`): `Tous les reps` sends no filter at all,
+a single rep uses `p_rep`, and **`p_reps` is non-null only for "Interne"**. So one
+guard — `p_reps IS NULL` on the objective source — means exactly "no target for
+Interne" while every other selection keeps its objective.
+
+`get_sommaire` had behaved this way since `20260914130000`; the other five had
+not, so picking Interne scored it against the full team or department target in
+five places across two dashboards.
 
 **Getting the percentage back under an office filter** needs an `office` column
 on `objectives` / `objectives_factures` and a way to enter those numbers in
