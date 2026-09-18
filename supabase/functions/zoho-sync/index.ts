@@ -349,11 +349,17 @@ Deno.serve(async (req: Request) => {
   // ─ Normal sync ──────────────────────────────────────────────────────────────
   const startTime = Date.now();
   const isManual = req.headers.get('x-sync-source') !== 'cron';
-  const isFullSync = req.headers.get('x-full-sync') === 'true';
+  // An orphan sweep is a full walk restricted to the won statuses. That is the
+  // only shape that still finishes in one invocation, and orphan detection needs
+  // one invocation to have seen all of Zoho by itself — see the guard below.
+  const isSweep = req.headers.get('x-orphan-sweep') === 'true';
+  const isFullSync = req.headers.get('x-full-sync') === 'true' || isSweep;
   // Reports what the run WOULD write and remove, without writing or removing it.
   const isDryRun = req.headers.get('x-dry-run') === 'true';
   // Storing every status is off until the secret is set; a single run can opt in.
-  const storeAll = STORE_ALL_ENV || req.headers.get('x-store-all') === 'true';
+  // A sweep deliberately opts OUT of storing everything, even when the secret is
+  // on: walking every status needs slicing, and a sliced walk can never sweep.
+  const storeAll = !isSweep && (STORE_ALL_ENV || req.headers.get('x-store-all') === 'true');
   const action = isManual
     ? (isFullSync ? 'sync_manual_full' : 'sync_manual')
     : 'sync_auto';
@@ -419,12 +425,16 @@ Deno.serve(async (req: Request) => {
           // Out of time. Remember where we are and let the next call continue;
           // the walk is deliberately NOT marked complete, which is what keeps
           // orphan detection from running against a half-seen Zoho.
-          if (useCursor && Date.now() > deadline) {
+          // The budget applies to every full walk, not only the sliced ones. A
+          // sweep that runs long stops itself and reports, rather than being
+          // killed at the platform's 150s limit with nothing to show; and because
+          // walkComplete goes false, it deletes nothing.
+          if (isFullSync && Date.now() > deadline) {
             // A dry run must not persist the cursor. Leaving one behind would make
             // the first real run resume from it and never see the pages before it,
             // which is the opposite of what a rehearsal is for. So a dry run only
             // ever reports its first slice.
-            if (!isDryRun) await writeWalkCursor({ org: orgIdx, page });
+            if (useCursor && !isDryRun) await writeWalkCursor({ org: orgIdx, page });
             walkComplete = false;
             outOfTime = true;
             hasMore = false;
@@ -625,6 +635,7 @@ Deno.serve(async (req: Request) => {
       orphans_found: totalDeleted,
       dry_run: isDryRun,
       store_all: storeAll,
+      sweep: isSweep,
       walk_complete: walkComplete,
       seen: seenZohoIds.size,
       ...(storeAll ? { by_status: byStatus, skipped_before_backfill: totalSkippedOld } : {}),
