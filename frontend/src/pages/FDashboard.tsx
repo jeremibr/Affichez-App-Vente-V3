@@ -346,6 +346,11 @@ export default function FDashboard() {
     const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
+    // objectives_factures is keyed (year, month, department) with no office
+    // dimension, so an office-filtered view has no target to be measured against
+    // and the RPC returns 0. Show "—", not 0 % — see STATS-INTEGRITY.md.
+    const hasTarget = Number(kpis?.annual_target ?? 0) > 0;
+
     return (
         <>
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto space-y-6 md:space-y-8">
@@ -388,10 +393,12 @@ export default function FDashboard() {
             ) : (
                 <>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Net après avoirs" icon={TrendingUp} trend={kpis?.pct_of_target} />
+                        {/* trend and target only when one exists for this scope: 0 % would
+                            read as zero attainment rather than "rien à comparer". */}
+                        <KPICard title="Total Facturé YTD" value={formatCurrencyCAD(kpis?.ytd_total || 0)} subText="Net après avoirs" icon={TrendingUp} trend={hasTarget ? kpis?.pct_of_target : undefined} />
                         <KPICard title="Nb Factures" value={String(kpis?.ytd_count || 0)} subText="Factures (filtres actifs)" icon={FileText} />
                         <KPICard title="Montant Moyen" value={formatCurrencyCAD(kpis?.avg_deal_size || 0)} subText="Par facture" icon={Briefcase} />
-                        <KPICard title="Objectif Annuel" value={formatCurrencyCAD(kpis?.annual_target || 0)} subText="Planifié pour l'année" icon={Target} />
+                        <KPICard title="Objectif Annuel" value={hasTarget ? formatCurrencyCAD(kpis!.annual_target) : '—'} subText={hasTarget ? "Planifié pour l'année" : 'Aucun objectif pour ce filtre'} icon={Target} />
                     </div>
 
                     {/* Attribution quality. Shown whenever there is anything to report so a

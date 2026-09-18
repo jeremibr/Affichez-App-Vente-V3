@@ -72,6 +72,11 @@ changing the SQL.
 
 ### 2. `% of target` is wrong whenever an office or rep-group filter is applied — **PROVEN**
 
+> **Office half fixed** by `20260918130000_objectives_office_scope.sql`: with an
+> office filter the objective source now yields no rows, so the card reads "—"
+> instead of a percentage against somebody else's target. The rep-group half is
+> deliberately untouched — see the end of this entry.
+
 `objectives` and `objectives_factures` have **no `office` column** — targets are
 company-wide. But the actuals are office-filtered while the target subquery is
 not ([devis_rep_groups.sql:60](supabase/migrations/20260914120000_devis_rep_groups.sql#L60),
@@ -94,8 +99,19 @@ the group, the target stays company-wide. `p_rep` (a single named rep) is handle
 correctly via `rep_objectives`, and `p_dept`/`p_month` are correctly filtered on
 both sides.
 
-Affects `get_dashboard_kpis`, `get_sommaire`, `get_sommaire_grand_total`, and all
+Affected `get_dashboard_kpis`, `get_sommaire`, `get_sommaire_grand_total`, and all
 three `get_inv_*` equivalents.
+
+**Why the rep-group half is still open.** For "Équipe entière" the team objective
+*is* the right target; for "Interne" it is not. The two need different answers
+and choosing between them is a product decision, not a bug fix, so it was left
+alone rather than settled quietly. Note the codebase is already inconsistent
+here: `get_sommaire` suppresses the objective on `p_reps`, the other five do not.
+
+**Getting the percentage back under an office filter** needs an `office` column
+on `objectives` / `objectives_factures` and a way to enter those numbers in
+Réglages. At that point the guards become
+`AND (p_office IS NULL OR office = p_office)`.
 
 ### 3. Year-over-year silently reports zero for 2025 — **PROVEN**
 
