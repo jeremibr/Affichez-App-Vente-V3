@@ -156,7 +156,11 @@ because only two of the four functions involved are in this repo —
 `supabase_quarterly_totals.sql`. The per-rep `get_quarterly_yoy` and
 `get_inv_quarterly_yoy` exist **only in the database**, so changing the two
 visible ones would make the team total print "—" above rep rows still printing
-`0`. **Prerequisite: pull those two functions into the repo first.**
+`0`.
+
+**That prerequisite is now met**: `supabase/schema.sql` is a snapshot of the live
+schema and contains both. The follow-up is writing a migration that redefines all
+four consistently, based on those definitions.
 
 ### 4. Task `completion_rate` compares two different cohorts — **CODE**
 
