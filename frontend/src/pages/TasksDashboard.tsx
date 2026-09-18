@@ -404,7 +404,11 @@ function WeekOverWeekPanel({ rows }: { rows: TasksWoWRow[] }) {
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline">
                 <h3 className="text-sm font-semibold text-ink">Cette semaine vs semaine dernière</h3>
-                <p className="text-2xs text-ink-mute mt-0.5">Tâches complétées, par rep : qui accélère, qui ralentit</p>
+                <p className="text-2xs text-ink-mute mt-0.5">
+                    Tâches complétées, par rep : qui accélère, qui ralentit. La semaine dernière
+                    est mesurée jusqu&apos;au même jour et à la même heure, pour que la comparaison
+                    tienne en milieu de semaine.
+                </p>
             </div>
             {rows.length === 0 ? (
                 <p className="px-5 py-8 text-sm text-ink-mute text-center">Aucune activité récente</p>
@@ -413,7 +417,7 @@ function WeekOverWeekPanel({ rows }: { rows: TasksWoWRow[] }) {
                     <thead>
                         <tr className="border-b border-hairline bg-sand/60">
                             <th className="px-4 py-2.5 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rep</th>
-                            <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Sem. dern.</th>
+                            <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Sem. dern. (même pér.)</th>
                             <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Cette sem.</th>
                             <th className="px-4 py-2.5 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Évol.</th>
                         </tr>
