@@ -87,10 +87,6 @@ function AppRoutes() {
                 {/* <Route path="leads" element={<LeadsDashboard />} /> */}
                 {/* <Route path="leads/detail" element={<LeadsDetail />} /> */}
 
-                {/* ─── Comptes module - Zoho CRM Accounts, the grain that replaced leads ─── */}
-                <Route path="comptes" element={<AccountsDashboard />} />
-                <Route path="comptes/detail" element={<AccountsDetail />} />
-
                 {/* ─── Mon Portail - personal view for every rep ─── */}
                 <Route path="portail" element={<PortailObjectifs />} />
                 <Route path="portail/devis" element={<PortailDevis />} />
@@ -112,6 +108,14 @@ function AppRoutes() {
                             leaderboard. Dominic, who asked for it: "c'est vraiment
                             juste pour moi, c'est même pas pour personne." */}
                         <Route path="createurs" element={<Createurs />} />
+
+                        {/* ─── Comptes module - Zoho CRM Accounts, the grain that
+                            replaced leads. Admin-only: zoho_accounts is restricted
+                            to admins by RLS too, so a member who reaches these
+                            URLs falls through to the catch-all and lands on the
+                            dashboard rather than on an empty screen. ─── */}
+                        <Route path="comptes" element={<AccountsDashboard />} />
+                        <Route path="comptes/detail" element={<AccountsDetail />} />
 
                         {/* Publicité - a screen of its own, admin-only.
                             ad_spend_daily is also restricted to admins by RLS. */}

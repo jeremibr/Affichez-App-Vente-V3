@@ -312,13 +312,17 @@ export default function Layout() {
                         { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
                     ],
                 }] : []),
-                {
+                // Admin-only, like Publicité below: the routes are gated the
+                // same way and zoho_accounts is admin-only at the row level, so a
+                // member sees no entry, cannot reach it by URL, and could not read
+                // the accounts even by asking the API directly.
+                ...(showAdminNav ? [{
                     key: 'comptes', name: 'Comptes', icon: Building2,
                     items: [
                         { name: 'Tableau de bord', href: '/comptes',        icon: LayoutDashboard, end: true },
                         { name: 'Détail comptes',  href: '/comptes/detail', icon: BookUser },
                     ],
-                },
+                }] : []),
                 // Publicite sits beside the revenue it is measured against: it
                 // owns ad_spend_daily and its own syncs, and Comptes is a lens
                 // it looks through, not its parent. A leaf until a second

@@ -270,9 +270,19 @@ back-fill coverage in Settings.
 ### Comptes: the account is the record
 
 The **Comptes** module (`/comptes`, `/comptes/detail`) is the primary funnel view
-and replaced the Leads pages on 2026-09-07. Its grain is the Zoho CRM **account**,
+and replaced the Leads pages on 2026-09-07. It is **admin-only** (2026-09-24),
+like Publicité beside it. Its grain is the Zoho CRM **account**,
 because that is the grain the business is run in: a company with three contacts
 is one account, so its revenue is counted once with no dedupe layer.
+
+**Admin-only at the row level, not just in the nav.** `zoho_accounts` carries an
+`app_is_admin()` SELECT policy, so a member reading it through PostgREST gets
+zero rows rather than the client list. Every reader is a Comptes or Publicité
+screen and all of them are SECURITY INVOKER, so nothing else changes;
+`zoho_accounts_enriched` is `security_invoker=true` and follows the table.
+`invoices` and `zoho_leads` deliberately stay readable to any signed-in user —
+the Factures module and Mon Portail are built on them. The syncs write with the
+service role and bypass RLS.
 
 The Leads pages and every `get_zoho_lead*` RPC are still there and still work —
 only the routes and nav entries in `App.tsx` / `Layout.tsx` are commented out.
@@ -418,9 +428,9 @@ the table would just be overwritten by the next sync.
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/comptes` | `AccountsDashboard` | Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
+| `/comptes` | `AccountsDashboard` | Admin-only. Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
 | `/createurs` | `Createurs` | **Documents créés** in the nav. Admin-only. Who *created* each quote/invoice, vs who sold it — a rep who builds a quote and hands it to another still gets the credit here. Never reconciles with rep figures, by design |
-| `/comptes/detail` | `AccountsDetail` | Searchable client directory; a row opens its billing history by department and year |
+| `/comptes/detail` | `AccountsDetail` | Admin-only. Searchable client directory; a row opens its billing history by department and year |
 | `/publicite` | `Advertising` | Admin-only. Google Ads + Meta spend against the revenue of the accounts tagged to each. Channel-level and monthly, never per lead |
 | `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |
