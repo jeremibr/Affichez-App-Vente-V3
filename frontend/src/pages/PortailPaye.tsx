@@ -103,7 +103,18 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
     const { viewAsRep } = useAdminView();
     const repName = propRepName ?? viewAsRep ?? authRepName ?? '';
 
-    const canEdit = isAdmin && !viewAsRep;
+    /**
+     * Payroll is admin-only to edit, wherever the lines are shown.
+     *
+     * This was `isAdmin && !viewAsRep`, which contradicted itself. An admin has
+     * no rep row of their own, so the only way to see any payroll at all is to
+     * name a rep - through the View switcher here, or through propRepName on
+     * the admin screen - and the View switcher then withdrew the very right it
+     * took to get there. Worse, that switcher is sticky (sessionStorage), so a
+     * preview left on a rep made payroll read-only on the admin screen too,
+     * silently: the "Lecture seule" badge below only renders on the portal view.
+     */
+    const canEdit = isAdmin;
     const isAdminView = !!propRepName;
 
     const [year, setYear]         = useUrlStateNumber('year', 2026);
@@ -288,10 +299,13 @@ export default function PortailPaye({ propRepName, embedded }: Props) {
                         <Wallet className="w-5 h-5 text-data-1-ink" />
                         {isAdminView ? `Paye de ${repName}` : 'Ma Paye'}
                     </h2>
-                    {!isAdminView && (
+                    {/* The read-only state is stated on every view, never only on
+                        the portal one: a payroll screen that quietly refuses to
+                        save looks like a broken page, not a permission. */}
+                    {(!isAdminView || !canEdit) && (
                         <p className="text-sm text-ink-mute mt-0.5">
-                            {repName || 'Représentant'}
-                            {!canEdit && <span className="ml-2 text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Lecture seule</span>}
+                            {!isAdminView && (repName || 'Représentant')}
+                            {!canEdit && <span className={cn('text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow', !isAdminView && 'ml-2')}>Lecture seule</span>}
                         </p>
                     )}
                 </div>
