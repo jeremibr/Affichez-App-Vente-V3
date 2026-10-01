@@ -2,7 +2,7 @@ import { DollarSign, Building2, Receipt, MousePointerClick } from 'lucide-react'
 import type { AdPerformanceRow } from '../../types/database';
 import { formatCurrencyCAD, cn } from '../../lib/utils';
 import { InfoHint } from '../InfoHint';
-import { channelLabel, isCohortOpen, formatReturn, ORGANIC_CAVEAT } from './channel';
+import { channelLabel, isCohortOpen, formatReturn } from './channel';
 import { ChannelLogoTile } from './ChannelLogo';
 
 /**
@@ -71,7 +71,8 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 divide-x divide-hairline border-b border-hairline">
+                    {/* Last block of the organic card: no rule under it. */}
+                    <div className="grid grid-cols-2 divide-x divide-hairline">
                         <Stat
                             icon={Building2}
                             label="Comptes créés"
@@ -86,10 +87,6 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                             hint="Revenus attribués ÷ comptes créés sur la période, la même mesure que sur Comptes."
                         />
                     </div>
-
-                    <p className="px-5 py-3 mt-auto text-2xs text-ink-mute leading-relaxed bg-sand/60">
-                        {ORGANIC_CAVEAT[row.channel]}
-                    </p>
                 </>
             ) : (
                 <>

@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { cachedRpc } from '../lib/rpcCache';
 import {
-    Loader2, AlertTriangle, TriangleAlert, Settings2, Info,
+    Loader2, AlertTriangle, TriangleAlert, Settings2,
 } from 'lucide-react';
 import type {
     AdPerformanceRow, AdMonthlyRow, AdCampaignRow, AdSpendStatusRow, AdChannel,
@@ -238,9 +238,8 @@ export default function Advertising() {
                 </div>
             ) : (
                 <>
-                    {organic ? (
-                        <OrganicNotice />
-                    ) : (
+                    {/* Spend notices only make sense where spend is shown. */}
+                    {!organic && (
                         <>
                             {noSpendData && <NoDataNotice />}
                             {foreignCurrency.length > 0 && <CurrencyNotice currencies={foreignCurrency} />}
@@ -278,21 +277,6 @@ export default function Advertising() {
 }
 
 // ─── Notices ──────────────────────────────────────────────────────────────────
-
-function OrganicNotice() {
-    return (
-        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-white shadow-card">
-            <Info className="w-4 h-4 text-ink-mute shrink-0 mt-0.5" />
-            <div className="text-xs text-ink-secondary leading-relaxed">
-                <strong className="font-semibold text-ink">Vue organique : aucune dépense publicitaire ici.</strong>
-                {' '}Ce sont les comptes dont l&rsquo;origine est « Publicité/Recherche Google » (ils nous ont
-                trouvés sur Google) ou « Facebook » (venus par la page), à comparer avec les comptes
-                « Google Ads » et « Meta Ads » de la vue <strong className="font-semibold">Payant</strong>.
-                Même fenêtre de revenus, même façon de compter.
-            </div>
-        </div>
-    );
-}
 
 function NoDataNotice() {
     return (
