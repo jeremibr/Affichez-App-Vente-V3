@@ -312,11 +312,23 @@ zero invoice rows). It is synced into `zoho_accounts.ventes_*` and reported
 *beside* the invoice figures, never added into `revenue_attributed` or
 `revenue_lifetime`.
 
-**Account sources must come from the data, never a picklist.** Accounts hold 26
-distinct `origine_du_client` values against 21 live picklist entries. The orphans
-include **"Publicité/Recherche Google" (108 accounts)** — the exact segment asked
-about in the 2026-09-04 meeting. `get_zoho_account_filter_options` reads stored
-values for this reason.
+**Source values live in one Zoho Global Set, "Origine".** Since 2026-09-29 the
+Leads field `Lead_Source` and the Comptes field `Origine_du_client` share that
+set: 21 values, identical on both modules and in both languages, and a converted
+lead always lands on a real option. Before that day the two fields had drifted
+apart, 126 accounts carried words that were not options at all, and five values
+showed a different word in French than in English. The rules that keep it that
+way: add or merge a value only in the set (Setup → Global Sets → Origine), in an
+English session, never rename in one language only, never delete a value records
+still hold (Replace it first), and update the SQL literals (`Meta Ads`,
+`Google Ads`, `Client Royer & Fils / VotreLogo.ca`, `Client PLOGG/BUCCO`) before
+touching those values. `get_zoho_account_filter_options` still reads stored
+values rather than the set, so a stray word would show up in the filter within a
+day. The pre-cleanup baseline lives in schema `backup` (not served by the API):
+`backup.source_baseline` holds every record's value before the merges and
+`backup.source_final_check` must stay empty. The sync login (Eva (IA)) must stay
+in English: Zoho returns picklist labels in the caller's language, and a French
+login once wrote French labels into 135 rows.
 
 ### Publicité: ad spend against revenue
 
@@ -331,12 +343,20 @@ credentials: **`docs/ADVERTISING.md`**.
 - **Admin-only at the row level** (`app_is_admin()` policy), not just hidden in the nav. The RPCs
   are SECURITY INVOKER, so a non-admin caller gets zero spend, not an error.
 - **Channel ↔ source mapping is fixed** in `ad_channel_source_map()`:
-  `Publicité/Recherche Google` → google, `Meta Ads` → meta. There is no `Google AdWords` value on
-  Accounts (that one only exists on Leads).
+  `Google Ads` → google, `Meta Ads` → meta (`20260929160000_google_ads_channel.sql`).
+  `Publicité/Recherche Google` is deliberately **not** a channel: it mixes organic search with ads,
+  and since the 2026-09-29 source cleanup it also holds the 3,336 former `Internet` accounts. Leads
+  and Comptes share the Zoho Global Set `Origine`, so every source value exists on both modules.
+- **Two views, one page.** `?vue=organique` (the default for now, `DEFAULT_VIEW` in
+  `Advertising.tsx`) attributes the same cohorts to `Publicité/Recherche Google` and `Facebook`
+  with no spend at all (`p_organic => true` on `get_ad_performance` / `get_ad_monthly`, organic
+  map in `ad_channel_source_map(true)`); `?vue=payant` is the ad view. Cost, return and net are
+  NULL whenever a period has no spend, in either view.
 - **Attribution is by channel and month of account creation, never per lead or per campaign** —
   the CRM stores no click identifiers. The campaign table therefore has no revenue column.
-- **Origins only exist from a date** (`Publicité/Recherche Google` from 2026-02-16, `Meta Ads`
-  regularly from 2024-08-21). `ad_source_first_used()` exposes it; `roas`/`net` are NULL when a
+- **Origins only exist from a date** (`Google Ads` from its first tagged account, created after
+  2026-09-29; `Meta Ads` regularly from 2024-08-21). Google months before that show no accounts and
+  no return, by design. `ad_source_first_used()` exposes it; `roas`/`net` are NULL when a
   period has no tagged accounts, and the page warns when a period starts before first use.
 - **Campaign status comes from `ad_campaigns`**, refreshed from each platform's campaign list on
   every sync — never from `ad_spend_daily`, whose older rows are not re-synced.

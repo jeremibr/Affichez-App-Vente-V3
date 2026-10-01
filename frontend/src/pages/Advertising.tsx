@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useUrlState } from '../hooks/useUrlState';
 import { cachedRpc } from '../lib/rpcCache';
 import {
-    Loader2, AlertTriangle, TriangleAlert, Settings2,
+    Loader2, AlertTriangle, TriangleAlert, Settings2, Info,
 } from 'lucide-react';
 import type {
     AdPerformanceRow, AdMonthlyRow, AdCampaignRow, AdSpendStatusRow, AdChannel,
@@ -16,18 +16,30 @@ import { formatCurrencyCAD, cn } from '../lib/utils';
 import { ChannelCard } from '../components/advertising/ChannelCard';
 import { SpendVsRevenueChart } from '../components/advertising/SpendVsRevenueChart';
 import { CampaignTable } from '../components/advertising/CampaignTable';
-import { CHANNEL_LABEL, isCohortOpen } from '../components/advertising/channel';
+import { CHANNEL_LABEL, channelLabel, isCohortOpen } from '../components/advertising/channel';
+import type { AdView } from '../components/advertising/channel';
 import { ChannelLogo, ChannelLogoTile } from '../components/advertising/ChannelLogo';
 import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
 
 /**
- * Publicité: Google Ads and Meta spend compared with the revenue of the CRM
- * accounts attributed to each channel.
+ * Publicité: Google and Meta, in two views.
+ *
+ *   payant    — ad spend compared with the revenue of the accounts tagged
+ *               Google Ads / Meta Ads (the channel cards, the comparison, the
+ *               monthly chart and the campaign table).
+ *   organique — the accounts that came through the same platforms without an
+ *               ad ("Publicité/Recherche Google", "Facebook"): accounts and
+ *               revenue only, no spend, no return, no campaigns.
  *
  * Attribution is by channel and by month of account creation. Revenue for a
  * period keeps accruing until its attribution window closes, so figures from an
  * open window are marked as provisional (see isCohortOpen).
+ *
+ * Organic is the default view while the Google Ads cohort is young; DEFAULT_VIEW
+ * is the one line to flip when the paid figures carry enough months.
  */
+
+const DEFAULT_VIEW: AdView = 'organique';
 
 const DEFAULT_EXCLUDED_RATINGS = ['Compte interne : Ne pas reprendre', 'Fournisseur'];
 
@@ -47,7 +59,16 @@ const YEAR_OPTIONS = [
         .map(y => ({ value: String(y), label: String(y) })),
 ];
 
+const VIEWS: { value: AdView; label: string }[] = [
+    { value: 'organique', label: 'Organique' },
+    { value: 'payant',    label: 'Payant' },
+];
+
 export default function Advertising() {
+    const [viewParam, setViewParam] = useUrlState('vue', DEFAULT_VIEW);
+    const view: AdView = viewParam === 'payant' ? 'payant' : 'organique';
+    const organic = view === 'organique';
+
     const [yearParam, setYearParam] = useUrlState('year', String(CURRENT_YEAR));
     const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
 
@@ -71,6 +92,7 @@ export default function Advertising() {
     const windowMonths = windowParam === 'Toute' ? null : Number(windowParam);
     const excludeRatings = ratingScope === 'Tous' ? null : DEFAULT_EXCLUDED_RATINGS;
 
+    // The view is a mode, not a filter: it is neither counted nor cleared.
     const activeFilterCount = [
         yearParam !== String(CURRENT_YEAR),
         monthParam !== 'Toutes',
@@ -88,7 +110,9 @@ export default function Advertising() {
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const shared = { p_window_months: windowMonths, p_exclude_ratings: excludeRatings };
+        const shared = {
+            p_window_months: windowMonths, p_exclude_ratings: excludeRatings, p_organic: organic,
+        };
 
         const [
             { data: perfData },
@@ -102,8 +126,13 @@ export default function Advertising() {
             yearValue === null
                 ? Promise.resolve({ data: [] })
                 : cachedRpc('get_ad_monthly', { ...shared, p_year: yearValue }),
-            cachedRpc('get_ad_campaigns', { p_year: yearValue, p_month: monthValue, p_platform: null }),
-            cachedRpc('get_ad_spend_status'),
+            // Spend-side data is only shown in the paid view.
+            organic
+                ? Promise.resolve({ data: [] })
+                : cachedRpc('get_ad_campaigns', { p_year: yearValue, p_month: monthValue, p_platform: null }),
+            organic
+                ? Promise.resolve({ data: [] })
+                : cachedRpc('get_ad_spend_status'),
         ]);
 
         setPerf((perfData as AdPerformanceRow[]) ?? []);
@@ -111,7 +140,7 @@ export default function Advertising() {
         setCampaigns((campaignData as AdCampaignRow[]) ?? []);
         setStatus((statusData as AdSpendStatusRow[]) ?? []);
         setLoading(false);
-    }, [yearValue, monthValue, windowMonths, excludeRatings]);
+    }, [yearValue, monthValue, windowMonths, excludeRatings, organic]);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -152,9 +181,29 @@ export default function Advertising() {
                             Publicité
                         </h1>
                         <p className="text-xs md:text-sm text-ink-mute mt-0.5">
-                            Ce que la publicité coûte, et ce que les comptes qu&rsquo;elle a ramenés ont facturé
+                            {organic
+                                ? 'Les comptes venus de Google ou de Facebook sans publicité, et ce qu’ils ont facturé'
+                                : 'Ce que la publicité coûte, et ce que les comptes qu’elle a ramenés ont facturé'}
                         </p>
                     </div>
+                </div>
+
+                <div className="flex gap-1 bg-stone p-0.5 rounded-md self-start md:self-auto" role="tablist"
+                     aria-label="Vue">
+                    {VIEWS.map(v => (
+                        <button
+                            key={v.value}
+                            role="tab"
+                            aria-selected={view === v.value}
+                            onClick={() => setViewParam(v.value)}
+                            className={cn(
+                                'px-4 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all',
+                                view === v.value ? 'bg-white text-ink shadow-card' : 'text-ink-mute hover:text-ink-secondary',
+                            )}
+                        >
+                            {v.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -189,31 +238,39 @@ export default function Advertising() {
                 </div>
             ) : (
                 <>
-                    {noSpendData && <NoDataNotice />}
-                    {foreignCurrency.length > 0 && <CurrencyNotice currencies={foreignCurrency} />}
-                    {!noSpendData && partial.length > 0 && (
-                        <PartialNotice channels={partial.map(p => p.channel)} />
+                    {organic ? (
+                        <OrganicNotice />
+                    ) : (
+                        <>
+                            {noSpendData && <NoDataNotice />}
+                            {foreignCurrency.length > 0 && <CurrencyNotice currencies={foreignCurrency} />}
+                            {!noSpendData && partial.length > 0 && (
+                                <PartialNotice channels={partial.map(p => p.channel)} />
+                            )}
+                        </>
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6" translate="no">
                         {perf.map(row => (
-                            <ChannelCard key={row.channel} row={row} windowLabel={windowLabel} />
+                            <ChannelCard key={row.channel} row={row} windowLabel={windowLabel} organic={organic} />
                         ))}
                     </div>
 
-                    <ComparisonTable rows={perf} windowLabel={windowLabel} openCohort={openCohort} />
+                    <ComparisonTable rows={perf} windowLabel={windowLabel} openCohort={openCohort} organic={organic} />
 
                     {year !== 'Toutes' && (
-                        <SpendVsRevenueChart rows={monthly} year={year} windowLabel={windowLabel} />
+                        <SpendVsRevenueChart rows={monthly} year={year} windowLabel={windowLabel} organic={organic} />
                     )}
 
-                    <CampaignTable
-                        rows={campaigns}
-                        platform={campaignPlatform}
-                        onPlatformChange={setCampaignPlatform}
-                        status={campaignStatus}
-                        onStatusChange={setCampaignStatus}
-                    />
+                    {!organic && (
+                        <CampaignTable
+                            rows={campaigns}
+                            platform={campaignPlatform}
+                            onPlatformChange={setCampaignPlatform}
+                            status={campaignStatus}
+                            onStatusChange={setCampaignStatus}
+                        />
+                    )}
                 </>
             )}
         </div>
@@ -221,6 +278,21 @@ export default function Advertising() {
 }
 
 // ─── Notices ──────────────────────────────────────────────────────────────────
+
+function OrganicNotice() {
+    return (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-white shadow-card">
+            <Info className="w-4 h-4 text-ink-mute shrink-0 mt-0.5" />
+            <div className="text-xs text-ink-secondary leading-relaxed">
+                <strong className="font-semibold text-ink">Vue organique : aucune dépense publicitaire ici.</strong>
+                {' '}Ce sont les comptes dont l&rsquo;origine est « Publicité/Recherche Google » (ils nous ont
+                trouvés sur Google) ou « Facebook » (venus par la page), à comparer avec les comptes
+                « Google Ads » et « Meta Ads » de la vue <strong className="font-semibold">Payant</strong>.
+                Même fenêtre de revenus, même façon de compter.
+            </div>
+        </div>
+    );
+}
 
 function NoDataNotice() {
     return (
@@ -277,22 +349,28 @@ function PartialNotice({ channels }: { channels: AdChannel[] }) {
 // ─── Side-by-side comparison ──────────────────────────────────────────────────
 
 /** Both channels side by side. */
-function ComparisonTable({ rows, windowLabel, openCohort }: {
+function ComparisonTable({ rows, windowLabel, openCohort, organic }: {
     rows: AdPerformanceRow[];
     windowLabel: string;
     openCohort: boolean;
+    organic: boolean;
 }) {
     const best = useMemo(() => {
+        if (organic) return null;
         const scored = rows.filter(r => r.roas !== null);
         if (scored.length < 2) return null;
         return scored.reduce((a, b) => (a.roas ?? 0) >= (b.roas ?? 0) ? a : b).channel;
-    }, [rows]);
+    }, [rows, organic]);
 
     return (
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-ink">Comparaison des deux canaux</h3>
-                <InfoHint text={`Dépenses de la période choisie, comparées aux comptes créés dans cette même période et à ce qu'ils ont facturé dans les ${windowLabel}. Le coût par compte divise la dépense par tous les comptes créés, y compris ceux qui n'ont rien acheté.`} />
+                <h3 className="text-sm font-semibold text-ink">
+                    {organic ? 'Comparaison des deux sources organiques' : 'Comparaison des deux canaux'}
+                </h3>
+                <InfoHint text={organic
+                    ? `Comptes créés dans la période choisie avec cette origine, et ce qu'ils ont facturé dans les ${windowLabel}. Le revenu par compte divise par tous les comptes créés, y compris ceux qui n'ont rien acheté.`
+                    : `Dépenses de la période choisie, comparées aux comptes créés dans cette même période et à ce qu'ils ont facturé dans les ${windowLabel}. Le coût par compte divise la dépense par tous les comptes créés, y compris ceux qui n'ont rien acheté.`} />
                 {openCohort && (
                     <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-tone-warn-soft text-tone-warn-ink">
                         Cohorte en cours
@@ -304,28 +382,32 @@ function ComparisonTable({ rows, windowLabel, openCohort }: {
                 <table className="w-full text-sm" translate="no">
                     <thead className="bg-sand/95">
                         <tr className="border-b border-hairline">
-                            <Th align="left">Canal</Th>
-                            <Th>Dépense</Th>
+                            <Th align="left">{organic ? 'Source' : 'Canal'}</Th>
+                            {!organic && <Th>Dépense</Th>}
                             <Th>Comptes</Th>
-                            <Th>Coût / compte</Th>
+                            {!organic && <Th>Coût / compte</Th>}
                             <Th>Facturés</Th>
-                            <Th>Coût / client</Th>
+                            {organic && <Th>% facturés</Th>}
+                            {!organic && <Th>Coût / client</Th>}
                             <Th>Revenus</Th>
                             <Th>Revenu / compte</Th>
-                            <Th>Rendement</Th>
-                            <Th>Net</Th>
+                            {!organic && <Th>Rendement</Th>}
+                            {!organic && <Th>Net</Th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-hairline">
                         {rows.map(r => {
                             const open = isCohortOpen(r.window_ends_on);
+                            const share = r.accounts_created > 0
+                                ? `${Math.round((r.accounts_invoiced / r.accounts_created) * 100)} %`
+                                : '—';
                             return (
                             <tr key={r.channel} className="hover:bg-sand/60 transition-colors">
                                 <td className="px-4 py-3">
                                     <div className="flex items-center gap-3">
                                         <ChannelLogoTile channel={r.channel} size="sm" />
                                         <div className="min-w-0">
-                                            <p className="font-semibold text-ink text-xs">{CHANNEL_LABEL[r.channel]}</p>
+                                            <p className="font-semibold text-ink text-xs">{channelLabel(r.channel, organic)}</p>
                                             <p className="text-2xs text-ink-mute mt-0.5 truncate max-w-[200px]"
                                                title={r.sources.join(', ')}>
                                                 {r.sources.join(', ')}
@@ -333,39 +415,44 @@ function ComparisonTable({ rows, windowLabel, openCohort }: {
                                         </div>
                                     </div>
                                 </td>
-                                <Td value={r.spend > 0 ? formatCurrencyCAD(r.spend) : '—'} />
-                                <Td value={r.accounts_created.toLocaleString('fr-CA')} />
-                                <Td value={r.cost_per_account !== null ? formatCurrencyCAD(r.cost_per_account) : '—'} strong />
+                                {!organic && <Td value={r.spend > 0 ? formatCurrencyCAD(r.spend) : '—'} />}
+                                <Td value={r.accounts_created.toLocaleString('fr-CA')} strong={organic} />
+                                {!organic && <Td value={r.cost_per_account !== null ? formatCurrencyCAD(r.cost_per_account) : '—'} strong />}
                                 <Td value={r.accounts_invoiced.toLocaleString('fr-CA')} />
-                                <Td value={r.cost_per_client !== null ? formatCurrencyCAD(r.cost_per_client) : '—'} />
-                                <Td value={formatCurrencyCAD(r.revenue_attributed)} />
+                                {organic && <Td value={share} />}
+                                {!organic && <Td value={r.cost_per_client !== null ? formatCurrencyCAD(r.cost_per_client) : '—'} />}
+                                <Td value={formatCurrencyCAD(r.revenue_attributed)} strong={organic} />
                                 <Td value={r.revenue_per_account !== null ? formatCurrencyCAD(r.revenue_per_account) : '—'} />
-                                <td className="px-4 py-3 text-right tabular-nums">
-                                    {r.roas === null ? (
-                                        <span className="text-ink-faint text-xs">—</span>
-                                    ) : (
-                                        <span className={cn(
-                                            'text-xs font-bold',
-                                            open ? 'text-ink-mute'
-                                                : r.roas >= 1 ? 'text-tone-good' : 'text-tone-critical',
-                                        )}>
-                                            {r.roas.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ×
-                                            {best === r.channel && rows.length > 1 && (
-                                                <span className="ml-1.5 text-2xs font-bold px-1.5 py-0.5 rounded-full bg-tone-good-soft text-tone-good-ink">
-                                                    Meilleur
-                                                </span>
-                                            )}
+                                {!organic && (
+                                    <td className="px-4 py-3 text-right tabular-nums">
+                                        {r.roas === null ? (
+                                            <span className="text-ink-faint text-xs">—</span>
+                                        ) : (
+                                            <span className={cn(
+                                                'text-xs font-bold',
+                                                open ? 'text-ink-mute'
+                                                    : r.roas >= 1 ? 'text-tone-good' : 'text-tone-critical',
+                                            )}>
+                                                {r.roas.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ×
+                                                {best === r.channel && rows.length > 1 && (
+                                                    <span className="ml-1.5 text-2xs font-bold px-1.5 py-0.5 rounded-full bg-tone-good-soft text-tone-good-ink">
+                                                        Meilleur
+                                                    </span>
+                                                )}
+                                            </span>
+                                        )}
+                                    </td>
+                                )}
+                                {!organic && (
+                                    <td className="px-4 py-3 text-right tabular-nums">
+                                        <span className={cn('text-xs font-bold',
+                                            r.spend === 0 || r.net === null ? 'text-ink-faint'
+                                                : open ? 'text-ink-mute'
+                                                    : r.net >= 0 ? 'text-tone-good' : 'text-tone-critical')}>
+                                            {r.spend === 0 || r.net === null ? '—' : formatCurrencyCAD(r.net)}
                                         </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-right tabular-nums">
-                                    <span className={cn('text-xs font-bold',
-                                        r.spend === 0 || r.net === null ? 'text-ink-faint'
-                                            : open ? 'text-ink-mute'
-                                                : r.net >= 0 ? 'text-tone-good' : 'text-tone-critical')}>
-                                        {r.spend === 0 || r.net === null ? '—' : formatCurrencyCAD(r.net)}
-                                    </span>
-                                </td>
+                                    </td>
+                                )}
                             </tr>
                             );
                         })}
@@ -374,10 +461,16 @@ function ComparisonTable({ rows, windowLabel, openCohort }: {
             </div>
 
             <p className="px-5 py-3 text-2xs text-ink-mute border-t border-hairline leading-relaxed">
-                « Coût / compte » est l&rsquo;équivalent du coût par lead. « Rendement » = revenus
-                facturés par les comptes créés sur la période ÷ dépense publicitaire de la période.
-                1,00 × signifie que la publicité s&rsquo;est payée elle-même, sans compter les coûts de
-                production ni les commissions. En gris : fenêtre de revenus pas encore terminée.
+                {organic ? (
+                    <>« Revenu / compte » = revenus facturés par les comptes créés sur la période ÷ tous
+                    ces comptes, même ceux qui n&rsquo;ont rien acheté. En gris : fenêtre de revenus pas
+                    encore terminée.</>
+                ) : (
+                    <>« Coût / compte » est l&rsquo;équivalent du coût par lead. « Rendement » = revenus
+                    facturés par les comptes créés sur la période ÷ dépense publicitaire de la période.
+                    1,00 × signifie que la publicité s&rsquo;est payée elle-même, sans compter les coûts de
+                    production ni les commissions. En gris : fenêtre de revenus pas encore terminée.</>
+                )}
             </p>
         </div>
     );

@@ -5,7 +5,7 @@ import { InfoHint } from '../InfoHint';
 import { ExportButton } from '../ExportButton';
 import type { CsvColumn } from '../../lib/csv';
 import { formatCurrencyCAD, cn } from '../../lib/utils';
-import { CHANNELS, CHANNEL_LABEL, CHANNEL_TONE, isCohortOpen } from './channel';
+import { CHANNELS, CHANNEL_TONE, channelLabel, isCohortOpen } from './channel';
 import { ChannelLogo } from './ChannelLogo';
 
 // Distinct short labels: slicing the full names gives "Jui" for both June and July.
@@ -15,13 +15,18 @@ const MONTH_SHORT = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Ao�
  * Monthly spend against attributed revenue for one channel at a time, as paired
  * bars on a shared money axis, with the same figures in a table below.
  * Revenue bars for months whose attribution window is still open are hatched.
+ *
+ * In the organic view there is no spend: only the revenue bars are drawn and
+ * the cost and return columns are left out, rather than shown as zero.
  */
-export function SpendVsRevenueChart({ rows, year, windowLabel }: {
+export function SpendVsRevenueChart({ rows, year, windowLabel, organic = false }: {
     rows: AdMonthlyRow[];
     year: number;
     windowLabel: string;
+    organic?: boolean;
 }) {
     const [channel, setChannel] = useState<AdChannel>('google');
+    const label = channelLabel(channel, organic);
 
     const data = useMemo(() => {
         const byMonth = new Map(
@@ -43,7 +48,7 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
         });
     }, [rows, channel]);
 
-    const hasAnything = data.some(d => d.spend > 0 || d.revenue > 0);
+    const hasAnything = data.some(d => d.spend > 0 || d.revenue > 0 || d.accounts > 0);
     const hasComplete = data.some(d => d.revenue > 0 && !d.open);
     const hasOpen = data.some(d => d.revenue > 0 && d.open);
     const max = Math.max(1, ...data.map(d => Math.max(d.spend, d.revenue)));
@@ -54,16 +59,21 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
     const plotH = H - PAD_T - PAD_B;
     const step = plotW / 12;
     const x = (i: number) => PAD_L + step * i;
+    // Paired bars in the paid view; a single centred bar when there is no spend.
     const barW = step * 0.34;
     const h = (v: number) => (v / max) * plotH;
+
+    const th = 'py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow';
 
     return (
         <div className="bg-white rounded-xl shadow-card overflow-hidden">
             <div className="px-5 py-4 border-b border-hairline flex flex-wrap items-center gap-2">
                 <h3 className="text-sm font-semibold text-ink">
-                    Dépense et revenus, mois par mois · {year}
+                    {organic ? 'Comptes et revenus, mois par mois' : 'Dépense et revenus, mois par mois'} · {year}
                 </h3>
-                <InfoHint text={`Pour chaque mois : ce qui a été dépensé sur ${CHANNEL_LABEL[channel]} dans ce mois, et ce que les comptes créés dans ce même mois ont facturé dans les ${windowLabel}. Les mois hachurés n'ont pas encore une fenêtre complète : leurs revenus vont encore augmenter, donc leur rendement est sous-estimé et ne doit pas être comparé aux mois pleins.`} />
+                <InfoHint text={organic
+                    ? `Pour chaque mois : les comptes « ${label} » créés dans ce mois, et ce qu'ils ont facturé dans les ${windowLabel}. Les mois hachurés n'ont pas encore une fenêtre complète : leurs revenus vont encore augmenter et ne doivent pas être comparés aux mois pleins.`
+                    : `Pour chaque mois : ce qui a été dépensé sur ${label} dans ce mois, et ce que les comptes créés dans ce même mois ont facturé dans les ${windowLabel}. Les mois hachurés n'ont pas encore une fenêtre complète : leurs revenus vont encore augmenter, donc leur rendement est sous-estimé et ne doit pas être comparé aux mois pleins.`} />
 
                 <div className="ml-auto flex items-center gap-3">
                     <div className="flex gap-1 bg-stone p-0.5 rounded-md" role="tablist">
@@ -79,26 +89,29 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
                                 )}
                             >
                                 <ChannelLogo channel={c} size="xs" />
-                                {CHANNEL_LABEL[c]}
+                                {channelLabel(c, organic)}
                             </button>
                         ))}
                     </div>
-                    <ExportButton rows={data} columns={CSV} filename={`publicite_${channel}_${year}`}
+                    <ExportButton rows={data} columns={organic ? CSV_ORGANIC : CSV}
+                                  filename={`publicite_${organic ? 'organique_' : ''}${channel}_${year}`}
                                   disabled={!hasAnything} />
                 </div>
             </div>
 
             {!hasAnything ? (
                 <p className="px-5 py-10 text-sm text-ink-mute text-center">
-                    Aucune dépense ni revenu pour {CHANNEL_LABEL[channel]} en {year}.
+                    {organic
+                        ? `Aucun compte « ${label} » créé en ${year}.`
+                        : `Aucune dépense ni revenu pour ${label} en ${year}.`}
                 </p>
             ) : (
                 <>
                     <div className="px-5 pt-4">
-                        <Legend tone={tone} complete={hasComplete} open={hasOpen} />
+                        <Legend tone={tone} complete={hasComplete} open={hasOpen} spend={!organic} />
                         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none"
                              className="w-full h-[260px]" role="img"
-                             aria-label={`Dépense et revenus par mois pour ${CHANNEL_LABEL[channel]} en ${year}`}>
+                             aria-label={`${organic ? 'Revenus' : 'Dépense et revenus'} par mois pour ${label} en ${year}`}>
                             <defs>
                                 <pattern id={`hatch-${channel}`} width="6" height="6"
                                          patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -123,13 +136,18 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
                             {data.map((d, i) => {
                                 const spendH = h(d.spend);
                                 const revH = h(d.revenue);
-                                const left = x(i) + step / 2 - barW - 2;
+                                const left = organic
+                                    ? x(i) + step / 2 - barW / 2
+                                    : x(i) + step / 2 - barW - 2;
+                                const revLeft = organic ? left : left + barW + 4;
                                 return (
                                     <g key={d.month}>
-                                        <rect x={left} y={PAD_T + plotH - spendH}
-                                              width={barW} height={Math.max(0, spendH)}
-                                              rx={2} style={{ fill: 'var(--color-hairline-strong)' }} />
-                                        <rect x={left + barW + 4} y={PAD_T + plotH - revH}
+                                        {!organic && (
+                                            <rect x={left} y={PAD_T + plotH - spendH}
+                                                  width={barW} height={Math.max(0, spendH)}
+                                                  rx={2} style={{ fill: 'var(--color-hairline-strong)' }} />
+                                        )}
+                                        <rect x={revLeft} y={PAD_T + plotH - revH}
                                               width={barW} height={Math.max(0, revH)}
                                               rx={2} strokeWidth={1}
                                               style={{
@@ -155,12 +173,12 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
                             <thead>
                                 <tr className="border-b border-hairline">
                                     <th className="py-2 pr-3 text-left text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Mois</th>
-                                    <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Dépense</th>
-                                    <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Comptes</th>
-                                    <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Coût / compte</th>
-                                    <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Facturés</th>
-                                    <th className="py-2 px-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Revenus</th>
-                                    <th className="py-2 pl-2 text-right text-2xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rendement</th>
+                                    {!organic && <th className={th}>Dépense</th>}
+                                    <th className={th}>Comptes</th>
+                                    {!organic && <th className={th}>Coût / compte</th>}
+                                    <th className={th}>Facturés</th>
+                                    <th className={th}>Revenus</th>
+                                    {!organic && <th className={cn(th, 'pl-2')}>Rendement</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-hairline">
@@ -177,28 +195,34 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
                                                 </span>
                                             )}
                                         </td>
-                                        <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">
-                                            {d.spend > 0 ? formatCurrencyCAD(d.spend) : '—'}
-                                        </td>
+                                        {!organic && (
+                                            <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">
+                                                {d.spend > 0 ? formatCurrencyCAD(d.spend) : '—'}
+                                            </td>
+                                        )}
                                         <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary">{d.accounts}</td>
-                                        <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">
-                                            {d.costPerAccount !== null ? formatCurrencyCAD(d.costPerAccount) : '—'}
-                                        </td>
+                                        {!organic && (
+                                            <td className="py-1.5 px-2 text-right tabular-nums text-ink-secondary text-xs">
+                                                {d.costPerAccount !== null ? formatCurrencyCAD(d.costPerAccount) : '—'}
+                                            </td>
+                                        )}
                                         <td className="py-1.5 px-2 text-right tabular-nums text-ink-mute">{d.invoiced}</td>
                                         <td className="py-1.5 px-2 text-right tabular-nums font-semibold text-ink text-xs">
                                             {formatCurrencyCAD(d.revenue)}
                                         </td>
-                                        <td className="py-1.5 pl-2 text-right tabular-nums">
-                                            {d.roas === null ? (
-                                                <span className="text-ink-faint text-xs">—</span>
-                                            ) : (
-                                                <span className={cn('text-xs font-bold',
-                                                    d.open ? 'text-ink-mute'
-                                                        : d.roas >= 1 ? 'text-tone-good' : 'text-tone-critical')}>
-                                                    {d.roas.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ×
-                                                </span>
-                                            )}
-                                        </td>
+                                        {!organic && (
+                                            <td className="py-1.5 pl-2 text-right tabular-nums">
+                                                {d.roas === null ? (
+                                                    <span className="text-ink-faint text-xs">—</span>
+                                                ) : (
+                                                    <span className={cn('text-xs font-bold',
+                                                        d.open ? 'text-ink-mute'
+                                                            : d.roas >= 1 ? 'text-tone-good' : 'text-tone-critical')}>
+                                                        {d.roas.toLocaleString('fr-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ×
+                                                    </span>
+                                                )}
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
                             </tbody>
@@ -210,13 +234,17 @@ export function SpendVsRevenueChart({ rows, year, windowLabel }: {
     );
 }
 
-function Legend({ tone, complete, open }: { tone: { ink: string }; complete: boolean; open: boolean }) {
+function Legend({ tone, complete, open, spend }: {
+    tone: { ink: string }; complete: boolean; open: boolean; spend: boolean;
+}) {
     return (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs font-semibold text-ink-mute mb-1" translate="no">
-            <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: 'var(--color-hairline-strong)' }} />
-                Dépense
-            </span>
+            {spend && (
+                <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: 'var(--color-hairline-strong)' }} />
+                    Dépense
+                </span>
+            )}
             {complete && (
                 <span className="flex items-center gap-1.5">
                     <span className="h-2.5 w-3 rounded-xs" style={{ backgroundColor: tone.ink }} />
@@ -255,5 +283,13 @@ const CSV: CsvColumn<Row>[] = [
     { header: 'Comptes facturés',    value: d => d.invoiced },
     { header: 'Revenus attribués',   value: d => d.revenue },
     { header: 'Rendement',           value: d => d.roas },
+    { header: 'Fenêtre en cours',    value: d => d.open ? 'oui' : 'non' },
+];
+
+const CSV_ORGANIC: CsvColumn<Row>[] = [
+    { header: 'Mois',                value: d => d.label },
+    { header: 'Comptes créés',       value: d => d.accounts },
+    { header: 'Comptes facturés',    value: d => d.invoiced },
+    { header: 'Revenus attribués',   value: d => d.revenue },
     { header: 'Fenêtre en cours',    value: d => d.open ? 'oui' : 'non' },
 ];
