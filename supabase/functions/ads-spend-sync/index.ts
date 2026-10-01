@@ -7,6 +7,9 @@
 //   x-full-sync: true            Back-fill from ADS_SYNC_START_DATE, one month per
 //                                call, resumable via sync_state. Repeat until done.
 //   x-date-start / x-date-end    Explicit window.
+//   x-platform: google | meta    Restrict the rolling or an explicit window to one
+//                                platform. Refused with x-full-sync, whose cursor
+//                                is shared by both platforms.
 //   x-check-scope: true          Probe both platforms' credentials; writes nothing.
 //
 // Spend is re-pulled on a rolling window rather than from a cursor because both
@@ -14,6 +17,11 @@
 // Upserts on the table's primary key make the re-pulls idempotent.
 //
 // Each platform is optional: a platform whose secrets are missing is skipped.
+//
+// Google can be several ad accounts: GOOGLE_ADS_CUSTOMER_ID takes a list
+// ("579-661-3141, 437-363-4595"; dashes and separators are free). Every account
+// is written under its own ad_account_id, so the RPCs sum them per platform and
+// a campaign id can never collide across accounts.
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -30,7 +38,7 @@ const GOOGLE_API_VERSION = Deno.env.get('GOOGLE_ADS_API_VERSION') ?? 'v25';
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_ADS_CLIENT_ID') ?? '';
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_ADS_CLIENT_SECRET') ?? '';
 const GOOGLE_REFRESH_TOKEN = Deno.env.get('GOOGLE_ADS_REFRESH_TOKEN') ?? '';
-const GOOGLE_CUSTOMER_ID = digitsOnly(Deno.env.get('GOOGLE_ADS_CUSTOMER_ID') ?? '');
+const GOOGLE_CUSTOMER_IDS = customerIds(Deno.env.get('GOOGLE_ADS_CUSTOMER_ID') ?? '');
 const GOOGLE_LOGIN_CUSTOMER_ID = digitsOnly(Deno.env.get('GOOGLE_ADS_LOGIN_CUSTOMER_ID') ?? '');
 
 const META_API_VERSION = Deno.env.get('META_GRAPH_VERSION') ?? 'v25.0';
@@ -45,6 +53,16 @@ const FULL_CURSOR_KEY = 'ads_spend_full';
 
 function digitsOnly(v: string): string {
   return v.replace(/\D/g, '');
+}
+
+/**
+ * "579-661-3141, 437-363-4595" -> ['5796613141', '4373634595'], without duplicates.
+ * A customer id is ten digits, written 579-661-3141, 579 661 3141 or 5796613141.
+ * Matching that shape, rather than splitting on a separator, keeps an id typed
+ * with spaces in one piece.
+ */
+function customerIds(v: string): string[] {
+  return [...new Set((v.match(/\d{3}[-\s]?\d{3}[-\s]?\d{4}/g) ?? []).map(digitsOnly))];
 }
 
 /** Today on Montreal's calendar; the UTC date is already tomorrow in the evening. */
@@ -206,7 +224,7 @@ async function writeCursor(key: string, token: string | null): Promise<void> {
 // ─── Google Ads ───────────────────────────────────────────────────────────────
 
 const googleConfigured = () =>
-  Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN && GOOGLE_CUSTOMER_ID);
+  Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN && GOOGLE_CUSTOMER_IDS.length > 0);
 
 let googleToken: { token: string; expiresAt: number } | null = null;
 
@@ -245,21 +263,21 @@ function googleHeaders(token: string): Record<string, string> {
   return h;
 }
 
-async function googleSearch(query: string, token: string): Promise<Record<string, unknown>[]> {
+async function googleSearch(customerId: string, query: string, token: string): Promise<Record<string, unknown>[]> {
   const out: Record<string, unknown>[] = [];
   let pageToken: string | undefined;
   let guard = 0;
 
   do {
     const res = await fetch(
-      `https://googleads.googleapis.com/${GOOGLE_API_VERSION}/customers/${GOOGLE_CUSTOMER_ID}/googleAds:search`,
+      `https://googleads.googleapis.com/${GOOGLE_API_VERSION}/customers/${customerId}/googleAds:search`,
       {
         method: 'POST',
         headers: googleHeaders(token),
         body: JSON.stringify({ query, ...(pageToken ? { pageToken } : {}) }),
       },
     );
-    if (!res.ok) throw new Error(`Google: ${res.status} ${redact(await res.text()).slice(0, 400)}`);
+    if (!res.ok) throw new Error(`Google ${customerId}: ${res.status} ${redact(await res.text()).slice(0, 400)}`);
     const data = await res.json();
     for (const r of (data.results ?? [])) out.push(r);
     pageToken = data.nextPageToken ?? undefined;
@@ -268,83 +286,109 @@ async function googleSearch(query: string, token: string): Promise<Record<string
   return out;
 }
 
-async function googleCurrency(token: string): Promise<string | null> {
+async function googleCurrency(customerId: string, token: string): Promise<string | null> {
   try {
-    const rows = await googleSearch('SELECT customer.currency_code FROM customer LIMIT 1', token);
+    const rows = await googleSearch(customerId, 'SELECT customer.currency_code FROM customer LIMIT 1', token);
     return (rows[0]?.customer as { currencyCode?: string } | undefined)?.currencyCode ?? null;
   } catch {
     return null;
   }
 }
 
-/** REST responses use lowerCamelCase and encode int64 values as strings. */
+/**
+ * REST responses use lowerCamelCase and encode int64 values as strings.
+ * One account failing is recorded and the others still sync: their rows are
+ * independent, and dropping a good account's spend because another one errored
+ * would understate the channel.
+ */
 async function syncGoogle(start: string, end: string, errors: string[]): Promise<SpendRow[]> {
   const rows: SpendRow[] = [];
+  let token: string;
   try {
-    const token = await getGoogleToken();
-    const currency = await googleCurrency(token);
-    const now = new Date().toISOString();
-
-    const results = await googleSearch(
-      'SELECT campaign.id, campaign.name, campaign.status, segments.date, ' +
-      'metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions ' +
-      `FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}'`,
-      token,
-    );
-
-    for (const r of results) {
-      const campaign = (r.campaign ?? {}) as { id?: string; name?: string; status?: string };
-      const metrics = (r.metrics ?? {}) as Record<string, unknown>;
-      const date = (r.segments as { date?: string } | undefined)?.date;
-      if (!date || !campaign.id) continue;
-      rows.push({
-        platform: 'google',
-        ad_account_id: GOOGLE_CUSTOMER_ID,
-        campaign_id: String(campaign.id),
-        campaign_name: campaign.name ?? null,
-        campaign_status: campaign.status ?? null,
-        spend_date: date,
-        currency,
-        // Unrounded: per-row rounding makes summed totals drift from Google's.
-        spend: Number(metrics.costMicros ?? 0) / 1_000_000,
-        impressions: Number(metrics.impressions ?? 0),
-        clicks: Number(metrics.clicks ?? 0),
-        conversions: Number(metrics.conversions ?? 0),
-        leads: 0,
-        synced_at: now,
-      });
-    }
+    token = await getGoogleToken();
   } catch (e) {
     errors.push(errorText(e));
+    return rows;
+  }
+  const now = new Date().toISOString();
+
+  for (const customerId of GOOGLE_CUSTOMER_IDS) {
+    try {
+      const currency = await googleCurrency(customerId, token);
+      const results = await googleSearch(
+        customerId,
+        'SELECT campaign.id, campaign.name, campaign.status, segments.date, ' +
+        'metrics.cost_micros, metrics.impressions, metrics.clicks, metrics.conversions ' +
+        `FROM campaign WHERE segments.date BETWEEN '${start}' AND '${end}'`,
+        token,
+      );
+
+      for (const r of results) {
+        const campaign = (r.campaign ?? {}) as { id?: string; name?: string; status?: string };
+        const metrics = (r.metrics ?? {}) as Record<string, unknown>;
+        const date = (r.segments as { date?: string } | undefined)?.date;
+        if (!date || !campaign.id) continue;
+        rows.push({
+          platform: 'google',
+          ad_account_id: customerId,
+          campaign_id: String(campaign.id),
+          campaign_name: campaign.name ?? null,
+          campaign_status: campaign.status ?? null,
+          spend_date: date,
+          currency,
+          // Unrounded: per-row rounding makes summed totals drift from Google's.
+          spend: Number(metrics.costMicros ?? 0) / 1_000_000,
+          impressions: Number(metrics.impressions ?? 0),
+          clicks: Number(metrics.clicks ?? 0),
+          conversions: Number(metrics.conversions ?? 0),
+          leads: 0,
+          synced_at: now,
+        });
+      }
+    } catch (e) {
+      errors.push(errorText(e));
+    }
   }
   return rows;
 }
 
-/** Every campaign in the account with its current status (no date segment). */
+/** Every campaign of every account with its current status (no date segment). */
 async function googleCampaigns(errors: string[]): Promise<CampaignRow[]> {
+  const out: CampaignRow[] = [];
+  let token: string;
   try {
-    const token = await getGoogleToken();
-    const now = new Date().toISOString();
-    const results = await googleSearch('SELECT campaign.id, campaign.name, campaign.status FROM campaign', token);
-    const byId = new Map<string, CampaignRow>();
-    for (const r of results) {
-      const c = (r.campaign ?? {}) as { id?: string; name?: string; status?: string };
-      if (!c.id) continue;
-      byId.set(String(c.id), {
-        platform: 'google',
-        ad_account_id: GOOGLE_CUSTOMER_ID,
-        campaign_id: String(c.id),
-        campaign_name: c.name ?? null,
-        status: normalizeStatus(c.status),
-        platform_status: c.status ?? null,
-        synced_at: now,
-      });
-    }
-    return [...byId.values()];
+    token = await getGoogleToken();
   } catch (e) {
     errors.push(`campaigns: ${errorText(e)}`);
-    return [];
+    return out;
   }
+  const now = new Date().toISOString();
+
+  for (const customerId of GOOGLE_CUSTOMER_IDS) {
+    try {
+      const results = await googleSearch(
+        customerId, 'SELECT campaign.id, campaign.name, campaign.status FROM campaign', token,
+      );
+      const byId = new Map<string, CampaignRow>();
+      for (const r of results) {
+        const c = (r.campaign ?? {}) as { id?: string; name?: string; status?: string };
+        if (!c.id) continue;
+        byId.set(String(c.id), {
+          platform: 'google',
+          ad_account_id: customerId,
+          campaign_id: String(c.id),
+          campaign_name: c.name ?? null,
+          status: normalizeStatus(c.status),
+          platform_status: c.status ?? null,
+          synced_at: now,
+        });
+      }
+      out.push(...byId.values());
+    } catch (e) {
+      errors.push(`campaigns: ${errorText(e)}`);
+    }
+  }
+  return out;
 }
 
 // ─── Meta ─────────────────────────────────────────────────────────────────────
@@ -538,7 +582,7 @@ async function metaCampaigns(errors: string[]): Promise<CampaignRow[]> {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, apikey, content-type, x-client-info, x-sync-source, x-full-sync, x-check-scope, x-date-start, x-date-end',
+    'authorization, apikey, content-type, x-client-info, x-sync-source, x-full-sync, x-check-scope, x-date-start, x-date-end, x-platform',
 };
 
 function json(body: unknown, status = 200): Response {
@@ -557,20 +601,29 @@ async function checkScope(): Promise<Record<string, unknown>> {
   if (googleConfigured()) {
     try {
       const token = await getGoogleToken();
-      const res = await fetch(
-        `https://googleads.googleapis.com/${GOOGLE_API_VERSION}/customers/${GOOGLE_CUSTOMER_ID}/googleAds:search`,
-        {
-          method: 'POST',
-          headers: googleHeaders(token),
-          body: JSON.stringify({ query: 'SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer LIMIT 1' }),
-        },
-      );
+      // One probe per ad account: a login can reach one and not the other.
+      const accounts: Record<string, unknown>[] = [];
+      for (const customerId of GOOGLE_CUSTOMER_IDS) {
+        const res = await fetch(
+          `https://googleads.googleapis.com/${GOOGLE_API_VERSION}/customers/${customerId}/googleAds:search`,
+          {
+            method: 'POST',
+            headers: googleHeaders(token),
+            body: JSON.stringify({ query: 'SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer LIMIT 1' }),
+          },
+        );
+        accounts.push({
+          customer_id: customerId,
+          status: res.status,
+          ok: res.ok,
+          detail: redact(await res.text()).slice(0, 500),
+        });
+      }
       out.google = {
         configured: true,
         api_version: GOOGLE_API_VERSION,
-        status: res.status,
-        ok: res.ok,
-        detail: redact(await res.text()).slice(0, 500),
+        ok: accounts.every((a) => a.ok === true),
+        accounts,
       };
     } catch (e) {
       out.google = { configured: true, ok: false, detail: errorText(e, 500) };
@@ -618,6 +671,18 @@ Deno.serve(async (req: Request) => {
   const isFull = req.headers.get('x-full-sync') === 'true';
   const headerStart = req.headers.get('x-date-start');
 
+  const only = (req.headers.get('x-platform') ?? '').trim().toLowerCase();
+  if (only && only !== 'google' && only !== 'meta') {
+    return json({ error: 'x-platform must be google or meta' }, 400);
+  }
+  // The back-fill cursor is one date for both platforms: advancing it after
+  // reading only one would mark months the other never imported as done.
+  if (only && isFull) {
+    return json({ error: 'x-platform cannot be combined with x-full-sync; use x-date-start / x-date-end' }, 400);
+  }
+  const runGoogle = googleConfigured() && only !== 'meta';
+  const runMeta = metaConfigured() && only !== 'google';
+
   try {
     let mode: 'explicit' | 'full' | 'rolling';
     let start: string;
@@ -647,13 +712,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const rows: SpendRow[] = [];
-    if (googleConfigured()) rows.push(...await syncGoogle(start, end, errors));
-    if (metaConfigured()) rows.push(...await syncMeta(start, end, errors));
+    if (runGoogle) rows.push(...await syncGoogle(start, end, errors));
+    if (runMeta) rows.push(...await syncMeta(start, end, errors));
     const upserted = await upsertSpend(rows);
 
     const campaignRows: CampaignRow[] = [];
-    if (googleConfigured()) campaignRows.push(...await googleCampaigns(errors));
-    if (metaConfigured()) campaignRows.push(...await metaCampaigns(errors));
+    if (runGoogle) campaignRows.push(...await googleCampaigns(errors));
+    if (runMeta) campaignRows.push(...await metaCampaigns(errors));
     const campaigns = await upsertCampaigns(campaignRows);
 
     let done = true;
@@ -680,8 +745,9 @@ Deno.serve(async (req: Request) => {
       done,
       upserted,
       campaigns,
-      google: googleConfigured(),
-      meta: metaConfigured(),
+      google: runGoogle,
+      meta: runMeta,
+      google_accounts: runGoogle ? GOOGLE_CUSTOMER_IDS : [],
       duration_ms: Date.now() - startedAt,
       errors,
     });

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import {
@@ -12,13 +12,14 @@ import type {
 import { MONTHS, TASK_STATUSES } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { SortIcon } from '../components/SortIcon';
 import { cn } from '../lib/utils';
 import { useSort } from '../hooks/useSort';
 import { useRepList } from '../hooks/useRepList';
 import { ExportButton } from '../components/ExportButton';
 import { autoColumns } from '../lib/csv';
-import { RepName } from '../components/RepAvatar';
+import { RepName, RepAvatar } from '../components/RepAvatar';
 import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 
 const STATUS_LABELS: Record<string, string> = Object.fromEntries(TASK_STATUSES.map(s => [s.value, s.label]));
@@ -86,7 +87,8 @@ export default function TasksDashboard() {
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
+    // Several reps at once; an empty list is everyone.
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
     const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
 
     const [availableWeeks, setAvailableWeeks] = useState<TasksAvailableWeek[]>([]);
@@ -115,7 +117,7 @@ export default function TasksDashboard() {
         setLoading(true);
         const monthParam = isWeekly ? null : (selectedMonth === 'Toutes' ? null : selectedMonth);
         const weekParam = isWeekly ? selectedWeek : null;
-        const repParam = selectedRep === 'Tous' ? null : selectedRep;
+        const repsParam = selectedReps.length > 0 ? selectedReps : null;
 
         const [
             { data: kpiData },
@@ -124,11 +126,11 @@ export default function TasksDashboard() {
             { data: weeklyData },
             { data: wowData },
         ] = await Promise.all([
-            cachedRpc('get_tasks_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_week_start: weekParam }),
+            cachedRpc('get_tasks_kpis', { p_year: year, p_month: monthParam, p_reps: repsParam, p_week_start: weekParam }),
             cachedRpc('get_tasks_by_rep', { p_year: year, p_month: monthParam, p_week_start: weekParam }),
-            cachedRpc('get_tasks_by_status', { p_rep: repParam }),
-            cachedRpc('get_tasks_weekly', { p_year: year, p_rep: repParam }),
-            cachedRpc('get_tasks_wow', { p_rep: repParam }),
+            cachedRpc('get_tasks_by_status', { p_reps: repsParam }),
+            cachedRpc('get_tasks_weekly', { p_year: year, p_reps: repsParam }),
+            cachedRpc('get_tasks_wow', { p_reps: repsParam }),
         ]);
 
         setKpis(kpiData?.[0] ?? null);
@@ -137,7 +139,7 @@ export default function TasksDashboard() {
         setWeekly(weeklyData ?? []);
         setRawWow(wowData ?? []);
         setLoading(false);
-    }, [isWeekly, year, selectedMonth, selectedRep, selectedWeek]);
+    }, [isWeekly, year, selectedMonth, selectedReps, selectedWeek]);
 
     const fetchDataRef = useRef(fetchData);
     const fetchWeeksRef = useRef(fetchWeeks);
@@ -200,7 +202,10 @@ export default function TasksDashboard() {
 
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    const repOptions = useMemo(() => [{ value: 'Tous', label: 'Tous les reps' }, ...repList.map(r => ({ value: r, label: r }))], [repList]);
+    const repOptions = useMemo(
+        () => repList.map(r => ({ value: r, label: r, icon: <RepAvatar name={r} size="sm" /> })),
+        [repList],
+    );
 
     // Week navigation (availableWeeks is newest-first)
     const currentIdx = availableWeeks.findIndex(w => w.week_start === selectedWeek);
@@ -228,7 +233,8 @@ export default function TasksDashboard() {
                 <div className="space-y-4">
                     <FilterBar>
                         <FilterGroup label="Représentant">
-                            <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                            <MultiSelect values={selectedReps} onChange={setSelectedReps} options={repOptions}
+                                         allLabel="Tous les reps" allIcon={<RepAvatar name="Tous" size="sm" />} className="w-48" />
                         </FilterGroup>
                     </FilterBar>
                     {/* Week switcher */}
@@ -266,7 +272,8 @@ export default function TasksDashboard() {
                         <Select value={String(selectedMonth)} onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))} options={monthOptions} className="w-40" />
                     </FilterGroup>
                     <FilterGroup label="Représentant">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                        <MultiSelect values={selectedReps} onChange={setSelectedReps} options={repOptions}
+                                     allLabel="Tous les reps" allIcon={<RepAvatar name="Tous" size="sm" />} className="w-48" />
                     </FilterGroup>
                 </FilterBar>
             )}

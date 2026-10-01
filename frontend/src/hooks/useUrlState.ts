@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 /**
@@ -51,6 +51,52 @@ function applyCompanions(params: URLSearchParams, also?: UrlStateCompanions): vo
         if (value === null) params.delete(key);
         else params.set(key, value);
     }
+}
+
+/**
+ * The "everything" words the single-value filters used to put in the URL. A
+ * link saved before the filters took several values can still carry one, and it
+ * means what it always meant: no filter.
+ */
+const ALL_WORDS: readonly string[] = ['Tous', 'Toutes'];
+
+/**
+ * A list of values in the URL, for a filter that takes several.
+ *
+ * Written as a repeated param (`?rep=A&rep=B`), not a joined string: the values
+ * are free text from Zoho and can contain any separator one could pick. A link
+ * made when the filter held one value (`?rep=A`) reads as a list of one.
+ *
+ * An empty list removes the param, and means "no filter".
+ *
+ * The array keeps its identity while the URL holds the same values, so it is
+ * safe as a hook dependency.
+ */
+export function useUrlList(
+    key: string,
+): [string[], (values: string[], also?: UrlStateCompanions) => void] {
+    const [searchParams, setSearchParams] = useSearchParams();
+    // NUL cannot occur in a URL value, so the joined string is a faithful key.
+    const raw = searchParams.getAll(key).filter(v => v !== '' && !ALL_WORDS.includes(v)).join('\0');
+    const values = useMemo(() => (raw === '' ? [] : raw.split('\0')), [raw]);
+
+    const setValues = useCallback(
+        (newValues: string[], also?: UrlStateCompanions) => {
+            setSearchParams(
+                prev => {
+                    const next = new URLSearchParams(prev);
+                    next.delete(key);
+                    for (const v of newValues) next.append(key, v);
+                    applyCompanions(next, also);
+                    return next;
+                },
+                { replace: true },
+            );
+        },
+        [key, setSearchParams],
+    );
+
+    return [values, setValues];
 }
 
 /**

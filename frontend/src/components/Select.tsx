@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { ChevronDown, Check, Search } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, foldForSearch } from '../lib/utils';
 
 /**
  * From this many options the dropdown grows a search box. Some of these lists are
@@ -8,11 +8,6 @@ import { cn } from '../lib/utils';
  * find "Dentiste" is not a way to use a filter.
  */
 const SEARCHABLE_FROM = 4;
-
-/** Accent- and case-insensitive, so "evenement" finds "Évènement". */
-function foldForSearch(v: string): string {
-    return v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-}
 
 export interface SelectOption {
     value: string;

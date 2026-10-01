@@ -16,7 +16,9 @@ import { Select } from '../components/Select';
 import { ExportButton } from '../components/ExportButton';
 import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { TagCell } from '../components/TagCell';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
+import { useUrlList } from '../hooks/useUrlState';
+import { MultiSelect } from '../components/MultiSelect';
 import type { CsvColumn } from '../lib/csv';
 import { RepName } from '../components/RepAvatar';
 import { useRepTeam } from '../lib/repTeam';
@@ -74,11 +76,12 @@ export default function AccountsDetail() {
     const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const [selectedRep, _setSelectedRep] = useUrlState('rep', REP_DEFAULT);
-    const [selectedSource, _setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, _setSelectedService] = useUrlState('service', 'Tous');
-    const [selectedDomaine, _setSelectedDomaine] = useUrlState('domaine', 'Tous');
-    const [selectedRegion, _setSelectedRegion] = useUrlState('region', 'Toutes');
+    // Each of these takes several values; an empty list is "no filter".
+    const [selectedReps, _setSelectedReps] = useUrlList('rep');
+    const [selectedSources, _setSelectedSources] = useUrlList('source');
+    const [selectedServices, _setSelectedServices] = useUrlList('service');
+    const [selectedDomaines, _setSelectedDomaines] = useUrlList('domaine');
+    const [selectedRegions, _setSelectedRegions] = useUrlList('region');
     const [selectedInvoiced, _setSelectedInvoiced] = useUrlState('factures', 'Tous');
     const [ratingScope, _setRatingScope] = useUrlState('statut', 'Clients');
     const [page, setPage] = useUrlStateNumber('page', 1);
@@ -93,8 +96,8 @@ export default function AccountsDetail() {
     const [invoiceTotals, setInvoiceTotals] = useState<Record<string, LeadInvoiceTotals>>({});
     const [detailAccount, setDetailAccount] = useState<ZohoAccountRow | null>(null);
 
-    // Équipe entière / Interne / one rep. See hooks/useRepFilter.
-    const repFilter = useRepFilter(selectedRep, options?.reps ?? []);
+    // Interne and/or reps by name. See hooks/useRepFilter.
+    const repFilter = useRepFilter(selectedReps, options?.reps ?? []);
 
     // A filter change invalidates the page number - page 7 of a 3-page result is
     // an empty table, which reads as "no data" rather than "wrong page".
@@ -111,11 +114,11 @@ export default function AccountsDetail() {
         _setYearParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
     const setSelectedMonth = (v: number | 'Toutes') =>
         _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
-    const setSelectedRep = (v: string) => _setSelectedRep(v, toPage1);
-    const setSelectedSource = (v: string) => _setSelectedSource(v, toPage1);
-    const setSelectedService = (v: string) => _setSelectedService(v, toPage1);
-    const setSelectedDomaine = (v: string) => _setSelectedDomaine(v, toPage1);
-    const setSelectedRegion = (v: string) => _setSelectedRegion(v, toPage1);
+    const setSelectedReps = (v: string[]) => _setSelectedReps(v, toPage1);
+    const setSelectedSources = (v: string[]) => _setSelectedSources(v, toPage1);
+    const setSelectedServices = (v: string[]) => _setSelectedServices(v, toPage1);
+    const setSelectedDomaines = (v: string[]) => _setSelectedDomaines(v, toPage1);
+    const setSelectedRegions = (v: string[]) => _setSelectedRegions(v, toPage1);
     const setSelectedInvoiced = (v: string) => _setSelectedInvoiced(v, toPage1);
     const setRatingScope = (v: string) => _setRatingScope(v, toPage1);
 
@@ -153,11 +156,11 @@ export default function AccountsDetail() {
         search.trim() !== '',
         year !== 'Toutes',
         selectedMonth !== 'Toutes',
-        selectedRep !== REP_DEFAULT,
-        selectedSource !== 'Toutes',
-        selectedService !== 'Tous',
-        selectedDomaine !== 'Tous',
-        selectedRegion !== 'Toutes',
+        !repFilter.isAll,
+        selectedSources.length > 0,
+        selectedServices.length > 0,
+        selectedDomaines.length > 0,
+        selectedRegions.length > 0,
         selectedInvoiced !== 'Tous',
         ratingScope !== 'Clients',
     ].filter(Boolean).length;
@@ -207,17 +210,18 @@ export default function AccountsDetail() {
         // through repFilter so the dropdown and the query can never disagree.
         if (repFilter.rep) query = query.eq('rep_name', repFilter.rep);
         else if (repFilter.reps) query = query.in('rep_name', repFilter.reps);
-        if (selectedSource !== 'Toutes') query = query.eq('origine_du_client', selectedSource);
-        if (selectedDomaine !== 'Tous') query = query.eq('domaine_activite', selectedDomaine);
-        if (selectedRegion !== 'Toutes') query = query.eq('region_administrative', selectedRegion);
+        if (selectedSources.length > 0) query = query.in('origine_du_client', selectedSources);
+        if (selectedDomaines.length > 0) query = query.in('domaine_activite', selectedDomaines);
+        if (selectedRegions.length > 0) query = query.in('region_administrative', selectedRegions);
         if (selectedInvoiced !== 'Tous') query = query.eq('has_invoices', selectedInvoiced === 'avec');
         // A precomputed boolean, not `rating not.in (...)`: PostgREST turns that
         // into NOT (rating IN ...), which is NULL - and therefore false - for the
         // 977 accounts with no rating, silently hiding them.
         if (ratingScope !== 'Tous') query = query.eq('is_internal', false);
-        if (selectedService !== 'Tous') {
-            // overlaps, not contains: match every spelling of the same service.
-            query = query.overlaps('service_interest', serviceVariants[selectedService] ?? [selectedService]);
+        if (selectedServices.length > 0) {
+            // overlaps, not contains: match every spelling of every selected service.
+            query = query.overlaps('service_interest',
+                selectedServices.flatMap(s => serviceVariants[s] ?? [s]));
         }
 
         const term = sanitizeSearch(debouncedSearch);
@@ -229,8 +233,8 @@ export default function AccountsDetail() {
             );
         }
         return query;
-    }, [dateBounds, repFilter, selectedSource, selectedService, selectedDomaine,
-        selectedRegion, selectedInvoiced, ratingScope, debouncedSearch, serviceVariants]);
+    }, [dateBounds, repFilter, selectedSources, selectedServices, selectedDomaines,
+        selectedRegions, selectedInvoiced, ratingScope, debouncedSearch, serviceVariants]);
 
     /**
      * Monotonic request id. Nine filters over 20,645 rows means a broad query and
@@ -316,10 +320,7 @@ export default function AccountsDetail() {
     const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
     const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
-    const optionList = (all: string, values: string[] | undefined, allLabel: string) => [
-        { value: all, label: allLabel },
-        ...(values ?? []).map(v => ({ value: v, label: v })),
-    ];
+    const optionList = (values: string[] | undefined) => (values ?? []).map(v => ({ value: v, label: v }));
     const yearOptions = useMemo(() => [
         { value: 'Toutes', label: 'Toutes les années' },
         ...(options?.years ?? []).map(y => ({ value: String(y), label: String(y) })),
@@ -390,19 +391,20 @@ export default function AccountsDetail() {
                     />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={repFilter.options} className="w-48" />
+                    <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repFilter.options}
+                                 allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Source">
-                    <Select value={selectedSource} onChange={setSelectedSource} options={optionList('Toutes', options?.sources, 'Toutes les sources')} className="w-52" />
+                    <MultiSelect values={selectedSources} onChange={setSelectedSources} options={optionList(options?.sources)} allLabel="Toutes les sources" className="w-52" />
                 </FilterGroup>
                 <FilterGroup label="Service">
-                    <Select value={selectedService} onChange={setSelectedService} options={optionList('Tous', options?.services, 'Tous les services')} className="w-48" />
+                    <MultiSelect values={selectedServices} onChange={setSelectedServices} options={optionList(options?.services)} allLabel="Tous les services" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Domaine">
-                    <Select value={selectedDomaine} onChange={setSelectedDomaine} options={optionList('Tous', options?.domaines, 'Tous les domaines')} className="w-48" />
+                    <MultiSelect values={selectedDomaines} onChange={setSelectedDomaines} options={optionList(options?.domaines)} allLabel="Tous les domaines" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Région">
-                    <Select value={selectedRegion} onChange={setSelectedRegion} options={optionList('Toutes', options?.regions, 'Toutes les régions')} className="w-44" />
+                    <MultiSelect values={selectedRegions} onChange={setSelectedRegions} options={optionList(options?.regions)} allLabel="Toutes les régions" className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Factures">
                     <Select

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2 } from 'lucide-react';
@@ -21,11 +21,12 @@ import { OFFICES } from '../lib/constants';
 import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { MultiSelect } from '../components/MultiSelect';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
 
 export default function QuarterlyAverages() {
     const [year, setYear] = useUrlStateNumber('year', 2026);
-    const [selectedRep, setSelectedRep] = useUrlState('rep', REP_DEFAULT);
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
@@ -77,7 +78,7 @@ export default function QuarterlyAverages() {
     }, [year, selectedOffice]);
 
     // True per-quarter last-year total (whole team, incl. departed reps). Only applied
-    // to the "Total équipe" row when no single rep is filtered.
+    // to the "Total équipe" row when no rep is filtered.
     // Keep null as null: it means the comparison year has no fiscal calendar, and
     // Number(null) would turn that into a 0 the page then reads as a real figure.
     const previousTotalByQuarter = useMemo(() => {
@@ -95,9 +96,9 @@ export default function QuarterlyAverages() {
     }, [fetchAverages]);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    // Groups first, then the current sales team by name. Former staff and
+    // "Interne" first, then the current sales team by name. Former staff and
     // internal billing live behind "Interne" rather than as 20 more rows.
-    const repFilter = useRepFilter(selectedRep, uniqueReps);
+    const repFilter = useRepFilter(selectedReps, uniqueReps);
     const repOptions = repFilter.options;
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
@@ -128,7 +129,8 @@ export default function QuarterlyAverages() {
                     <Select value={selectedOffice} onChange={setSelectedOffice} options={officeOptions} className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-48" />
+                    <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repOptions}
+                                 allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                 </FilterGroup>
             </FilterBar>
 
@@ -149,7 +151,7 @@ export default function QuarterlyAverages() {
                                 quarter={q}
                                 data={dataForQuarter}
                                 currentYear={year}
-                                previousTotalOverride={selectedRep === REP_DEFAULT ? previousTotalByQuarter.get(q) : undefined}
+                                previousTotalOverride={repFilter.isAll ? previousTotalByQuarter.get(q) : undefined}
                             />
                         );
                     })}

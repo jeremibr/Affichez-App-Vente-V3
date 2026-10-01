@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Target, Briefcase, Trophy, User, FileText, X, ChevronRight, Unlink } from 'lucide-react';
@@ -9,9 +9,11 @@ import { DEPARTMENTS, MONTHS, OFFICES, INVOICE_STATUSES } from '../lib/constants
 import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { formatCurrencyCAD, formatShortDate, cn } from '../lib/utils';
 import { InfoHint } from '../components/InfoHint';
-import { useRepFilter, REP_DEFAULT, REP_ALL } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
+import { sumDepartments } from '../lib/sommaire';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,18 +57,19 @@ export default function FDashboard() {
 
     const [year, setYear] = useUrlStateNumber('year', 2026);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
-    const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
-    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
+    const [selectedStatuses, setSelectedStatuses] = useUrlList('status');
+    const [selectedDepts, setSelectedDepts] = useUrlList('dept');
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    // Admin can switch reps; members are locked to their own rep
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_ALL));
+    // Admin can switch reps; members are locked to their own rep, whatever the URL says.
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [showClients, setShowClients] = useState(false);
     const [grandTotalData, setGrandTotalData] = useState<SommaireRow[]>([]);
+    // The selected departments as one row per month. Empty while none is selected.
     const [deptData, setDeptData] = useState<SommaireRow[]>([]);
     const [prevGrandTotalData, setPrevGrandTotalData] = useState<SommaireRow[]>([]);
     const [prevDeptData, setPrevDeptData] = useState<SommaireRow[]>([]);
@@ -112,27 +115,22 @@ export default function FDashboard() {
     const [allReps, setAllReps] = useState<string[]>([]);
 
     /**
-     * The rep filter, rebuilt 2026-09-08.
+     * The rep filter. The dropdown lists the sales team by name plus "Interne"
+     * (everybody else), and several can be ticked at once.
      *
-     * THE BUG being fixed: 'Tous' and the since-renamed internal group BOTH resolved to
-     * repParam = null, so they sent an identical query - switching between them
-     * changed nothing on screen. repParam was also the effect dependency, so
-     * nothing even refetched.
-     *
-     * The dropdown now offers groups: Équipe entière (the reps in the View
-     * dropdown, and the default) and Interne (everybody else). p_rep cannot
-     * express a group - it holds one name - so p_reps carries the list.
-     *
-     * Both are sent because they do different jobs on these functions: p_rep
-     * filters rows AND selects that rep's own objective from rep_objectives,
-     * while p_reps filters rows only and leaves the team objective in place. A
-     * group has no single target, so a group sends p_rep = null.
+     * Three parameters, because they do different jobs on these functions:
+     *   p_rep          one rep: filters rows AND selects that rep's own objective;
+     *   p_reps         a list: filters rows only;
+     *   p_target_reps  a list made of team members only: the objective is the
+     *                  sum of theirs. Left null when "Interne" is in the
+     *                  selection, which has no objective to be measured against.
      */
-    const repFilter = useRepFilter(selectedRep, allReps);
+    const repFilter = useRepFilter(selectedReps, allReps);
     const repParam = isAdmin ? repFilter.rep : (authRepName ?? null);
-    // Only an admin gets the group options; a rep is pinned to their own name,
-    // where p_rep already does the right thing and a list would add nothing.
+    // Only an admin gets the lists; a rep is pinned to their own name, where
+    // p_rep already does the right thing.
     const repsParam = isAdmin ? repFilter.reps : null;
+    const targetRepsParam = isAdmin ? repFilter.targetReps : null;
 
     useEffect(() => {
         if (!isAdmin) return;
@@ -154,8 +152,8 @@ export default function FDashboard() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         const officeParam = selectedOffice === 'Toutes' ? null : selectedOffice;
-        const statusParam = selectedStatus === 'Toutes' ? null : selectedStatus;
-        const deptParam = selectedDept === 'Toutes' ? null : selectedDept;
+        const statusesParam = selectedStatuses.length > 0 ? selectedStatuses : null;
+        const deptsParam = selectedDepts.length > 0 ? selectedDepts : null;
         const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
 
         const { data: excludedClientData } = await supabase.from('excluded_clients').select('client_name');
@@ -171,15 +169,15 @@ export default function FDashboard() {
             { data: leaderData },
             { data: unassignedData }
         ] = await Promise.all([
-            cachedRpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year, p_office: officeParam, p_statuses: statusesParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
+            cachedRpc('get_inv_sommaire', { p_year: year, p_office: officeParam, p_statuses: statusesParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_statuses: statusesParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
+            cachedRpc('get_inv_sommaire', { p_year: year - 1, p_office: officeParam, p_statuses: statusesParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_dashboard_kpis', { p_year: year, p_office: officeParam, p_statuses: statusesParam, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
+            cachedRpc('get_inv_top_clients', { p_year: year, p_office: officeParam, p_statuses: statusesParam, p_limit: 200, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_inv_rep_leaderboard', { p_year: year, p_office: officeParam, p_statuses: statusesParam, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam }),
             // No status filter: an invoice is unattributed regardless of whether it is paid.
-            cachedRpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
+            cachedRpc('get_invoice_unassigned_summary', { p_year: year, p_office: officeParam, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setUnassigned((unassignedData as InvoiceUnassignedSummary[])?.[0] ?? null);
@@ -201,8 +199,8 @@ export default function FDashboard() {
                     .lt('invoice_date', `${y + 1}-01-01`);
                 excludedClients.forEach((c: string) => { q = q.neq('client_name', c); });
                 if (officeParam) q = q.eq('office', officeParam);
-                if (statusParam) q = q.eq('status', statusParam as any);
-                if (deptParam)   q = q.eq('department', deptParam);
+                if (statusesParam) q = q.in('status', statusesParam as any);
+                if (deptsParam)    q = q.in('department', deptsParam);
                 if (monthParam) {
                     const nm = monthParam === 12 ? 1 : monthParam + 1;
                     const ny2 = monthParam === 12 ? y + 1 : y;
@@ -259,28 +257,14 @@ export default function FDashboard() {
             setGrandTotalData(mergeInto(grandData || [], intMonthly));
             setPrevGrandTotalData(mergeInto(prevGrandData || [], intPrevMonthly));
 
-            // Dept data: only merge when a specific dept is active (intMonthly is already dept-filtered then)
-            if (deptParam) {
-                const mergeDept = (base: SommaireRow[], extra: Map<number, { amount: number; count: number }>): SommaireRow[] => {
-                    const result: SommaireRow[] = (base || []).map(r => {
-                        if (r.department !== deptParam) return r;
-                        const ex = extra.get(r.month);
-                        if (!ex) return r;
-                        const newAmt = r.actual_amount + ex.amount;
-                        return { ...r, actual_amount: newAmt, deal_count: r.deal_count + ex.count, pct_atteint: r.objectif > 0 ? (newAmt / r.objectif) * 100 : 0 };
-                    });
-                    for (const [m, ex] of extra) {
-                        if (!result.find(r => r.month === m && r.department === deptParam)) {
-                            result.push({ month: m, department: deptParam, objectif: 0, actual_amount: ex.amount, pct_atteint: 0, deal_count: ex.count });
-                        }
-                    }
-                    return result;
-                };
-                setDeptData(mergeDept(dData || [], intMonthly));
-                setPrevDeptData(mergeDept(prevDData || [], intPrevMonthly));
+            // The selected departments, one row per month. intMonthly was read with
+            // the same department filter, so it merges in by month alone.
+            if (deptsParam) {
+                setDeptData(mergeInto(sumDepartments(dData || [], deptsParam), intMonthly));
+                setPrevDeptData(mergeInto(sumDepartments(prevDData || [], deptsParam), intPrevMonthly));
             } else {
-                setDeptData(dData || []);
-                setPrevDeptData(prevDData || []);
+                setDeptData([]);
+                setPrevDeptData([]);
             }
 
             // KPI adjustment
@@ -310,15 +294,15 @@ export default function FDashboard() {
                 : ((leaderData as LeaderboardEntry[]) || []));
         } else {
             setGrandTotalData(grandData || []);
-            setDeptData(dData || []);
+            setDeptData(deptsParam ? sumDepartments(dData || [], deptsParam) : []);
             setPrevGrandTotalData(prevGrandData || []);
-            setPrevDeptData(prevDData || []);
+            setPrevDeptData(deptsParam ? sumDepartments(prevDData || [], deptsParam) : []);
             setKpis(kpiData?.[0] || null);
             setRawLeaderboard((leaderData as LeaderboardEntry[]) || []);
         }
 
         setLoading(false);
-    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam, repsParam]);
+    }, [year, selectedOffice, selectedStatuses, selectedDepts, selectedMonth, repParam, repsParam, targetRepsParam]);
 
     const fetchDataRef = useRef(fetchData);
     useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
@@ -338,11 +322,11 @@ export default function FDashboard() {
     }, []);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les statuts' }, ...INVOICE_STATUSES], []);
-    const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
+    const statusOptions = useMemo(() => INVOICE_STATUSES.map(s => ({ value: s.value as string, label: s.label as string })), []);
+    const deptOptions = useMemo(() => DEPARTMENTS.map(d => ({ value: d as string, label: d as string })), []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
-    // Groups first, then every name - from the shared hook, so the Factures and
-    // Comptes pages offer exactly the same choices.
+    // "Interne" first, then the team by name - from the shared hook, so the
+    // Factures and Comptes pages offer exactly the same choices.
     const repOptions = repFilter.options;
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
 
@@ -370,17 +354,20 @@ export default function FDashboard() {
                     <Select value={selectedOffice} onChange={setSelectedOffice} options={officeOptions} className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Statut">
-                    <Select value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} className="w-40" />
+                    <MultiSelect values={selectedStatuses} onChange={setSelectedStatuses} options={statusOptions}
+                                 allLabel="Tous les statuts" className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Département">
-                    <Select value={selectedDept} onChange={setSelectedDept} options={deptOptions} className="w-48" />
+                    <MultiSelect values={selectedDepts} onChange={setSelectedDepts} options={deptOptions}
+                                 allLabel="Tous services" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Mois">
                     <Select value={String(selectedMonth)} onChange={(val) => setSelectedMonth(val === 'Toutes' ? 'Toutes' : Number(val))} options={monthOptions} className="w-40" />
                 </FilterGroup>
                 {isAdmin && (
                     <FilterGroup label="Représentant">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                        <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repOptions}
+                                     allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                     </FilterGroup>
                 )}
             </FilterBar>
@@ -412,8 +399,9 @@ export default function FDashboard() {
                             year={year}
                             office={selectedOffice === 'Toutes' ? null : selectedOffice}
                             month={selectedMonth === 'Toutes' ? null : selectedMonth}
-                            dept={selectedDept === 'Toutes' ? null : selectedDept}
-                            rep={selectedRep === 'Tous' ? null : selectedRep}
+                            depts={selectedDepts.length > 0 ? selectedDepts : null}
+                            rep={repParam}
+                            reps={repsParam}
                             onClose={() => setShowUnassigned(false)}
                         />
                     )}
@@ -495,9 +483,9 @@ export default function FDashboard() {
 
                     <div className="space-y-6">
                         <SommaireTable
-                            title={selectedDept === 'Toutes' ? "Performance Globale · Factures" : `Performance · ${selectedDept}`}
-                            data={selectedDept === 'Toutes' ? grandTotalData : deptData.filter(x => x.department === selectedDept)}
-                            prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
+                            title={selectedDepts.length === 0 ? "Performance Globale · Factures" : `Performance · ${selectedDepts.join(', ')}`}
+                            data={selectedDepts.length === 0 ? grandTotalData : deptData}
+                            prevYearData={selectedDepts.length === 0 ? prevGrandTotalData : prevDeptData}
                             year={year}
                             selectedMonth={selectedMonth}
                             dealLabel="factures"
@@ -650,12 +638,13 @@ function UnassignedCard({ data, onOpen }: {
 }
 
 /** The rows behind the figure, with the reason each one could not be linked. */
-function UnassignedModal({ year, office, month, dept, rep, onClose }: {
+function UnassignedModal({ year, office, month, depts, rep, reps, onClose }: {
     year: number;
     office: string | null;
     month: number | null;
-    dept: string | null;
+    depts: string[] | null;
     rep: string | null;
+    reps: string[] | null;
     onClose: () => void;
 }) {
     const [rows, setRows] = useState<UnassignedInvoiceRow[]>([]);
@@ -667,14 +656,14 @@ function UnassignedModal({ year, office, month, dept, rep, onClose }: {
             setLoading(true);
             const { data } = await cachedRpc('get_unassigned_invoices', {
                 p_year: year, p_office: office, p_month: month,
-                p_dept: dept, p_rep: rep, p_limit: 500,
+                p_depts: depts, p_rep: rep, p_reps: reps, p_limit: 500,
             });
             if (cancelled) return;
             setRows((data as UnassignedInvoiceRow[]) ?? []);
             setLoading(false);
         })();
         return () => { cancelled = true; };
-    }, [year, office, month, dept, rep]);
+    }, [year, office, month, depts, rep, reps]);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };

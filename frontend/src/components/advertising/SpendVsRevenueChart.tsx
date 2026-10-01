@@ -5,7 +5,8 @@ import { InfoHint } from '../InfoHint';
 import { ExportButton } from '../ExportButton';
 import type { CsvColumn } from '../../lib/csv';
 import { formatCurrencyCAD, cn } from '../../lib/utils';
-import { CHANNELS, CHANNEL_TONE, channelLabel, isCohortOpen } from './channel';
+import { CHANNELS, CHANNEL_TONE, channelLabel, isCohortOpen, viewHasSpend } from './channel';
+import type { AdView } from './channel';
 import { ChannelLogo } from './ChannelLogo';
 
 // Distinct short labels: slicing the full names gives "Jui" for both June and July.
@@ -16,17 +17,27 @@ const MONTH_SHORT = ['Janv', 'Févr', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Ao�
  * bars on a shared money axis, with the same figures in a table below.
  * Revenue bars for months whose attribution window is still open are hatched.
  *
- * In the organic view there is no spend: only the revenue bars are drawn and
+ * Outside the paid view there is no spend: only the revenue bars are drawn and
  * the cost and return columns are left out, rather than shown as zero.
+ *
+ * The channel tabs list the channels the rows actually contain: the "inconnu"
+ * view has Google alone, and a source filter can leave a single channel.
  */
-export function SpendVsRevenueChart({ rows, year, windowLabel, organic = false }: {
+export function SpendVsRevenueChart({ rows, year, windowLabel, view }: {
     rows: AdMonthlyRow[];
     year: number;
     windowLabel: string;
-    organic?: boolean;
+    view: AdView;
 }) {
-    const [channel, setChannel] = useState<AdChannel>('google');
-    const label = channelLabel(channel, organic);
+    const organic = !viewHasSpend(view);
+    const channels = useMemo(() => {
+        const present = CHANNELS.filter(c => rows.some(r => r.channel === c));
+        return present.length > 0 ? present : CHANNELS;
+    }, [rows]);
+    const [picked, setChannel] = useState<AdChannel>('google');
+    // The picked channel can leave the list when the view or a filter changes.
+    const channel = channels.includes(picked) ? picked : channels[0];
+    const label = channelLabel(channel, view);
 
     const data = useMemo(() => {
         const byMonth = new Map(
@@ -76,8 +87,9 @@ export function SpendVsRevenueChart({ rows, year, windowLabel, organic = false }
                     : `Pour chaque mois : ce qui a été dépensé sur ${label} dans ce mois, et ce que les comptes créés dans ce même mois ont facturé dans les ${windowLabel}. Les mois hachurés n'ont pas encore une fenêtre complète : leurs revenus vont encore augmenter, donc leur rendement est sous-estimé et ne doit pas être comparé aux mois pleins.`} />
 
                 <div className="ml-auto flex items-center gap-3">
+                    {channels.length > 1 && (
                     <div className="flex gap-1 bg-stone p-0.5 rounded-md" role="tablist">
-                        {CHANNELS.map(c => (
+                        {channels.map(c => (
                             <button
                                 key={c}
                                 role="tab"
@@ -89,12 +101,13 @@ export function SpendVsRevenueChart({ rows, year, windowLabel, organic = false }
                                 )}
                             >
                                 <ChannelLogo channel={c} size="xs" />
-                                {channelLabel(c, organic)}
+                                {channelLabel(c, view)}
                             </button>
                         ))}
                     </div>
+                    )}
                     <ExportButton rows={data} columns={organic ? CSV_ORGANIC : CSV}
-                                  filename={`publicite_${organic ? 'organique_' : ''}${channel}_${year}`}
+                                  filename={`publicite_${view}_${channel}_${year}`}
                                   disabled={!hasAnything} />
                 </div>
             </div>

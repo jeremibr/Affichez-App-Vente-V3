@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Target, Briefcase, Trophy, User, FileText, X, ChevronRight } from 'lucide-react';
@@ -9,11 +9,13 @@ import { DEPARTMENTS, MONTHS, OFFICES, SALE_STATUSES } from '../lib/constants';
 import { useRepTeam, mergeInternalRows, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
+import { sumDepartments } from '../lib/sommaire';
 import { RepAvatar, RepName } from '../components/RepAvatar';
 
 interface DashboardKPIs {
@@ -66,11 +68,12 @@ export default function Dashboard() {
     const [year, setYear] = useUrlStateNumber('year', 2026);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
     const [selectedStatus, setSelectedStatus] = useUrlState('status', 'Toutes');
-    const [selectedDept, setSelectedDept] = useUrlState('dept', 'Toutes');
+    const [selectedDepts, setSelectedDepts] = useUrlList('dept');
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_DEFAULT));
+    // Admin only; a rep is pinned to their own name below, whatever the URL says.
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
 
     const [loading, setLoading] = useState(true);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -118,24 +121,23 @@ export default function Dashboard() {
 
     /**
      * The rep filter. See useRepFilter - the dropdown lists the current sales
-     * team by name plus two groups, and everyone else (former staff, internal
-     * billing) sits behind "Interne" instead of adding 20 rows nobody scrolls.
+     * team by name, and everyone else (former staff, internal billing) sits
+     * behind "Interne" instead of adding 20 rows nobody scrolls. Several can be
+     * ticked at once.
      *
-     * THE BUG this replaced: 'Tous' and the since-renamed internal group BOTH resolved to
-     * repParam = null, so the two sent an identical query and switching between
-     * them changed nothing. repParam was also the effect dependency, so the page
-     * did not even refetch.
-     *
-     * p_rep and p_reps are both sent because they do different jobs: p_rep
-     * filters rows AND selects that rep's own objective from rep_objectives,
-     * while p_reps filters rows only and leaves the team objective in place. A
-     * group has no single target, so a group sends p_rep = null.
+     * Three parameters, because they do different jobs:
+     *   p_rep          one rep: filters rows AND selects that rep's own objective;
+     *   p_reps         a list: filters rows only;
+     *   p_target_reps  a list made of team members only: the objective is the
+     *                  sum of theirs. Left null when "Interne" is in the
+     *                  selection, which has no objective to be measured against.
      */
-    const repFilter = useRepFilter(selectedRep, allReps);
+    const repFilter = useRepFilter(selectedReps, allReps);
     const repParam = isAdmin ? repFilter.rep : (authRepName ?? null);
-    // Only an admin gets the groups; a rep is pinned to their own name, where
-    // p_rep already does the right thing and a list would add nothing.
+    // Only an admin gets the lists; a rep is pinned to their own name, where
+    // p_rep already does the right thing.
     const repsParam = isAdmin ? repFilter.reps : null;
+    const targetRepsParam = isAdmin ? repFilter.targetReps : null;
 
     useEffect(() => {
         if (!isAdmin) return;
@@ -155,7 +157,7 @@ export default function Dashboard() {
         setLoading(true);
         const officeParam = selectedOffice === 'Toutes' ? null : selectedOffice;
         const statusParam = selectedStatus === 'Toutes' ? null : selectedStatus;
-        const deptParam = selectedDept === 'Toutes' ? null : selectedDept;
+        const deptsParam = selectedDepts.length > 0 ? selectedDepts : null;
         const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
 
         const [
@@ -167,13 +169,13 @@ export default function Dashboard() {
             { data: clientData },
             { data: leaderData }
         ] = await Promise.all([
-            cachedRpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
             cachedRpc('get_sommaire', { p_year: year, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_sommaire_grand_total', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
             cachedRpc('get_sommaire', { p_year: year - 1, p_office: officeParam, p_status: statusParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam }),
-            cachedRpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_dept: deptParam, p_rep: repParam, p_reps: repsParam })
+            cachedRpc('get_dashboard_kpis', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam, p_target_reps: targetRepsParam }),
+            cachedRpc('get_top_clients', { p_year: year, p_office: officeParam, p_status: statusParam, p_limit: 200, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam }),
+            cachedRpc('get_rep_leaderboard', { p_year: year, p_office: officeParam, p_status: statusParam, p_month: monthParam, p_depts: deptsParam, p_rep: repParam, p_reps: repsParam })
         ]);
 
         setGrandTotalData(grandData || []);
@@ -185,7 +187,7 @@ export default function Dashboard() {
 
         setRawLeaderboard((leaderData as LeaderboardEntry[]) || []);
         setLoading(false);
-    }, [year, selectedOffice, selectedStatus, selectedDept, selectedMonth, repParam, repsParam]);
+    }, [year, selectedOffice, selectedStatus, selectedDepts, selectedMonth, repParam, repsParam, targetRepsParam]);
 
     // Always keep a current reference so the Realtime callback never goes stale
     const fetchDataRef = useRef(fetchData);
@@ -205,7 +207,7 @@ export default function Dashboard() {
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
     const statusOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous les devis' }, ...SALE_STATUSES], []);
-    const deptOptions = useMemo(() => [{ value: 'Toutes', label: 'Tous services' }, ...DEPARTMENTS.map(d => ({ value: d, label: d }))], []);
+    const deptOptions = useMemo(() => DEPARTMENTS.map(d => ({ value: d as string, label: d as string })), []);
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
 
     // objectives is keyed (year, month, department) with no office dimension, so
@@ -239,14 +241,16 @@ export default function Dashboard() {
                     <Select value={selectedStatus} onChange={setSelectedStatus} options={statusOptions} className="w-40" />
                 </FilterGroup>
                 <FilterGroup label="Département">
-                    <Select value={selectedDept} onChange={setSelectedDept} options={deptOptions} className="w-48" />
+                    <MultiSelect values={selectedDepts} onChange={setSelectedDepts} options={deptOptions}
+                                 allLabel="Tous services" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Mois">
                     <Select value={String(selectedMonth)} onChange={(val) => setSelectedMonth(val === 'Toutes' ? 'Toutes' : Number(val))} options={monthOptions} className="w-40" />
                 </FilterGroup>
                 {isAdmin && (
                     <FilterGroup label="Représentant">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                        <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repOptions}
+                                     allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                     </FilterGroup>
                 )}
             </FilterBar>
@@ -377,9 +381,9 @@ export default function Dashboard() {
                     {/* Main Performance Table */}
                     <div className="space-y-6">
                         <SommaireTable
-                            title={selectedDept === 'Toutes' ? "Performance Globale" : `Performance · ${selectedDept}`}
-                            data={selectedDept === 'Toutes' ? grandTotalData : deptData.filter(x => x.department === selectedDept)}
-                            prevYearData={selectedDept === 'Toutes' ? prevGrandTotalData : prevDeptData.filter(x => x.department === selectedDept)}
+                            title={selectedDepts.length === 0 ? "Performance Globale" : `Performance · ${selectedDepts.join(', ')}`}
+                            data={selectedDepts.length === 0 ? grandTotalData : sumDepartments(deptData, selectedDepts)}
+                            prevYearData={selectedDepts.length === 0 ? prevGrandTotalData : sumDepartments(prevDeptData, selectedDepts)}
                             year={year}
                             selectedMonth={selectedMonth}
                         />

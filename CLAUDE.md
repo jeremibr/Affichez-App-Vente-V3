@@ -48,6 +48,94 @@ All data flows through `src/lib/supabase.ts` (the singleton Supabase client). Pa
 
 There is no service layer abstraction; Supabase calls are made directly inside page components using `useCallback`-wrapped async functions. Real-time subscriptions (Supabase Realtime) are set up in `useEffect` and cleaned up on unmount.
 
+### Access: the user list, then sections
+
+`allowed_users` is the whole access model (migration `20261001130000_section_access.sql`).
+Two roles, `admin` and `member`, and five section flags; there is no third role.
+
+**1. Not in the list, no access.** `zoho-auth` gives a session only to an address
+that has a row; the `@affichez.ca` auto-registration is gone. A session without a
+row (someone removed from the list, an old sign-in) reads **zero rows from every
+table**: each table in `public` carries a RESTRICTIVE policy `listed_users_only`
+(`app_is_listed()`), which is ANDed with the table's own policies. The app shows
+`AccessDenied` instead of the routes.
+
+> A table created after that migration needs the same policy. Nothing adds it
+> automatically, and without it the new table is readable by any session.
+
+Identity is the email in the session token, so two more things hold it up:
+
+- **A session opened with a password is refused** (`app_session_trusted()`, used
+  by `app_is_listed`, `app_can_access` and `app_is_admin`). The Zoho sign-in
+  issues a one-time link and never sets a password; Supabase's public sign-up
+  endpoint would otherwise let anybody register a listed address with a password
+  of their own before its owner first signs in. Turning sign-ups off in the
+  Supabase dashboard closes the same door one layer earlier.
+- **A SECURITY DEFINER function bypasses RLS**, so each one that returns data
+  refuses an anonymous or unlisted API caller itself (`get_sales_team`,
+  `tasks_visible_reps`). Write a new one the same way, or make it SECURITY INVOKER.
+
+**2. A member opens the sections ticked for them** in Paramètres → Utilisateurs.
+One boolean column each, listed once in `src/lib/sections.ts`:
+
+| flag | section | default |
+|---|---|---|
+| `can_access_devis` | Devis | true |
+| `can_access_factures` | Factures | false |
+| `can_access_comptes` | Comptes | false |
+| `can_access_publicite` | Publicité | false |
+| `can_access_portail` | Mon Portail | true |
+
+An admin has all five whatever the columns say. Notre équipe and Administration
+have no flag: admin-only. An "ads manager" is a member with only Publicité ticked.
+
+What a flag protects, and what it only hides:
+
+- **Comptes, Publicité: protected at the row level.** `zoho_accounts` is readable
+  with `comptes` OR `publicite` (the ad RPCs are SECURITY INVOKER and read it);
+  `ad_spend_daily` and `ad_campaigns` with `publicite`. Policies call
+  `app_can_access('<section>')`.
+- **Devis, Factures, Mon Portail: screens only.** `sales`, `invoices` and
+  `zoho_leads` stay readable to every listed user, because Mon Portail is built on
+  them. Unticking Devis removes the screens, not the API access.
+- **Settings are written by admins only**, in the database too: `objectives`,
+  `objectives_factures`, `rep_objectives`, `rep_objectives_dept`,
+  `excluded_clients`, `reps` and `leads` carry restrictive `admin_*_only` policies
+  on insert, update and delete. Every listed user can still read them.
+
+`AuthContext` reads the user's own row with `select('*')` and exposes `access`
+(`granted` / `denied` / `error`), `isAdmin` and `sections`. `App.tsx` builds the
+routes from `sections`; a URL outside them falls to the catch-all and lands on
+`homePathFor(sections)`, the first section the person can open. When you add a
+section: a column, a line in `SECTIONS`, a `WHEN` in `app_can_access`, the route
+and the nav entry.
+
+### Filters take several values
+
+Every category filter with more than two values is a `MultiSelect`
+(`src/components/MultiSelect.tsx`): rep, department, invoice status, source,
+service, domain, region, campaign status. Year, month, week and window stay
+single (they are periods), and so do the two-value filters (Siège, devis status,
+the Statut scope), where ticking both would only mean "all".
+
+- **State** is `useUrlList(key)`: a repeated URL param (`?rep=A&rep=B`). An empty
+  list is "no filter", and there is no "Tous" value any more; a link from before
+  the change (`?rep=A`, `?dept=Toutes`) still reads correctly.
+- **RPCs take a list beside the scalar they already had** (`p_depts`, `p_statuses`,
+  `p_sources`, `p_services`, `p_domaines`, `p_regions`, `p_reps`). The scalar
+  parameters still work, and the two forms AND together. New parameters are
+  appended, so a function gaining one is `DROP` + `CREATE`, never an overload:
+  two signatures for one name make PostgREST refuse the call (PGRST203).
+- **Objectives follow the selection.** Several departments: the objectives of
+  those departments. Several reps: `p_target_reps`, the sum of their own
+  objectives, sent by `useRepFilter` only when every selected rep is on the sales
+  team. A selection that includes "Interne" has no objective, like Interne alone.
+- **A breakdown ignores its own dimension** in both forms (`get_zoho_accounts_by_source`
+  does not receive the source selection), so the table keeps every bar. The by-rep
+  table is the one exception it always was: a single rep leaves it whole, a list
+  (Interne, or several reps) narrows it to its members.
+- Lists are sent in option order, so the same selection is the same cache key.
+
 ### Read this before you write a statistic
 
 **No table in this app contains what its name says.** Each sync applies a filter,
@@ -270,15 +358,16 @@ back-fill coverage in Settings.
 ### Comptes: the account is the record
 
 The **Comptes** module (`/comptes`, `/comptes/detail`) is the primary funnel view
-and replaced the Leads pages on 2026-09-07. It is **admin-only** (2026-09-24),
-like Publicité beside it. Its grain is the Zoho CRM **account**,
-because that is the grain the business is run in: a company with three contacts
-is one account, so its revenue is counted once with no dedupe layer.
+and replaced the Leads pages on 2026-09-07. It is open to admins and to members
+with the **Comptes** section (see **Access** above). Its grain is the Zoho CRM
+**account**, because that is the grain the business is run in: a company with
+three contacts is one account, so its revenue is counted once with no dedupe layer.
 
-**Admin-only at the row level, not just in the nav.** `zoho_accounts` carries an
-`app_is_admin()` SELECT policy, so a member reading it through PostgREST gets
-zero rows rather than the client list. Every reader is a Comptes or Publicité
-screen and all of them are SECURITY INVOKER, so nothing else changes;
+**Restricted at the row level, not just in the nav.** `zoho_accounts` carries a
+SELECT policy on `app_can_access('comptes') OR app_can_access('publicite')`, so
+anyone else reading it through PostgREST gets zero rows rather than the client
+list. Every reader is a Comptes or Publicité screen and all of them are SECURITY
+INVOKER, so nothing else changes;
 `zoho_accounts_enriched` is `security_invoker=true` and follows the table.
 `invoices` and `zoho_leads` deliberately stay readable to any signed-in user —
 the Factures module and Mon Portail are built on them. The syncs write with the
@@ -345,27 +434,47 @@ words again.
 
 ### Publicité: ad spend against revenue
 
-The **Publicité** module (`/publicite`, admin-only) compares Google Ads and Meta Ads spend
-with the revenue of the accounts attributed to each channel. Only those two channels. Setup and
-credentials: **`docs/ADVERTISING.md`**.
+The **Publicité** module (`/publicite`, admins and members with the Publicité section) compares
+Google Ads and Meta Ads spend with the revenue of the accounts attributed to each channel. Only
+those two channels. Setup and credentials: **`docs/ADVERTISING.md`**.
 
 - **`ad_spend_daily`** holds daily × campaign spend, written only by `ads-spend-sync` (cron every
   4 h). Each run **re-pulls the last 35 days** instead of walking a cursor, because both platforms
   restate recent spend; the PK `(platform, ad_account_id, campaign_id, spend_date)` makes that an
   idempotent upsert.
-- **Admin-only at the row level** (`app_is_admin()` policy), not just hidden in the nav. The RPCs
-  are SECURITY INVOKER, so a non-admin caller gets zero spend, not an error.
-- **Channel ↔ source mapping is fixed** in `ad_channel_source_map()`:
-  `Google Ads` → google, `Meta Ads` → meta (`20260929160000_google_ads_channel.sql`).
-  `Google Organique` (named `Publicité/Recherche Google` until 2026-10-01) is deliberately **not** a
-  paid channel: its older accounts mix organic search with ads, and since the 2026-09-29 source
-  cleanup it also holds the 3,336 former `Internet` accounts. Leads and Comptes share the Zoho
-  Global Set `Origine`, so every source value exists on both modules.
-- **Two views, one page.** `?vue=organique` (the default for now, `DEFAULT_VIEW` in
-  `Advertising.tsx`) attributes the same cohorts to `Google Organique` and `Meta Organique`
-  (formerly `Facebook`) with no spend at all (`p_organic => true` on `get_ad_performance` / `get_ad_monthly`, organic
-  map in `ad_channel_source_map(true)`); `?vue=payant` is the ad view. Cost, return and net are
-  NULL whenever a period has no spend, in either view.
+- **Google is two ad accounts, summed.** `GOOGLE_ADS_CUSTOMER_ID` is a comma-separated list:
+  `579-661-3141` (Affichez - GLOBAL/PUB) and `437-363-4595` (Affichez- BOUTIQUE PROMO), both reached
+  through the same manager account and both in CAD. Each is stored under its own `ad_account_id`
+  and every RPC groups by platform, so the channel figure is their sum. Adding an account does not
+  bring in its past: run `scripts/ads-google-backfill.sh` once.
+- **Restricted at the row level** (`app_can_access('publicite')` policy), not just hidden in the
+  nav. The RPCs are SECURITY INVOKER, so a caller without the section gets zero spend, not an error.
+- **Three views, one page**, all defined in `ad_channel_source_map(p_view)`
+  (`20261001150000_ad_views_and_filters.sql`), which returns each source with the creation-date
+  range its accounts are taken from:
+
+  | `?vue=` | `p_view` | Google | Meta |
+  |---|---|---|---|
+  | `payant` | `paid` | `Google Ads` | `Meta Ads` |
+  | `organique` (default, `DEFAULT_AD_VIEW`) | `organic` | `Google Organique`, created **from** 2026-10-01 | `Meta Organique` |
+  | `inconnu` | `unknown` | `Google Organique`, created **before** 2026-10-01 | none |
+
+  Until 2026-10-01 `Google Organique` (named `Publicité/Recherche Google` before that day) mixed
+  organic search, clicks on a Google ad and the 3,336 former `Internet` accounts, and they cannot
+  be told apart after the fact. From that date the source is organic only and paid arrivals are
+  tagged `Google Ads`. The old accounts are therefore a view of their own and counted in neither of
+  the other two. The date lives in `ad_google_organic_since()` and nowhere else, the two Google
+  cohorts always add up to the whole source, and the page reads the date from the RPC
+  (`cohort_from` / `cohort_before`). Only the paid view has spend; cost, return and net are NULL
+  in the other two, and whenever a period has no spend.
+- **The account filters narrow accounts, not spend.** Rep, service, domain and region
+  (`p_reps`, `p_services`, `p_domaines`, `p_regions`) filter the accounts and their revenue. Spend
+  is reported per campaign and cannot be split that way, so with one of them set
+  `cost_per_account`, `cost_per_client`, `roas` and `net` come back NULL and the page says why.
+  `p_sources` is different: a source is a whole channel, so it selects channels and keeps every
+  ratio. `p_organic` is still accepted and keeps its old meaning (`p_organic => true` without
+  `p_view` is every `Google Organique` account, no date split), so a browser holding the previous
+  build shows what it always showed; `p_view` wins. Drop the parameter in a later migration.
 - **Attribution is by channel and month of account creation, never per lead or per campaign** —
   the CRM stores no click identifiers. The campaign table therefore has no revenue column.
 - **Origins only exist from a date** (`Google Ads` from its first tagged account, created after
@@ -462,17 +571,18 @@ the table would just be overwritten by the next sync.
 
 | Route | Page | Purpose |
 |---|---|---|
-| `/comptes` | `AccountsDashboard` | Admin-only. Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
+| `/comptes` | `AccountsDashboard` | Comptes section. Account cohorts by source/rep/service/domaine, monthly evolution vs last year, revenue attribution window |
 | `/createurs` | `Createurs` | **Documents créés** in the nav. Admin-only. Who *created* each quote/invoice, vs who sold it — a rep who builds a quote and hands it to another still gets the credit here. Never reconciles with rep figures, by design |
-| `/comptes/detail` | `AccountsDetail` | Admin-only. Searchable client directory; a row opens its billing history by department and year |
-| `/publicite` | `Advertising` | Admin-only. Google Ads + Meta spend against the revenue of the accounts tagged to each. Channel-level and monthly, never per lead |
-| `/` | `Dashboard` | YTD KPIs, rep leaderboard, top clients, monthly targets |
+| `/comptes/detail` | `AccountsDetail` | Comptes section. Searchable client directory; a row opens its billing history by department and year |
+| `/publicite` | `Advertising` | Publicité section. Google Ads + Meta spend against the revenue of the accounts tagged to each, in three views (payant, organique, Google inconnu). Channel-level and monthly, never per lead |
+| `/` | `Dashboard` | Devis section. YTD KPIs, rep leaderboard, top clients, monthly targets. Without the section, `/` redirects to the first section the user has |
 | `/weekly` | `WeeklyDetail` | Week-by-week sales breakdown (pivot + line items) |
 | `/quarterly` | `QuarterlyAverages` | YoY quarterly average deal size per rep |
 | `/taches` | `TasksDashboard` | Admin-only. CRM task completion per rep, by week |
-| `/settings` | `Settings` | Manage reps, monthly objectives, fiscal quarters, webhook logs |
+| `/settings` | `Settings` | Admin-only. Users and their sections, monthly objectives, fiscal quarters, syncs, webhook logs |
 
-All routes are children of `Layout`, which provides the sidebar navigation.
+All routes are children of `Layout`, which provides the sidebar navigation. Which
+routes exist depends on the signed-in user's sections (see **Access**).
 
 The sidebar is two levels deep: a **section** (text only, no icon) holds
 **modules** (Devis, Factures, Comptes), each with its own icon and its
@@ -490,9 +600,9 @@ spend) nor Tâches CRM is a setting.
 
 | section | holds | who sees it |
 |---|---|---|
-| **Ventes Affichez** | Devis, Factures, Comptes, Publicité | everyone (Factures needs `canAccessFactures`, Publicité admin) |
+| **Ventes Affichez** | Devis, Factures, Comptes, Publicité | each module has its own section flag |
 | **Notre équipe** | Tâches CRM, Commissions, Objectifs d'équipe | admin only, today |
-| **Mon Portail** | the signed-in rep's own numbers | everyone |
+| **Mon Portail** | the signed-in rep's own numbers | the Mon Portail section flag |
 | **Administration** | Documents créés, then Objectifs des reps, Taux de commission, Paramètres — screens that **change** something | admin only |
 
 Consequences worth knowing before you edit the tree:
@@ -503,8 +613,9 @@ Consequences worth knowing before you edit the tree:
   day one of those screens opens to reps, a flag changes and nothing moves —
   that is the point of filing by subject.
 - **`showAdminNav` is `isAdmin && !viewAsRep`**: an admin previewing a rep's
-  view sees what that rep sees. The routes stay reachable by URL — the guards in
-  `App.tsx` are `isAdmin`, not `viewAsRep`.
+  view sees what that rep sees, including that rep's own sections (`Layout` reads
+  the previewed rep's row). The routes stay reachable by URL — the guards in
+  `App.tsx` follow the signed-in user, not `viewAsRep`.
 - **`Documents créés` (`/createurs`) stays in Administration** even though it is
   a view, not a setting. It is Dominic's own back-office check on who keyed a
   document in — *"c'est vraiment juste pour moi"* — and he asked for it there
@@ -528,7 +639,10 @@ Consequences worth knowing before you edit the tree:
 - **`src/lib/constants.ts`**: `DEPARTMENTS`, `MONTHS`, `OFFICES`, `SALE_STATUSES` — used as filter option sources across all pages
 - **`src/types/database.ts`**: TypeScript types mirroring Supabase view/RPC return shapes (`SommaireRow`, `ZoneA_SummaryRow`, `ZoneB_DetailRow`, `YoYRow`, etc.)
 - **`src/components/FilterBar.tsx`**: `<FilterBar>` / `<FilterGroup>` composable filter bar used on every page
-- **`src/components/Select.tsx`**: Reusable styled dropdown with an `accent` variant (brand orange)
+- **`src/components/Select.tsx`**: Reusable styled dropdown with an `accent` variant (brand orange). One value: periods, modes, two-value filters
+- **`src/components/MultiSelect.tsx`** + **`useUrlList`** (`src/hooks/useUrlState.ts`): the same dropdown taking several values, for category filters. See **Filters take several values**
+- **`src/hooks/useRepFilter.ts`**: the rep filter (Interne + the team by name). Returns `rep` / `reps` / `targetReps` for the RPCs and `matches()` for pages that filter in memory
+- **`src/lib/sections.ts`**: the five section flags, and `homePathFor()`
 - **`src/hooks/useSort.ts`**: Generic column sort hook used in data tables
 
 ### Styling

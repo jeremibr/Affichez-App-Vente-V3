@@ -683,7 +683,15 @@ export type AccountContactRow = {
 /** Same string as `ad_spend_daily.platform`. */
 export type AdChannel = 'google' | 'meta';
 
-/** get_ad_performance - one row per channel, always both. */
+/**
+ * get_ad_performance - one row per channel the view counts: both in the paid and
+ * organic views, Google alone in the "inconnu" view, and only the channels of
+ * the selected sources when a source filter is set.
+ *
+ * `cost_per_account`, `cost_per_client`, `roas` and `net` are also null when the
+ * accounts are narrowed by rep, service, domain or region: spend cannot be
+ * narrowed the same way, so there is nothing honest to divide.
+ */
 export type AdPerformanceRow = {
     channel: AdChannel;
     /** origine_du_client values counted as this channel. */
@@ -708,6 +716,22 @@ export type AdPerformanceRow = {
     window_ends_on: string | null;
     /** Creation date of the first account ever tagged with this channel's origin. */
     source_first_used: string | null;
+    /** The view only counts accounts created on or after this date. Null: no lower bound. */
+    cohort_from: string | null;
+    /** The view only counts accounts created before this date. Null: no upper bound. */
+    cohort_before: string | null;
+};
+
+/**
+ * get_ad_filter_options - the values the Publicité filters offer, drawn from the
+ * accounts the current view counts in the selected year.
+ */
+export type AdFilterOptions = {
+    sources: string[];
+    services: string[];
+    reps: string[];
+    domaines: string[];
+    regions: string[];
 };
 
 /** get_ad_monthly - one row per channel per month, all 12 months present. */

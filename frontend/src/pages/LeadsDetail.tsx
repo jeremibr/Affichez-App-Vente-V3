@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
+import { MultiSelect } from '../components/MultiSelect';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, ExternalLink, Search, RefreshCw, ChevronLeft, ChevronRight, FileText, X } from 'lucide-react';
@@ -69,9 +70,10 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
     const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
-    const [selectedRep, _setSelectedRep] = useUrlState('rep', 'Tous');
-    const [selectedSource, _setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, _setSelectedService] = useUrlState('service', 'Tous');
+    // Several values each; an empty list is "no filter".
+    const [selectedReps, _setSelectedReps] = useUrlList('rep');
+    const [selectedSources, _setSelectedSources] = useUrlList('source');
+    const [selectedServices, _setSelectedServices] = useUrlList('service');
     const [selectedStage, _setSelectedStage] = useUrlState('stage', 'Tous');
     // Composes with the Type filter above rather than replacing it: "leads with
     // invoices", "contacts with invoices" and "both" are Type x Factures, so the
@@ -95,9 +97,9 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         _setYearParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
     const setSelectedMonth = (v: number | 'Toutes') =>
         _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v), toPage1);
-    const setSelectedRep = (v: string) => _setSelectedRep(v, toPage1);
-    const setSelectedSource = (v: string) => _setSelectedSource(v, toPage1);
-    const setSelectedService = (v: string) => _setSelectedService(v, toPage1);
+    const setSelectedReps = (v: string[]) => _setSelectedReps(v, toPage1);
+    const setSelectedSources = (v: string[]) => _setSelectedSources(v, toPage1);
+    const setSelectedServices = (v: string[]) => _setSelectedServices(v, toPage1);
     const setSelectedStage = (v: string) => _setSelectedStage(v, toPage1);
     const setSelectedInvoiced = (v: string) => _setSelectedInvoiced(v, toPage1);
 
@@ -181,15 +183,16 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         }
 
         if (effectiveRepName) query = query.eq('rep_name', effectiveRepName);
-        else if (selectedRep !== 'Tous') query = query.eq('rep_name', selectedRep);
+        else if (selectedReps.length > 0) query = query.in('rep_name', selectedReps);
 
         // source_resolved / service_resolved, not the raw Zoho columns: those are
         // empty for most contacts, so filtering on them would return nothing for
         // exactly the rows the dropdown was populated from.
-        if (selectedSource !== 'Toutes') query = query.eq('source_resolved', selectedSource);
-        if (selectedService !== 'Tous') {
-            // overlaps, not contains: match any of the label's spellings.
-            query = query.overlaps('service_resolved', serviceVariants[selectedService] ?? [selectedService]);
+        if (selectedSources.length > 0) query = query.in('source_resolved', selectedSources);
+        if (selectedServices.length > 0) {
+            // overlaps, not contains: match any spelling of any selected label.
+            query = query.overlaps('service_resolved',
+                selectedServices.flatMap(s => serviceVariants[s] ?? [s]));
         }
         if (selectedStage !== 'Tous') query = query.eq('stage', selectedStage);
         // Server-side, on the view's computed flag: the page is cut by
@@ -219,7 +222,7 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         // column, so it renders on the first result rather than waiting on a
         // second round trip.
         fetchInvoiceTotals(pageRows);
-    }, [yearBounds, selectedRep, selectedSource, selectedService, selectedStage,
+    }, [yearBounds, selectedReps, selectedSources, selectedServices, selectedStage,
         selectedInvoiced, effectiveRepName, page, debouncedSearch, fetchInvoiceTotals,
         serviceVariants]);
 
@@ -314,15 +317,15 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
         [],
     );
     const repOptions = useMemo(
-        () => [{ value: 'Tous', label: 'Tous les reps' }, ...allReps.map(r => ({ value: r, label: r }))],
+        () => allReps.map(r => ({ value: r, label: r })),
         [allReps],
     );
     const sourceOptions = useMemo(
-        () => [{ value: 'Toutes', label: 'Toutes les sources' }, ...allSources.map(s => ({ value: s, label: s }))],
+        () => allSources.map(s => ({ value: s, label: s })),
         [allSources],
     );
     const serviceOptions = useMemo(
-        () => [{ value: 'Tous', label: 'Tous les services' }, ...allServices.map(s => ({ value: s, label: s }))],
+        () => allServices.map(s => ({ value: s, label: s })),
         [allServices],
     );
     const stageOptions = [
@@ -429,14 +432,17 @@ export default function LeadsDetail({ propRepName }: { propRepName?: string }) {
                 </FilterGroup>
                 {!effectiveRepName && (
                     <FilterGroup label="Propriétaire">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} />
+                        <MultiSelect values={selectedReps} onChange={setSelectedReps} options={repOptions}
+                                     allLabel="Tous les reps" className="w-48" />
                     </FilterGroup>
                 )}
                 <FilterGroup label="Source">
-                    <Select value={selectedSource} onChange={setSelectedSource} options={sourceOptions} />
+                    <MultiSelect values={selectedSources} onChange={setSelectedSources} options={sourceOptions}
+                                 allLabel="Toutes les sources" className="w-52" />
                 </FilterGroup>
                 <FilterGroup label="Service">
-                    <Select value={selectedService} onChange={setSelectedService} options={serviceOptions} />
+                    <MultiSelect values={selectedServices} onChange={setSelectedServices} options={serviceOptions}
+                                 allLabel="Tous les services" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Type">
                     <Select value={selectedStage} onChange={setSelectedStage} options={stageOptions} />

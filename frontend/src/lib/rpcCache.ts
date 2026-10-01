@@ -54,6 +54,7 @@ const LONG_TTL = 10 * 60_000;
 const TTL_BY_FN: Record<string, number> = {
     get_zoho_account_filter_options: LONG_TTL,
     get_zoho_lead_filter_options: LONG_TTL,
+    get_ad_filter_options: LONG_TTL,
     get_tasks_available_weeks: LONG_TTL,
     get_available_weeks: LONG_TTL,
     get_inv_available_weeks: LONG_TTL,

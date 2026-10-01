@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState } from '../hooks/useUrlState';
+import { useUrlState, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, Building2, Percent, DollarSign, Timer } from 'lucide-react';
@@ -11,10 +11,11 @@ import { MonthlyEvolution } from '../components/accounts/MonthlyEvolution';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { InfoHint } from '../components/InfoHint';
 import { ExportButton } from '../components/ExportButton';
 import { ClearFiltersButton } from '../components/ClearFiltersButton';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import type { CsvColumn } from '../lib/csv';
 import { RepAvatar } from '../components/RepAvatar';
@@ -66,11 +67,12 @@ export default function AccountsDashboard() {
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
 
-    const [selectedRep, setSelectedRep] = useUrlState('rep', REP_DEFAULT);
-    const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
-    const [selectedDomaine, setSelectedDomaine] = useUrlState('domaine', 'Tous');
-    const [selectedRegion, setSelectedRegion] = useUrlState('region', 'Toutes');
+    // Each of these takes several values; an empty list is "no filter".
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
+    const [selectedSources, setSelectedSources] = useUrlList('source');
+    const [selectedServices, setSelectedServices] = useUrlList('service');
+    const [selectedDomaines, setSelectedDomaines] = useUrlList('domaine');
+    const [selectedRegions, setSelectedRegions] = useUrlList('region');
     const [windowParam, setWindowParam] = useUrlState('fenetre', '12');
     // 'Tous' means show the internal and supplier accounts too.
     const [ratingScope, setRatingScope] = useUrlState('statut', 'Clients');
@@ -85,8 +87,8 @@ export default function AccountsDashboard() {
     const [monthlyPrev, setMonthlyPrev] = useState<ZohoAccountMonthlyRow[]>([]);
     const [options, setOptions] = useState<ZohoAccountFilterOptions | null>(null);
 
-    // Équipe entière / Interne / one rep. See hooks/useRepFilter.
-    const repFilter = useRepFilter(selectedRep, options?.reps ?? []);
+    // Interne and/or reps by name. See hooks/useRepFilter.
+    const repFilter = useRepFilter(selectedReps, options?.reps ?? []);
 
     const yearParamValue = year === 'Toutes' ? null : year;
     // null is the RPC's "no cap", not a missing argument.
@@ -113,11 +115,11 @@ export default function AccountsDashboard() {
     const activeFilterCount = [
         yearParam !== '2026',
         selectedMonth !== 'Toutes',
-        selectedRep !== REP_DEFAULT,
-        selectedSource !== 'Toutes',
-        selectedService !== 'Tous',
-        selectedDomaine !== 'Tous',
-        selectedRegion !== 'Toutes',
+        !repFilter.isAll,
+        selectedSources.length > 0,
+        selectedServices.length > 0,
+        selectedDomaines.length > 0,
+        selectedRegions.length > 0,
         windowParam !== '12',
         ratingScope !== 'Clients',
     ].filter(Boolean).length;
@@ -129,13 +131,13 @@ export default function AccountsDashboard() {
             p_month: selectedMonth === 'Toutes' ? null : selectedMonth,
             p_window_months: windowMonths,
             p_exclude_ratings: excludeRatings,
-            p_domaine: selectedDomaine === 'Tous' ? null : selectedDomaine,
-            p_region: selectedRegion === 'Toutes' ? null : selectedRegion,
+            p_regions: selectedRegions.length > 0 ? selectedRegions : null,
         };
         const rep = repFilter.rep;
         const reps = repFilter.reps;
-        const source = selectedSource === 'Toutes' ? null : selectedSource;
-        const service = selectedService === 'Tous' ? null : selectedService;
+        const sources = selectedSources.length > 0 ? selectedSources : null;
+        const services = selectedServices.length > 0 ? selectedServices : null;
+        const domaines = selectedDomaines.length > 0 ? selectedDomaines : null;
 
         // Each breakdown drops its own dimension from the filter set, so choosing
         // "Meta Ads" does not reduce the source chart to a single bar.
@@ -145,8 +147,8 @@ export default function AccountsDashboard() {
         // against the same month last year rather than only against its
         // neighbours.
         const monthlyArgs = {
-            p_rep: rep, p_reps: reps, p_source: source, p_service: service,
-            p_domaine: shared.p_domaine, p_region: shared.p_region,
+            p_rep: rep, p_reps: reps, p_sources: sources, p_services: services,
+            p_domaines: domaines, p_regions: shared.p_regions,
             p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
         };
 
@@ -159,19 +161,14 @@ export default function AccountsDashboard() {
             { data: monData },
             { data: monPrevData },
         ] = await Promise.all([
-            cachedRpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_source: source, p_service: service }),
+            cachedRpc('get_zoho_account_kpis',       { ...shared, p_rep: rep, p_reps: reps, p_sources: sources, p_services: services, p_domaines: domaines }),
             // by_rep keeps p_reps (so a group narrows the list to its members)
             // but never p_rep - picking one rep must not reduce their own
             // breakdown to a single bar with nothing to compare it against.
-            cachedRpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_source: source, p_service: service }),
-            cachedRpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps,       p_service: service }),
-            cachedRpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_reps: reps, p_source: source }),
-            cachedRpc('get_zoho_accounts_by_domaine',{
-                p_year: shared.p_year, p_month: shared.p_month,
-                p_window_months: shared.p_window_months, p_exclude_ratings: shared.p_exclude_ratings,
-                p_region: shared.p_region,
-                p_rep: rep, p_reps: reps, p_source: source, p_service: service,
-            }),
+            cachedRpc('get_zoho_accounts_by_rep',    { ...shared, p_reps: reps, p_sources: sources, p_services: services, p_domaines: domaines }),
+            cachedRpc('get_zoho_accounts_by_source', { ...shared, p_rep: rep, p_reps: reps, p_services: services, p_domaines: domaines }),
+            cachedRpc('get_zoho_accounts_by_service',{ ...shared, p_rep: rep, p_reps: reps, p_sources: sources, p_domaines: domaines }),
+            cachedRpc('get_zoho_accounts_by_domaine',{ ...shared, p_rep: rep, p_reps: reps, p_sources: sources, p_services: services }),
             cachedRpc('get_zoho_accounts_monthly_summary', { ...monthlyArgs, p_year: yearParamValue }),
             cachedRpc('get_zoho_accounts_monthly_summary', {
                 ...monthlyArgs,
@@ -187,8 +184,8 @@ export default function AccountsDashboard() {
         setMonthly((monData as ZohoAccountMonthlyRow[]) ?? []);
         setMonthlyPrev((monPrevData as ZohoAccountMonthlyRow[]) ?? []);
         setLoading(false);
-    }, [yearParamValue, selectedMonth, repFilter, selectedSource, selectedService,
-        selectedDomaine, selectedRegion, windowMonths, excludeRatings]);
+    }, [yearParamValue, selectedMonth, repFilter, selectedSources, selectedServices,
+        selectedDomaines, selectedRegions, windowMonths, excludeRatings]);
 
     const fetchOptions = useCallback(async () => {
         const { data } = await cachedRpc<ZohoAccountFilterOptions>('get_zoho_account_filter_options', {
@@ -257,10 +254,7 @@ export default function AccountsDashboard() {
         () => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))],
         [],
     );
-    const optionList = (all: string, values: string[] | undefined, allLabel: string) => [
-        { value: all, label: allLabel },
-        ...(values ?? []).map(v => ({ value: v, label: v })),
-    ];
+    const optionList = (values: string[] | undefined) => (values ?? []).map(v => ({ value: v, label: v }));
 
     const windowLabel = windowParam === 'Toute'
         ? 'tout l’historique'
@@ -294,19 +288,20 @@ export default function AccountsDashboard() {
                     <Select value={windowParam} onChange={setWindowParam} options={WINDOW_OPTIONS} variant="accent" className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={repFilter.options} className="w-48" />
+                    <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repFilter.options}
+                                 allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Source">
-                    <Select value={selectedSource} onChange={setSelectedSource} options={optionList('Toutes', options?.sources, 'Toutes les sources')} className="w-52" />
+                    <MultiSelect values={selectedSources} onChange={setSelectedSources} options={optionList(options?.sources)} allLabel="Toutes les sources" className="w-52" />
                 </FilterGroup>
                 <FilterGroup label="Service">
-                    <Select value={selectedService} onChange={setSelectedService} options={optionList('Tous', options?.services, 'Tous les services')} className="w-48" />
+                    <MultiSelect values={selectedServices} onChange={setSelectedServices} options={optionList(options?.services)} allLabel="Tous les services" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Domaine">
-                    <Select value={selectedDomaine} onChange={setSelectedDomaine} options={optionList('Tous', options?.domaines, 'Tous les domaines')} className="w-48" />
+                    <MultiSelect values={selectedDomaines} onChange={setSelectedDomaines} options={optionList(options?.domaines)} allLabel="Tous les domaines" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Région">
-                    <Select value={selectedRegion} onChange={setSelectedRegion} options={optionList('Toutes', options?.regions, 'Toutes les régions')} className="w-44" />
+                    <MultiSelect values={selectedRegions} onChange={setSelectedRegions} options={optionList(options?.regions)} allLabel="Toutes les régions" className="w-44" />
                 </FilterGroup>
                 <FilterGroup label="Statut">
                     <Select

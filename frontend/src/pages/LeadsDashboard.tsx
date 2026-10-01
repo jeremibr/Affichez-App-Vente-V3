@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState } from '../hooks/useUrlState';
+import { useUrlState, useUrlList } from '../hooks/useUrlState';
+import { MultiSelect } from '../components/MultiSelect';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Percent, DollarSign } from 'lucide-react';
@@ -28,9 +29,10 @@ export default function LeadsDashboard() {
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
     const setYear = (v: number | 'Toutes') => _setYearParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedRep, setSelectedRep] = useUrlState('rep', 'Tous');
-    const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
+    // Several values each; an empty list is "no filter".
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
+    const [selectedSources, setSelectedSources] = useUrlList('source');
+    const [selectedServices, setSelectedServices] = useUrlList('service');
 
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState<ZohoLeadKPIs | null>(null);
@@ -48,9 +50,9 @@ export default function LeadsDashboard() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
-        const repParam = selectedRep === 'Tous' ? null : selectedRep;
-        const sourceParam = selectedSource === 'Toutes' ? null : selectedSource;
-        const serviceParam = selectedService === 'Tous' ? null : selectedService;
+        const repsParam = selectedReps.length > 0 ? selectedReps : null;
+        const sourcesParam = selectedSources.length > 0 ? selectedSources : null;
+        const servicesParam = selectedServices.length > 0 ? selectedServices : null;
 
         const [
             { data: kpiData },
@@ -59,20 +61,20 @@ export default function LeadsDashboard() {
             { data: svcData },
         ] = await Promise.all([
             cachedRpc('get_zoho_lead_kpis', {
-                p_year: yearParamValue, p_month: monthParam, p_rep: repParam,
-                p_source: sourceParam, p_service: serviceParam,
+                p_year: yearParamValue, p_month: monthParam, p_reps: repsParam,
+                p_sources: sourcesParam, p_services: servicesParam,
             }),
             cachedRpc('get_zoho_leads_by_rep', {
                 p_year: yearParamValue, p_month: monthParam,
-                p_source: sourceParam, p_service: serviceParam,
+                p_sources: sourcesParam, p_services: servicesParam,
             }),
             cachedRpc('get_zoho_leads_by_source', {
                 p_year: yearParamValue, p_month: monthParam,
-                p_rep: repParam, p_service: serviceParam,
+                p_reps: repsParam, p_services: servicesParam,
             }),
             cachedRpc('get_zoho_leads_by_service', {
                 p_year: yearParamValue, p_month: monthParam,
-                p_rep: repParam, p_source: sourceParam,
+                p_reps: repsParam, p_sources: sourcesParam,
             }),
         ]);
 
@@ -81,7 +83,7 @@ export default function LeadsDashboard() {
         setBySource((srcData as ZohoLeadBreakdownRow[]) ?? []);
         setByService((svcData as ZohoLeadBreakdownRow[]) ?? []);
         setLoading(false);
-    }, [yearParamValue, selectedMonth, selectedRep, selectedSource, selectedService]);
+    }, [yearParamValue, selectedMonth, selectedReps, selectedSources, selectedServices]);
 
     const fetchOptions = useCallback(async () => {
         const { data } = await cachedRpc<ZohoLeadFilterOptions>(
@@ -128,15 +130,15 @@ export default function LeadsDashboard() {
         [],
     );
     const repOptions = useMemo(
-        () => [{ value: 'Tous', label: 'Tous les reps' }, ...(options?.reps ?? []).map(r => ({ value: r, label: r }))],
+        () => (options?.reps ?? []).map(r => ({ value: r, label: r })),
         [options],
     );
     const sourceOptions = useMemo(
-        () => [{ value: 'Toutes', label: 'Toutes les sources' }, ...(options?.sources ?? []).map(s => ({ value: s, label: s }))],
+        () => (options?.sources ?? []).map(s => ({ value: s, label: s })),
         [options],
     );
     const serviceOptions = useMemo(
-        () => [{ value: 'Tous', label: 'Tous les services' }, ...(options?.services ?? []).map(s => ({ value: s, label: s }))],
+        () => (options?.services ?? []).map(s => ({ value: s, label: s })),
         [options],
     );
 
@@ -165,13 +167,16 @@ export default function LeadsDashboard() {
                     />
                 </FilterGroup>
                 <FilterGroup label="Représentant">
-                    <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-44" />
+                    <MultiSelect values={selectedReps} onChange={setSelectedReps} options={repOptions}
+                                 allLabel="Tous les reps" className="w-48" />
                 </FilterGroup>
                 <FilterGroup label="Source">
-                    <Select value={selectedSource} onChange={setSelectedSource} options={sourceOptions} className="w-52" />
+                    <MultiSelect values={selectedSources} onChange={setSelectedSources} options={sourceOptions}
+                                 allLabel="Toutes les sources" className="w-52" />
                 </FilterGroup>
                 <FilterGroup label="Service">
-                    <Select value={selectedService} onChange={setSelectedService} options={serviceOptions} className="w-48" />
+                    <MultiSelect values={selectedServices} onChange={setSelectedServices} options={serviceOptions}
+                                 allLabel="Tous les services" className="w-48" />
                 </FilterGroup>
             </FilterBar>
 

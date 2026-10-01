@@ -1,5 +1,6 @@
 // supabase/functions/zoho-auth/index.ts
-// Handles Zoho OAuth callback: exchanges code → gets email → checks allowlist → creates Supabase session
+// Handles Zoho OAuth callback: exchanges code → gets email → checks allowed_users → creates Supabase session.
+// Only addresses listed in allowed_users get a session.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -67,16 +68,14 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${redirectBase}?auth_error=token_failed`, 302);
     }
 
-    // ─── 2. Extract email + name from OIDC id_token (JWT) ───────────────────
+    // ─── 2. Extract email from OIDC id_token (JWT) ──────────────────────────
     // Zoho returns an id_token JWT when openid scope is requested.
     // The /oauth/user/info endpoint requires AaaServer.profile.READ scope — skip it.
     let email = '';
-    let displayName = '';
     try {
       const idToken = tokenData.id_token as string;
       const payload = JSON.parse(atob(idToken.split('.')[1]));
       email = (payload.email ?? payload.Email ?? '').toLowerCase().trim();
-      displayName = payload.name ?? payload.given_name ?? '';
       console.log('Zoho id_token claims:', JSON.stringify(payload));
     } catch (e) {
       console.error('Failed to decode id_token:', e);
@@ -87,49 +86,33 @@ Deno.serve(async (req: Request) => {
       return Response.redirect(`${redirectBase}?auth_error=no_email`, 302);
     }
 
-    // Derive a display name from email if Zoho didn't provide one
-    if (!displayName) {
-      const localPart = email.split('@')[0];
-      displayName = localPart.charAt(0).toUpperCase() + localPart.slice(1);
-    }
-
-    // ─── 3. Access control + auto-registration ───────────────────────────────
+    // ─── 3. Access control ───────────────────────────────────────────────────
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-    // Check allowed_users for role/permissions metadata.
-    // If not listed: @affichez.ca domain is always allowed with default member permissions.
-    // Any other domain with no allowed_users entry is rejected.
-    const { data: allowed } = await admin
+    // allowed_users is the whole list: an address that is not on it gets no
+    // session, whatever its domain. Rows are added from Paramètres →
+    // Utilisateurs, which stores the address in lower case, as `email` is here.
+    const { data: allowed, error: allowedError } = await admin
       .from('allowed_users')
       .select('email, role, can_access_factures, rep_name')
       .eq('email', email)
       .maybeSingle();
 
-    let userRow: { role: string; can_access_factures: boolean; rep_name: string | null } | null = allowed as typeof userRow ?? null;
+    if (allowedError) {
+      console.error('allowed_users lookup failed:', allowedError.message);
+      return Response.redirect(`${redirectBase}?auth_error=server_error`, 302);
+    }
 
+    const userRow = allowed as { role: string; can_access_factures: boolean; rep_name: string | null } | null;
     if (!userRow) {
-      const domain = email.split('@')[1] ?? '';
-      if (domain !== 'affichez.ca') {
-        return Response.redirect(`${redirectBase}?auth_error=not_authorized`, 302);
-      }
-      // @affichez.ca not in allowed_users → auto-register with default member permissions
-      // so the admin can see and manage them in the Utilisateurs panel
-      const { data: inserted } = await admin
-        .from('allowed_users')
-        .upsert(
-          { email, name: displayName, role: 'member', can_access_factures: false, rep_name: null },
-          { onConflict: 'email', ignoreDuplicates: true }
-        )
-        .select('email, role, can_access_factures, rep_name')
-        .maybeSingle();
-      if (inserted) userRow = inserted as typeof userRow;
+      return Response.redirect(`${redirectBase}?auth_error=not_authorized`, 302);
     }
 
     // ─── 4. Generate Supabase magic link (creates user account if needed) ────
     const userMeta = {
-      role:                userRow?.role ?? 'member',
-      can_access_factures: userRow?.can_access_factures ?? false,
-      rep_name:            userRow?.rep_name ?? null,
+      role:                userRow.role ?? 'member',
+      can_access_factures: userRow.can_access_factures ?? false,
+      rep_name:            userRow.rep_name ?? null,
     };
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({

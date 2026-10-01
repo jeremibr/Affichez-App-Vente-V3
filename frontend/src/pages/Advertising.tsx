@@ -1,28 +1,33 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useUrlState } from '../hooks/useUrlState';
+import { useUrlState, useUrlList } from '../hooks/useUrlState';
 import { cachedRpc } from '../lib/rpcCache';
 import {
-    Loader2, AlertTriangle, TriangleAlert, Settings2,
+    Loader2, AlertTriangle, TriangleAlert, Settings2, Info,
 } from 'lucide-react';
 import type {
-    AdPerformanceRow, AdMonthlyRow, AdCampaignRow, AdSpendStatusRow, AdChannel,
+    AdPerformanceRow, AdMonthlyRow, AdCampaignRow, AdSpendStatusRow, AdChannel, AdFilterOptions,
 } from '../types/database';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
 import { InfoHint } from '../components/InfoHint';
 import { ClearFiltersButton } from '../components/ClearFiltersButton';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { ChannelCard } from '../components/advertising/ChannelCard';
 import { SpendVsRevenueChart } from '../components/advertising/SpendVsRevenueChart';
 import { CampaignTable } from '../components/advertising/CampaignTable';
-import { CHANNEL_LABEL, channelLabel, isCohortOpen } from '../components/advertising/channel';
+import {
+    CHANNEL_LABEL, AD_VIEWS, AD_VIEW_PARAM, DEFAULT_AD_VIEW,
+    channelLabel, isCohortOpen, parseAdView, viewHasSpend, formatAdDay,
+} from '../components/advertising/channel';
 import type { AdView } from '../components/advertising/channel';
 import { ChannelLogo, ChannelLogoTile } from '../components/advertising/ChannelLogo';
 import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
 
 /**
- * Publicité: Google and Meta, in two views.
+ * Publicité: Google and Meta, in three views.
  *
  *   payant    — ad spend compared with the revenue of the accounts tagged
  *               Google Ads / Meta Ads (the channel cards, the comparison, the
@@ -30,16 +35,24 @@ import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
  *   organique — the accounts that came through the same platforms without an
  *               ad ("Google Organique", "Meta Organique"): accounts and
  *               revenue only, no spend, no return, no campaigns.
+ *   inconnu   — Google only: the "Google Organique" accounts created before
+ *               that source was reserved for organic arrivals. They mix paid
+ *               and organic, so they are shown apart and counted in neither.
  *
  * Attribution is by channel and by month of account creation. Revenue for a
  * period keeps accruing until its attribution window closes, so figures from an
  * open window are marked as provisional (see isCohortOpen).
  *
- * Organic is the default view while the Google Ads cohort is young; DEFAULT_VIEW
- * is the one line to flip when the paid figures carry enough months.
+ * The account filters (rep, source, service, domain, region) narrow the
+ * accounts and their revenue. Spend is reported per campaign and cannot be
+ * narrowed by rep, service, domain or region, so with one of those set the RPCs
+ * return no cost and no return, and the page says so. A source filter selects
+ * whole channels and keeps every ratio.
+ *
+ * Organic is the default view while the Google Ads cohort is young;
+ * DEFAULT_AD_VIEW is the one line to flip when the paid figures carry enough
+ * months.
  */
-
-const DEFAULT_VIEW: AdView = 'organique';
 
 const DEFAULT_EXCLUDED_RATINGS = ['Compte interne : Ne pas reprendre', 'Fournisseur'];
 
@@ -53,21 +66,26 @@ const WINDOW_OPTIONS = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+/** What the filters offer when their list could not be read: nothing, but loaded. */
+const NO_OPTIONS: AdFilterOptions = { sources: [], services: [], reps: [], domaines: [], regions: [] };
+
 const YEAR_OPTIONS = [
     { value: 'Toutes', label: 'Toutes les années' },
     ...Array.from({ length: CURRENT_YEAR - 2020 }, (_, i) => CURRENT_YEAR - i)
         .map(y => ({ value: String(y), label: String(y) })),
 ];
 
-const VIEWS: { value: AdView; label: string }[] = [
-    { value: 'organique', label: 'Organique' },
-    { value: 'payant',    label: 'Payant' },
-];
+const SUBTITLE: Record<AdView, string> = {
+    organique: 'Les comptes venus de Google ou de Facebook sans publicité, et ce qu’ils ont facturé',
+    payant: 'Ce que la publicité coûte, et ce que les comptes qu’elle a ramenés ont facturé',
+    inconnu: 'Les comptes Google d’avant la séparation entre organique et payant, et ce qu’ils ont facturé',
+};
 
 export default function Advertising() {
-    const [viewParam, setViewParam] = useUrlState('vue', DEFAULT_VIEW);
-    const view: AdView = viewParam === 'payant' ? 'payant' : 'organique';
-    const organic = view === 'organique';
+    const [viewParam, setViewParam] = useUrlState('vue', DEFAULT_AD_VIEW);
+    const view = parseAdView(viewParam);
+    const hasSpend = viewHasSpend(view);
+    const viewArg = AD_VIEW_PARAM[view];
 
     const [yearParam, setYearParam] = useUrlState('year', String(CURRENT_YEAR));
     const year: number | 'Toutes' = yearParam === 'Toutes' ? 'Toutes' : Number(yearParam);
@@ -78,8 +96,16 @@ export default function Advertising() {
     const [windowParam, setWindowParam] = useUrlState('fenetre', '12');
     const [ratingScope, setRatingScope] = useUrlState('statut', 'Clients');
     const [campaignPlatform, setCampaignPlatform] = useUrlState('plateforme', 'Toutes');
-    const [campaignStatus, setCampaignStatus] = useUrlState('campagnes', 'Tous');
+    const [campaignStatuses, setCampaignStatuses] = useUrlList('campagnes');
 
+    // Account filters. Each takes several values; an empty list is "no filter".
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
+    const [selectedSources, setSelectedSources] = useUrlList('source');
+    const [selectedServices, setSelectedServices] = useUrlList('service');
+    const [selectedDomaines, setSelectedDomaines] = useUrlList('domaine');
+    const [selectedRegions, setSelectedRegions] = useUrlList('region');
+
+    const [options, setOptions] = useState<AdFilterOptions | null>(null);
     const [loading, setLoading] = useState(true);
     const [perf, setPerf] = useState<AdPerformanceRow[]>([]);
     const [monthly, setMonthly] = useState<AdMonthlyRow[]>([]);
@@ -92,26 +118,72 @@ export default function Advertising() {
     const windowMonths = windowParam === 'Toute' ? null : Number(windowParam);
     const excludeRatings = ratingScope === 'Tous' ? null : DEFAULT_EXCLUDED_RATINGS;
 
+    // Interne and/or reps by name. See hooks/useRepFilter.
+    const repFilter = useRepFilter(selectedReps, options?.reps ?? []);
+    // These RPCs take a list only: one rep is a list of one.
+    const repsParam = useMemo(
+        () => (repFilter.rep ? [repFilter.rep] : repFilter.reps),
+        [repFilter.rep, repFilter.reps],
+    );
+    // A source belongs to one view. One carried over in the URL from another
+    // view would match no channel and empty the page, so only the sources this
+    // view offers are sent.
+    const sourcesParam = useMemo(() => {
+        const known = selectedSources.filter(s => options?.sources.includes(s));
+        return known.length > 0 ? known : null;
+    }, [selectedSources, options]);
+    const servicesParam = selectedServices.length > 0 ? selectedServices : null;
+    const domainesParam = selectedDomaines.length > 0 ? selectedDomaines : null;
+    const regionsParam = selectedRegions.length > 0 ? selectedRegions : null;
+
+    /** The accounts are a subset the spend cannot be matched to. */
+    const narrowed = repsParam !== null || servicesParam !== null
+        || domainesParam !== null || regionsParam !== null;
+
     // The view is a mode, not a filter: it is neither counted nor cleared.
     const activeFilterCount = [
         yearParam !== String(CURRENT_YEAR),
         monthParam !== 'Toutes',
         windowParam !== '12',
         ratingScope !== 'Clients',
+        !repFilter.isAll,
+        selectedSources.length > 0,
+        selectedServices.length > 0,
+        selectedDomaines.length > 0,
+        selectedRegions.length > 0,
         campaignPlatform !== 'Toutes',
-        campaignStatus !== 'Tous',
+        campaignStatuses.length > 0,
     ].filter(Boolean).length;
 
     const clearFilters = () => {
         setYearParam(String(CURRENT_YEAR), {
             month: null, fenetre: null, statut: null, plateforme: null, campagnes: null,
+            rep: null, source: null, service: null, domaine: null, region: null,
         });
     };
 
+    const fetchOptions = useCallback(async () => {
+        const { data } = await cachedRpc<AdFilterOptions>('get_ad_filter_options', {
+            p_year: yearValue, p_exclude_ratings: excludeRatings, p_view: viewArg,
+        }, { single: true });
+        // `null` means "still loading" and nothing else: fetchData waits on it.
+        setOptions(data ?? NO_OPTIONS);
+    }, [yearValue, excludeRatings, viewArg]);
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    useEffect(() => { fetchOptions(); }, [fetchOptions]);
+
+    // A source filter in the URL can only be checked against the view's own
+    // sources, so the first read waits for them rather than running unfiltered.
+    const waitingForOptions = selectedSources.length > 0 && options === null;
+
     const fetchData = useCallback(async () => {
+        if (waitingForOptions) return;
         setLoading(true);
         const shared = {
-            p_window_months: windowMonths, p_exclude_ratings: excludeRatings, p_organic: organic,
+            p_window_months: windowMonths, p_exclude_ratings: excludeRatings, p_view: viewArg,
+            p_reps: repsParam, p_sources: sourcesParam, p_services: servicesParam,
+            p_domaines: domainesParam, p_regions: regionsParam,
         };
 
         const [
@@ -127,12 +199,12 @@ export default function Advertising() {
                 ? Promise.resolve({ data: [] })
                 : cachedRpc('get_ad_monthly', { ...shared, p_year: yearValue }),
             // Spend-side data is only shown in the paid view.
-            organic
-                ? Promise.resolve({ data: [] })
-                : cachedRpc('get_ad_campaigns', { p_year: yearValue, p_month: monthValue, p_platform: null }),
-            organic
-                ? Promise.resolve({ data: [] })
-                : cachedRpc('get_ad_spend_status'),
+            hasSpend
+                ? cachedRpc('get_ad_campaigns', { p_year: yearValue, p_month: monthValue, p_platform: null })
+                : Promise.resolve({ data: [] }),
+            hasSpend
+                ? cachedRpc('get_ad_spend_status')
+                : Promise.resolve({ data: [] }),
         ]);
 
         setPerf((perfData as AdPerformanceRow[]) ?? []);
@@ -140,7 +212,8 @@ export default function Advertising() {
         setCampaigns((campaignData as AdCampaignRow[]) ?? []);
         setStatus((statusData as AdSpendStatusRow[]) ?? []);
         setLoading(false);
-    }, [yearValue, monthValue, windowMonths, excludeRatings, organic]);
+    }, [yearValue, monthValue, windowMonths, excludeRatings, viewArg, hasSpend, waitingForOptions,
+        repsParam, sourcesParam, servicesParam, domainesParam, regionsParam]);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -150,6 +223,12 @@ export default function Advertising() {
                ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))],
         [],
     );
+
+    const optionList = (values: string[] | undefined) => (values ?? []).map(v => ({ value: v, label: v }));
+
+    /** The date that separates "Google inconnu" from "Google Organique", from the data. */
+    const splitDate = perf.find(p => p.cohort_from || p.cohort_before);
+    const splitDay = formatAdDay(splitDate?.cohort_from ?? splitDate?.cohort_before ?? null);
 
     const windowLabel = windowParam === 'Toute'
         ? 'tout l’historique'
@@ -180,22 +259,20 @@ export default function Advertising() {
                         <h1 className="text-xl md:text-2xl font-semibold text-ink tracking-tight">
                             Publicité
                         </h1>
-                        <p className="text-xs md:text-sm text-ink-mute mt-0.5">
-                            {organic
-                                ? 'Les comptes venus de Google ou de Facebook sans publicité, et ce qu’ils ont facturé'
-                                : 'Ce que la publicité coûte, et ce que les comptes qu’elle a ramenés ont facturé'}
-                        </p>
+                        <p className="text-xs md:text-sm text-ink-mute mt-0.5">{SUBTITLE[view]}</p>
                     </div>
                 </div>
 
                 <div className="flex gap-1 bg-stone p-0.5 rounded-md self-start md:self-auto" role="tablist"
                      aria-label="Vue">
-                    {VIEWS.map(v => (
+                    {AD_VIEWS.map(v => (
                         <button
                             key={v.value}
                             role="tab"
                             aria-selected={view === v.value}
-                            onClick={() => setViewParam(v.value)}
+                            // The sources differ from one view to the next, so the
+                            // source selection does not follow.
+                            onClick={() => { setOptions(null); setViewParam(v.value, { source: null }); }}
                             className={cn(
                                 'px-4 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all',
                                 view === v.value ? 'bg-white text-ink shadow-card' : 'text-ink-mute hover:text-ink-secondary',
@@ -221,6 +298,26 @@ export default function Advertising() {
                     <Select value={windowParam} onChange={setWindowParam}
                             options={WINDOW_OPTIONS} variant="accent" className="w-44" />
                 </FilterGroup>
+                <FilterGroup label="Représentant">
+                    <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repFilter.options}
+                                 allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Source">
+                    <MultiSelect values={sourcesParam ?? []} onChange={setSelectedSources}
+                                 options={optionList(options?.sources)} allLabel="Toutes les sources" className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Service">
+                    <MultiSelect values={selectedServices} onChange={setSelectedServices}
+                                 options={optionList(options?.services)} allLabel="Tous les services" className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Domaine">
+                    <MultiSelect values={selectedDomaines} onChange={setSelectedDomaines}
+                                 options={optionList(options?.domaines)} allLabel="Tous les domaines" className="w-48" />
+                </FilterGroup>
+                <FilterGroup label="Région">
+                    <MultiSelect values={selectedRegions} onChange={setSelectedRegions}
+                                 options={optionList(options?.regions)} allLabel="Toutes les régions" className="w-44" />
+                </FilterGroup>
                 <FilterGroup label="Statut">
                     <Select value={ratingScope} onChange={setRatingScope} className="w-52"
                             options={[
@@ -238,36 +335,44 @@ export default function Advertising() {
                 </div>
             ) : (
                 <>
+                    {view === 'inconnu' && splitDay && <UnknownNotice day={splitDay} />}
+                    {view === 'organique' && splitDay && <OrganicSinceNotice day={splitDay} />}
+
                     {/* Spend notices only make sense where spend is shown. */}
-                    {!organic && (
+                    {hasSpend && (
                         <>
                             {noSpendData && <NoDataNotice />}
                             {foreignCurrency.length > 0 && <CurrencyNotice currencies={foreignCurrency} />}
                             {!noSpendData && partial.length > 0 && (
                                 <PartialNotice channels={partial.map(p => p.channel)} />
                             )}
+                            {!noSpendData && narrowed && <NarrowedNotice />}
                         </>
                     )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6" translate="no">
                         {perf.map(row => (
-                            <ChannelCard key={row.channel} row={row} windowLabel={windowLabel} organic={organic} />
+                            <ChannelCard key={row.channel} row={row} windowLabel={windowLabel}
+                                         view={view} narrowed={narrowed} />
                         ))}
                     </div>
 
-                    <ComparisonTable rows={perf} windowLabel={windowLabel} openCohort={openCohort} organic={organic} />
-
-                    {year !== 'Toutes' && (
-                        <SpendVsRevenueChart rows={monthly} year={year} windowLabel={windowLabel} organic={organic} />
+                    {/* One channel has nothing to be compared with. */}
+                    {perf.length > 1 && (
+                        <ComparisonTable rows={perf} windowLabel={windowLabel} openCohort={openCohort} view={view} />
                     )}
 
-                    {!organic && (
+                    {year !== 'Toutes' && (
+                        <SpendVsRevenueChart rows={monthly} year={year} windowLabel={windowLabel} view={view} />
+                    )}
+
+                    {hasSpend && (
                         <CampaignTable
                             rows={campaigns}
                             platform={campaignPlatform}
                             onPlatformChange={setCampaignPlatform}
-                            status={campaignStatus}
-                            onStatusChange={setCampaignStatus}
+                            statuses={campaignStatuses}
+                            onStatusesChange={setCampaignStatuses}
                         />
                     )}
                 </>
@@ -277,6 +382,54 @@ export default function Advertising() {
 }
 
 // ─── Notices ──────────────────────────────────────────────────────────────────
+
+function UnknownNotice({ day }: { day: string }) {
+    return (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-tone-neutral-soft border border-hairline">
+            <Info className="w-4 h-4 text-tone-neutral-ink shrink-0 mt-0.5" />
+            <div className="text-xs text-tone-neutral-ink leading-relaxed">
+                <strong className="font-semibold">
+                    Comptes « Google Organique » créés avant le {day}.
+                </strong>{' '}
+                Jusqu&rsquo;à cette date, cette origine regroupait la recherche Google et les clics sur
+                une publicité Google, sans moyen de les distinguer. Ces comptes ne sont donc comptés
+                ni dans <strong>Organique</strong> ni dans <strong>Payant</strong>, et aucune dépense
+                ne leur est comparée.
+            </div>
+        </div>
+    );
+}
+
+function OrganicSinceNotice({ day }: { day: string }) {
+    return (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-tone-neutral-soft border border-hairline">
+            <Info className="w-4 h-4 text-tone-neutral-ink shrink-0 mt-0.5" />
+            <div className="text-xs text-tone-neutral-ink leading-relaxed">
+                <strong className="font-semibold">
+                    Google Organique compte les comptes créés depuis le {day}.
+                </strong>{' '}
+                Les comptes plus anciens portant cette origine mélangent recherche et publicité :
+                ils sont dans l&rsquo;onglet <strong>Google inconnu</strong>.
+            </div>
+        </div>
+    );
+}
+
+function NarrowedNotice() {
+    return (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-tone-neutral-soft border border-hairline">
+            <Info className="w-4 h-4 text-tone-neutral-ink shrink-0 mt-0.5" />
+            <div className="text-xs text-tone-neutral-ink leading-relaxed">
+                <strong className="font-semibold">
+                    Coût par compte et rendement non calculés avec ces filtres.
+                </strong>{' '}
+                Les comptes et leurs revenus suivent les filtres représentant, service, domaine et
+                région. La dépense, elle, est rapportée par campagne et ne peut pas être répartie
+                ainsi : la diviser par une partie seulement des comptes donnerait un coût trop élevé.
+            </div>
+        </div>
+    );
+}
 
 function NoDataNotice() {
     return (
@@ -333,12 +486,13 @@ function PartialNotice({ channels }: { channels: AdChannel[] }) {
 // ─── Side-by-side comparison ──────────────────────────────────────────────────
 
 /** Both channels side by side. */
-function ComparisonTable({ rows, windowLabel, openCohort, organic }: {
+function ComparisonTable({ rows, windowLabel, openCohort, view }: {
     rows: AdPerformanceRow[];
     windowLabel: string;
     openCohort: boolean;
-    organic: boolean;
+    view: AdView;
 }) {
+    const organic = !viewHasSpend(view);
     const best = useMemo(() => {
         if (organic) return null;
         const scored = rows.filter(r => r.roas !== null);
@@ -391,7 +545,7 @@ function ComparisonTable({ rows, windowLabel, openCohort, organic }: {
                                     <div className="flex items-center gap-3">
                                         <ChannelLogoTile channel={r.channel} size="sm" />
                                         <div className="min-w-0">
-                                            <p className="font-semibold text-ink text-xs">{channelLabel(r.channel, organic)}</p>
+                                            <p className="font-semibold text-ink text-xs">{channelLabel(r.channel, view)}</p>
                                             <p className="text-2xs text-ink-mute mt-0.5 truncate max-w-[200px]"
                                                title={r.sources.join(', ')}>
                                                 {r.sources.join(', ')}

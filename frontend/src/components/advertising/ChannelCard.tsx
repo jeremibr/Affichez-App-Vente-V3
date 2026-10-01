@@ -2,30 +2,38 @@ import { DollarSign, Building2, Receipt, MousePointerClick } from 'lucide-react'
 import type { AdPerformanceRow } from '../../types/database';
 import { formatCurrencyCAD, cn } from '../../lib/utils';
 import { InfoHint } from '../InfoHint';
-import { channelLabel, isCohortOpen, formatReturn } from './channel';
+import { channelLabel, isCohortOpen, formatReturn, formatAdDay, cohortBoundsLabel, viewHasSpend } from './channel';
+import type { AdView } from './channel';
 import { ChannelLogoTile } from './ChannelLogo';
 
 /**
  * One ad channel: return on spend as the headline, then spend, revenue and the
  * acquisition costs, with platform reach figures underneath.
  *
- * In the organic view the same card shows the accounts that came through the
- * platform without an ad: revenue as the headline, accounts and revenue per
- * account below, and no spend anywhere, because there is none to divide by.
+ * In the organic and "inconnu" views the same card shows accounts that have no
+ * ad spend to be measured against: revenue as the headline, accounts and
+ * revenue per account below, and no spend anywhere.
  *
  * While the attribution window is open the return is shown muted and labelled,
  * rather than hidden, so it is not recomputed by hand from the figures below.
+ *
+ * `narrowed` is true when the accounts are filtered by rep, service, domain or
+ * region. Spend cannot be filtered that way, so the RPC returns no cost and no
+ * return, and the card says why instead of blaming a missing import.
  */
-export function ChannelCard({ row, windowLabel, organic = false }: {
+export function ChannelCard({ row, windowLabel, view, narrowed = false }: {
     row: AdPerformanceRow;
     windowLabel: string;
-    organic?: boolean;
+    view: AdView;
+    narrowed?: boolean;
 }) {
+    const organic = !viewHasSpend(view);
     const open = isCohortOpen(row.window_ends_on);
     const hasSpend = row.spend > 0;
     const ctr = row.impressions > 0 ? (row.clicks / row.impressions) * 100 : null;
-    const label = channelLabel(row.channel, organic);
+    const label = channelLabel(row.channel, view);
     const sources = row.sources.join(', ');
+    const bounds = cohortBoundsLabel(row.cohort_from, row.cohort_before);
     const invoicedShare = row.accounts_created > 0
         ? Math.round((row.accounts_invoiced / row.accounts_created) * 100)
         : null;
@@ -37,9 +45,11 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                 <ChannelLogoTile channel={row.channel} />
                 <div className="min-w-0">
                     <h3 className="text-sm font-semibold text-ink">{label}</h3>
-                    <p className="text-2xs text-ink-mute truncate">Origine : {sources}</p>
+                    <p className="text-2xs text-ink-mute truncate" translate="no">
+                        Origine : {sources}{bounds && ` · ${bounds}`}
+                    </p>
                 </div>
-                <InfoHint text={`Comptes dont « Origine du client » est : ${sources}.`} />
+                <InfoHint text={`Comptes dont « Origine du client » est : ${sources}${bounds ? `, ${bounds}` : ''}.`} />
             </div>
 
             {organic ? (
@@ -64,7 +74,7 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                                 <p className={cn('text-2xs mt-1 font-medium italic',
                                                  open ? 'text-tone-warn-ink' : 'text-ink-mute')}>
                                     {open
-                                        ? `Cohorte en cours — fenêtre complète le ${formatDay(row.window_ends_on)}`
+                                        ? `Cohorte en cours — fenêtre complète le ${formatAdDay(row.window_ends_on)}`
                                         : `Facturé dans les ${windowLabel}`}
                                 </p>
                             </>
@@ -98,9 +108,11 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                             <>
                                 <p className="mt-1 text-2xl font-bold text-ink-mute tabular-nums">—</p>
                                 <p className="text-2xs text-ink-mute mt-1 font-medium italic">
-                                    {hasSpend
-                                        ? `Aucun compte « ${sources} » créé sur la période`
-                                        : 'Aucune dépense importée sur la période'}
+                                    {narrowed && hasSpend && row.accounts_created > 0
+                                        ? 'Non calculé : la dépense ne se répartit pas selon ces filtres'
+                                        : hasSpend
+                                            ? `Aucun compte « ${sources} » créé sur la période`
+                                            : 'Aucune dépense importée sur la période'}
                                 </p>
                             </>
                         ) : (
@@ -112,7 +124,7 @@ export function ChannelCard({ row, windowLabel, organic = false }: {
                                 <p className={cn('text-2xs mt-1 font-medium italic',
                                                  open ? 'text-tone-warn-ink' : 'text-ink-mute')}>
                                     {open
-                                        ? `Cohorte en cours — fenêtre complète le ${formatDay(row.window_ends_on)}`
+                                        ? `Cohorte en cours — fenêtre complète le ${formatAdDay(row.window_ends_on)}`
                                         : `Facturé dans les ${windowLabel}`}
                                 </p>
                             </>
@@ -197,11 +209,4 @@ function Mini({ label, value }: { label: string; value: string }) {
             {label} <strong className="font-bold text-ink-secondary tabular-nums ml-0.5">{value}</strong>
         </span>
     );
-}
-
-function formatDay(iso: string | null): string {
-    if (!iso) return '';
-    return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-CA', {
-        year: 'numeric', month: 'short', day: 'numeric',
-    });
 }

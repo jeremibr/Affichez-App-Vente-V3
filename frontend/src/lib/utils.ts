@@ -8,6 +8,11 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
+/** Accent- and case-insensitive, so "evenement" finds "Évènement". */
+export function foldForSearch(v: string): string {
+    return v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
 // ─── Canadian French Currency Formatter (CAD) ───
 // Rules: '1 287 016,80 $', space as thousands separator, comma for decimals, $ after
 // The native Intl.NumberFormat for fr-CA gets very close to this automatically.

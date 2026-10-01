@@ -4,6 +4,7 @@ import { formatCurrencyCAD, formatShortDate, cn } from '../../lib/utils';
 import { InfoHint } from '../InfoHint';
 import { ExportButton } from '../ExportButton';
 import { Select } from '../Select';
+import { MultiSelect } from '../MultiSelect';
 import type { CsvColumn } from '../../lib/csv';
 import { useSort, type SortConfig } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
@@ -25,40 +26,54 @@ const STATUS_CLASS: Record<AdCampaignStatus, string> = {
     unknown: 'bg-tone-neutral-soft text-tone-neutral-ink',
 };
 
-const CAMPAIGN_STATUS_FILTERS = ['Tous', 'active', 'paused', 'removed'] as const;
+const CAMPAIGN_STATUS_FILTERS = ['active', 'paused', 'removed'] as const;
 
 const FILTER_LABEL: Record<(typeof CAMPAIGN_STATUS_FILTERS)[number], string> = {
-    Tous: 'Tous les statuts',
     active: 'Actives',
     paused: 'En pause',
     removed: 'Supprimées',
 };
+
+/** A Google customer id the way Google Ads prints it: 437-363-4595. */
+function formatAccountId(id: string): string {
+    return /^\d{10}$/.test(id) ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
+}
 
 /**
  * Per-campaign figures as reported by the ad platforms, filterable by platform and
  * current status. There is no revenue column: CRM accounts cannot be traced back
  * to a campaign.
  */
-export function CampaignTable({ rows, platform, onPlatformChange, status, onStatusChange }: {
+export function CampaignTable({ rows, platform, onPlatformChange, statuses, onStatusesChange }: {
     rows: AdCampaignRow[];
     platform: string;
     onPlatformChange: (v: string) => void;
-    status: string;
-    onStatusChange: (v: string) => void;
+    /** Selected campaign statuses; an empty list shows them all. */
+    statuses: string[];
+    onStatusesChange: (v: string[]) => void;
 }) {
     const byPlatform = useMemo(
         () => (platform === 'Toutes' ? rows : rows.filter(r => r.platform === platform)),
         [rows, platform],
     );
     const counts = useMemo(() => {
-        const c: Record<string, number> = { Tous: byPlatform.length, active: 0, paused: 0, removed: 0 };
+        const c: Record<string, number> = { active: 0, paused: 0, removed: 0 };
         for (const r of byPlatform) if (r.status in c) c[r.status]++;
         return c;
     }, [byPlatform]);
     const visible = useMemo(
-        () => (status === 'Tous' ? byPlatform : byPlatform.filter(r => r.status === status)),
-        [byPlatform, status],
+        () => (statuses.length === 0 ? byPlatform : byPlatform.filter(r => statuses.includes(r.status))),
+        [byPlatform, statuses],
     );
+    // A platform synced from several ad accounts: say which one a campaign is in.
+    const multiAccount = useMemo(() => {
+        const perPlatform = new Map<string, Set<string>>();
+        for (const r of rows) {
+            if (!perPlatform.has(r.platform)) perPlatform.set(r.platform, new Set());
+            perPlatform.get(r.platform)!.add(r.ad_account_id);
+        }
+        return new Set([...perPlatform].filter(([, ids]) => ids.size > 1).map(([pf]) => pf));
+    }, [rows]);
     const { sortedData, sortConfig, handleSort } = useSort(visible, 'spend', 'desc');
     const total = visible.reduce((sum, r) => sum + Number(r.spend), 0);
 
@@ -68,10 +83,12 @@ export function CampaignTable({ rows, platform, onPlatformChange, status, onStat
                 <h3 className="text-sm font-semibold text-ink">Campagnes</h3>
                 <InfoHint text="Chiffres des plateformes publicitaires uniquement : dépense, impressions, clics et conversions telles que Google Ads et Meta les rapportent, sur la période choisie. Le statut est celui de la campagne aujourd'hui. Aucune colonne de revenus : le CRM ne conserve aucun identifiant de clic, un compte ne peut donc pas être rattaché à une campagne." />
                 <div className="ml-auto flex flex-wrap items-center gap-2 md:gap-3">
-                    <Select
-                        value={status}
-                        onChange={onStatusChange}
-                        className="w-44"
+                    <MultiSelect
+                        values={statuses}
+                        onChange={onStatusesChange}
+                        className="w-48"
+                        searchable={false}
+                        allLabel={`Tous les statuts (${byPlatform.length})`}
                         options={CAMPAIGN_STATUS_FILTERS.map(s => ({
                             value: s,
                             label: `${FILTER_LABEL[s]} (${counts[s] ?? 0})`,
@@ -131,6 +148,9 @@ export function CampaignTable({ rows, platform, onPlatformChange, status, onStat
                                                 {STATUS_LABEL[r.status]}
                                             </span>
                                             {CHANNEL_LABEL[r.platform]}
+                                            {multiAccount.has(r.platform) && (
+                                                <span className="tabular-nums">· compte {formatAccountId(r.ad_account_id)}</span>
+                                            )}
                                             {r.currency && r.currency !== 'CAD' && (
                                                 <span className="font-bold text-tone-critical-ink">· {r.currency}</span>
                                             )}
@@ -204,7 +224,7 @@ const round2 = (n: number | null) => (n === null ? null : Math.round(Number(n) *
 
 const CSV: CsvColumn<AdCampaignRow>[] = [
     { header: 'Canal',          value: r => CHANNEL_LABEL[r.platform] },
-    { header: 'Compte pub',     value: r => r.ad_account_id },
+    { header: 'Compte pub',     value: r => formatAccountId(r.ad_account_id) },
     { header: 'Campagne',       value: r => r.campaign_name ?? r.campaign_id },
     { header: 'Statut',         value: r => STATUS_LABEL[r.status] },
     { header: 'Première dépense', value: r => r.first_date },

@@ -16,6 +16,9 @@ import { prefetchRoute } from '../lib/prefetch';
 import { RepAvatar } from './RepAvatar';
 import { AdvertisingIcon } from './advertising/AdvertisingIcon';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
+import { supabase } from '../lib/supabase';
+import { DEFAULT_FLAGS, sectionAccessFromRow } from '../lib/sections';
+import type { SectionAccess } from '../lib/sections';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -255,11 +258,40 @@ function SectionHeader({ label, items, open, active, openGroups, onToggleGroup, 
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+/**
+ * The sections of the rep an admin is previewing, so the nav shows what that
+ * person sees and not what the admin can. Until their row has answered, and for
+ * a name that has no row, it is what a new member gets.
+ */
+function usePreviewedSections(repName: string | null): SectionAccess {
+    const [found, setFound] = useState<{ repName: string; access: SectionAccess } | null>(null);
+
+    useEffect(() => {
+        if (!repName) return;
+        let cancelled = false;
+        supabase.from('allowed_users').select('*').eq('rep_name', repName).limit(1).maybeSingle()
+            .then(({ data }) => {
+                if (cancelled || !data) return;
+                setFound({ repName, access: sectionAccessFromRow(data as Record<string, unknown>) });
+            });
+        return () => { cancelled = true; };
+    }, [repName]);
+
+    return found && found.repName === repName
+        ? found.access
+        : sectionAccessFromRow(DEFAULT_FLAGS);
+}
+
 export default function Layout() {
     const location = useLocation();
-    const { user, signOut, isAdmin, canAccessFactures, repName } = useAuth();
+    const { user, signOut, isAdmin, sections: ownSections, repName } = useAuth();
     const { viewAsRep, setViewAsRep } = useAdminView();
     const repList = useRepList();
+    const previewing = isAdmin && viewAsRep ? viewAsRep : null;
+    const previewedSections = usePreviewedSections(previewing);
+    // What the nav offers. The routes themselves follow the signed-in user, so
+    // an admin previewing a rep can still reach every screen by URL.
+    const sections = previewing ? previewedSections : ownSections;
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [openSections, setOpenSections] = useState<Set<string>>(
@@ -291,20 +323,22 @@ export default function Layout() {
     // used: while an admin previews a rep's view, they see what that rep sees.
     const showAdminNav = isAdmin && !viewAsRep;
 
-    const sections: Section[] = [
+    // Each module of "Ventes Affichez" and the whole of "Mon Portail" is shown to
+    // whoever has the matching section ticked in Paramètres → Utilisateurs.
+    const navSections: Section[] = [
         {
             key: 'ventes',
             label: 'Ventes Affichez',
             items: [
-                {
+                ...(sections.devis ? [{
                     key: 'devis', name: 'Devis', icon: FileSignature,
                     items: [
                         { name: 'Tableau de bord', href: '/',          icon: LayoutDashboard, end: true },
                         { name: 'Par semaine',     href: '/weekly',    icon: CalendarDays },
                         { name: 'Par trimestre',   href: '/quarterly', icon: LineChart },
                     ],
-                },
-                ...(canAccessFactures ? [{
+                }] : []),
+                ...(sections.factures ? [{
                     key: 'factures', name: 'Factures', icon: Receipt,
                     items: [
                         { name: 'Tableau de bord', href: '/factures',           icon: LayoutDashboard, end: true },
@@ -312,11 +346,11 @@ export default function Layout() {
                         { name: 'Par trimestre',   href: '/factures/quarterly', icon: LineChart },
                     ],
                 }] : []),
-                // Admin-only, like Publicité below: the routes are gated the
-                // same way and zoho_accounts is admin-only at the row level, so a
-                // member sees no entry, cannot reach it by URL, and could not read
-                // the accounts even by asking the API directly.
-                ...(showAdminNav ? [{
+                // Gated like the routes, and zoho_accounts is restricted the same
+                // way at the row level: without the section a member sees no
+                // entry, cannot reach it by URL, and could not read the accounts
+                // even by asking the API directly.
+                ...(sections.comptes ? [{
                     key: 'comptes', name: 'Comptes', icon: Building2,
                     items: [
                         { name: 'Tableau de bord', href: '/comptes',        icon: LayoutDashboard, end: true },
@@ -328,7 +362,7 @@ export default function Layout() {
                 // it looks through, not its parent. A leaf until a second
                 // screen exists - a module wrapping one screen is a collapse
                 // level that buys nothing.
-                ...(showAdminNav ? [
+                ...(sections.publicite ? [
                     { name: 'Publicité', href: '/publicite', icon: AdvertisingIcon, end: true },
                 ] : []),
                 // Leads - hidden while the Comptes module replaces it. Routes are
@@ -360,13 +394,13 @@ export default function Layout() {
         {
             key: 'portail',
             label: 'Mon Portail',
-            items: [
+            items: sections.portail ? [
                 { name: 'Mes Objectifs',   href: '/portail',             icon: Target,             end: true },
                 { name: 'Mes Devis',       href: '/portail/devis',       icon: ClipboardList },
                 { name: 'Mes Factures',    href: '/portail/factures',    icon: FileText },
                 { name: 'Ma Paye',         href: '/portail/paye',        icon: Wallet },
                 { name: 'Mes Leads',       href: '/portail/leads',       icon: UserPlus },
-            ],
+            ] : [],
         },
     ];
 
@@ -415,7 +449,7 @@ export default function Layout() {
 
             {/* Main nav */}
             <nav className="flex-1 px-3 py-3 overflow-y-auto space-y-0.5">
-                {sections.filter(s => s.items.length > 0).map(s => (
+                {navSections.filter(s => s.items.length > 0).map(s => (
                     <SectionHeader
                         key={s.key}
                         label={s.label}

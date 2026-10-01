@@ -1,58 +1,95 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { invalidateRpcCache } from '../lib/rpcCache';
+import { NO_ACCESS, sectionAccessFromRow } from '../lib/sections';
+import type { SectionAccess } from '../lib/sections';
 
-interface AuthContextType {
+/**
+ * Whether the signed-in address is in allowed_users.
+ *
+ *   granted   it has a row;
+ *   denied    it has none - the person can sign in to Zoho but was never added
+ *             here, or was removed. The database returns them no rows either;
+ *   error     the lookup itself failed, which says nothing about the person.
+ */
+export type AccessState = 'granted' | 'denied' | 'error';
+
+interface Permissions {
+    access: AccessState;
+    isAdmin: boolean;
+    /** The sections this user can open. All true for an admin. */
+    sections: SectionAccess;
+    repName: string | null;
+}
+
+interface AuthContextType extends Permissions {
     user: User | null;
     loading: boolean;
     signOut: () => Promise<void>;
-    isAdmin: boolean;
-    canAccessFactures: boolean;
-    repName: string | null;
+    /** Read allowed_users again, e.g. after a failed lookup. */
+    refreshAccess: () => Promise<void>;
 }
 
-interface Permissions {
-    isAdmin: boolean;
-    canAccessFactures: boolean;
-    repName: string | null;
-}
-
-const DEFAULT_PERMS: Permissions = { isAdmin: false, canAccessFactures: false, repName: null };
+const NO_PERMS: Permissions = { access: 'denied', isAdmin: false, sections: NO_ACCESS, repName: null };
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
     signOut: async () => {},
-    ...DEFAULT_PERMS,
+    refreshAccess: async () => {},
+    ...NO_PERMS,
 });
 
+/** How often a returning tab re-reads its own row, at most. */
+const RECHECK_AFTER_MS = 60_000;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser]           = useState<User | null>(null);
-    const [loading, setLoading]     = useState(true);
-    const [perms, setPerms]         = useState<Permissions>(DEFAULT_PERMS);
+    const [user, setUser]       = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [perms, setPerms]     = useState<Permissions>(NO_PERMS);
+    // The address `perms` was resolved for. Until it matches the signed-in user
+    // the app shows a loader, never the previous user's access or a refusal.
+    const [resolvedFor, setResolvedFor] = useState<string | null>(null);
+    const lastCheck = useRef(0);
+    // The address whose access was last read successfully.
+    const grantedFor = useRef<string | null>(null);
 
     const resolvePerms = useCallback(async (u: User | null) => {
-        if (!u?.email) { setPerms(DEFAULT_PERMS); return; }
+        if (!u?.email) { setPerms(NO_PERMS); setResolvedFor(null); grantedFor.current = null; return; }
 
         // Always read live from allowed_users so role/permission changes take effect
         // on the user's next page load - no need to log out + back in.
-        const { data } = await supabase
+        // Every column: the section flags are read by name, and a column this
+        // build knows about but the database does not yet have must not turn the
+        // lookup into an error.
+        const { data, error } = await supabase
             .from('allowed_users')
-            .select('role, can_access_factures, rep_name')
+            .select('*')
             .eq('email', u.email)
             .maybeSingle();
 
-        if (data) {
-            const isAdmin = data.role === 'admin';
-            setPerms({
-                isAdmin,
-                canAccessFactures: isAdmin || data.can_access_factures === true,
-                repName: (data.rep_name as string | null) ?? null,
-            });
+        lastCheck.current = Date.now();
+        if (error) {
+            // A re-check that fails (laptop waking, a network blip) says nothing
+            // new about someone whose access was already read: keep what they
+            // have rather than replace the screen they are working on. Only a
+            // first read that fails has nothing to fall back on.
+            if (grantedFor.current !== u.email) setPerms({ ...NO_PERMS, access: 'error' });
+        } else if (!data) {
+            grantedFor.current = null;
+            setPerms(NO_PERMS);
         } else {
-            setPerms(DEFAULT_PERMS);
+            grantedFor.current = u.email;
+            const row = data as Record<string, unknown>;
+            setPerms({
+                access: 'granted',
+                isAdmin: row.role === 'admin',
+                sections: sectionAccessFromRow(row),
+                repName: (row.rep_name as string | null) ?? null,
+            });
         }
+        setResolvedFor(u.email);
     }, []);
 
     useEffect(() => {
@@ -88,12 +125,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => { supabase.removeChannel(channel); };
     }, [user, resolvePerms]);
 
+    // A removal is a DELETE, and Realtime does not deliver filtered deletes, so
+    // the channel above never hears about it. Coming back to the tab re-reads
+    // the row instead; the data itself is already closed by the database.
+    useEffect(() => {
+        if (!user) return;
+        const onVisible = () => {
+            if (document.visibilityState !== 'visible') return;
+            if (Date.now() - lastCheck.current < RECHECK_AFTER_MS) return;
+            resolvePerms(user);
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
+    }, [user, resolvePerms]);
+
     // Cached rows were read under the previous session's permissions. They
     // must not survive into the next one, even on the same machine.
     const signOut = async () => { invalidateRpcCache(); await supabase.auth.signOut(); };
 
+    const refreshAccess = useCallback(() => resolvePerms(user), [resolvePerms, user]);
+
+    const pending = user !== null && resolvedFor !== user.email;
+
     return (
-        <AuthContext.Provider value={{ user, loading, signOut, ...perms }}>
+        <AuthContext.Provider value={{ user, loading: loading || pending, signOut, refreshAccess, ...perms }}>
             {children}
         </AuthContext.Provider>
     );

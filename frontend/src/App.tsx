@@ -6,6 +6,8 @@ import { AdminViewProvider } from './contexts/AdminViewContext';
 import Layout from './components/Layout';
 
 import Login from './pages/Login';
+import AccessDenied from './pages/AccessDenied';
+import { homePathFor } from './lib/sections';
 
 // Leads module - hidden from the UI while the Comptes module replaces it.
 // The pages and every get_zoho_lead* RPC behind them are left intact: the
@@ -49,8 +51,16 @@ const Createurs = lazy(() => import('./pages/Createurs'));
 const PortailLeads = lazy(() => import('./pages/PortailLeads'));
 const TasksDashboard = lazy(() => import('./pages/TasksDashboard'));
 
+/**
+ * Which routes exist depends on who is signed in.
+ *
+ * A member gets the routes of the sections ticked for them in Paramètres →
+ * Utilisateurs; an admin gets all of them plus the admin-only screens. A URL
+ * outside that set falls through to the catch-all and lands on the first
+ * section the person can open, never on an empty screen.
+ */
 function AppRoutes() {
-    const { user, loading, canAccessFactures, isAdmin } = useAuth();
+    const { user, loading, access, sections, isAdmin } = useAuth();
 
     if (loading) {
         return (
@@ -64,18 +74,31 @@ function AppRoutes() {
         return <Login />;
     }
 
+    // Signed in to Zoho is not enough: the address has to be in the user list.
+    if (access === 'error') return <AccessDenied reason="error" />;
+    if (access === 'denied') return <AccessDenied reason="denied" />;
+
+    const home = homePathFor(sections);
+    if (home === null && !isAdmin) return <AccessDenied reason="empty" />;
+
     return (
         <Suspense fallback={<RouteFallback />}>
         <Routes>
             <Route path="/" element={<Layout />}>
-                {/* ─── Devis module - accessible to all authenticated users ─── */}
-                <Route index element={<Dashboard />} />
-                <Route path="weekly" element={<WeeklyDetail />} />
-                <Route path="quarterly" element={<QuarterlyAverages />} />
-                <Route path="settings" element={<SettingsPage />} />
+                {/* ─── Devis module. "/" is its dashboard; without the section
+                    the address still has to lead somewhere. ─── */}
+                {sections.devis ? (
+                    <>
+                        <Route index element={<Dashboard />} />
+                        <Route path="weekly" element={<WeeklyDetail />} />
+                        <Route path="quarterly" element={<QuarterlyAverages />} />
+                    </>
+                ) : (
+                    <Route index element={<Navigate to={home ?? '/settings'} replace />} />
+                )}
 
-                {/* ─── Factures module (requires canAccessFactures) ─── */}
-                {canAccessFactures && (
+                {/* ─── Factures module ─── */}
+                {sections.factures && (
                     <>
                         <Route path="factures" element={<FDashboard />} />
                         <Route path="factures/weekly" element={<FWeeklyDetail />} />
@@ -87,17 +110,44 @@ function AppRoutes() {
                 {/* <Route path="leads" element={<LeadsDashboard />} /> */}
                 {/* <Route path="leads/detail" element={<LeadsDetail />} /> */}
 
-                {/* ─── Mon Portail - personal view for every rep ─── */}
-                <Route path="portail" element={<PortailObjectifs />} />
-                <Route path="portail/devis" element={<PortailDevis />} />
-                <Route path="portail/factures" element={<PortailFactures />} />
-                <Route path="portail/paye" element={<PortailPaye />} />
-                <Route path="portail/leads" element={<PortailLeads />} />
-                <Route path="portail/parametres" element={<PortailParametres />} />
+                {/* ─── Mon Portail - the signed-in rep's own numbers ─── */}
+                {sections.portail && (
+                    <>
+                        <Route path="portail" element={<PortailObjectifs />} />
+                        <Route path="portail/devis" element={<PortailDevis />} />
+                        <Route path="portail/factures" element={<PortailFactures />} />
+                        <Route path="portail/paye" element={<PortailPaye />} />
+                        <Route path="portail/leads" element={<PortailLeads />} />
+                    </>
+                )}
+
+                {/* ─── Comptes module - Zoho CRM Accounts, the grain that
+                    replaced leads. zoho_accounts is restricted by RLS to the
+                    same people, so a URL reached without the section shows
+                    nothing rather than the client list. ─── */}
+                {sections.comptes && (
+                    <>
+                        <Route path="comptes" element={<AccountsDashboard />} />
+                        <Route path="comptes/detail" element={<AccountsDetail />} />
+                    </>
+                )}
+
+                {/* ─── Publicité - a screen of its own. ad_spend_daily is
+                    restricted by RLS to the same people. ─── */}
+                {sections.publicite && (
+                    <>
+                        <Route path="publicite" element={<Advertising />} />
+                        {/* Its former address. Bookmarked and shared links carry
+                            the filters in the query string, so keep them. */}
+                        <Route path="comptes/publicite" element={<RedirectToPublicite />} />
+                    </>
+                )}
 
                 {/* ─── Admin-only ─── */}
                 {isAdmin && (
                     <>
+                        <Route path="settings" element={<SettingsPage />} />
+                        <Route path="portail/parametres" element={<PortailParametres />} />
                         <Route path="reps" element={<AdminReps />} />
                         <Route path="paye" element={<Paye />} />
                         <Route path="paye/settings" element={<PayeRepSettings />} />
@@ -108,23 +158,6 @@ function AppRoutes() {
                             leaderboard. Dominic, who asked for it: "c'est vraiment
                             juste pour moi, c'est même pas pour personne." */}
                         <Route path="createurs" element={<Createurs />} />
-
-                        {/* ─── Comptes module - Zoho CRM Accounts, the grain that
-                            replaced leads. Admin-only: zoho_accounts is restricted
-                            to admins by RLS too, so a member who reaches these
-                            URLs falls through to the catch-all and lands on the
-                            dashboard rather than on an empty screen. ─── */}
-                        <Route path="comptes" element={<AccountsDashboard />} />
-                        <Route path="comptes/detail" element={<AccountsDetail />} />
-
-                        {/* Publicité - a screen of its own, admin-only.
-                            ad_spend_daily is also restricted to admins by RLS. */}
-                        <Route path="publicite" element={<Advertising />} />
-
-                        {/* Moved out of the Comptes module on 2026-09-18. Links
-                            people have bookmarked or pasted into Slack carry the
-                            filters in the query string, so keep them. */}
-                        <Route path="comptes/publicite" element={<RedirectToPublicite />} />
 
                         {/* ─── Tâches CRM module (owner-only) - dashboard + weekly tabs ─── */}
                         <Route path="taches" element={<TasksDashboard />} />

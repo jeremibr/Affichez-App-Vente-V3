@@ -8,12 +8,12 @@ import type { AvailableWeek, ZoneA_SummaryRow, ZoneA_DeptTotal, ZoneB_DetailRow 
 import { ZoneAPivotTable } from '../components/weekly/ZoneAPivotTable';
 import { ZoneBTable } from '../components/weekly/ZoneBTable';
 import { cn } from '../lib/utils';
-import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { useRepList } from '../hooks/useRepList';
 import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { ExportButton } from '../components/ExportButton';
 import type { CsvColumn } from '../lib/csv';
-import { useRepFilter, REP_DEFAULT } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
 
 // "Je veux tout le temps qu'on puisse telecharger les rapports partout"
 // (2026-09-04). Exports the filtered line items for the selected week - the same
@@ -45,16 +45,16 @@ function fmtWeekRange(start: string, end: string): string {
 export default function WeeklyDetail() {
     const [availableWeeks, setAvailableWeeks] = useState<AvailableWeek[]>([]);
     const [selectedWeek, setSelectedWeek] = useUrlState('week', '');
-    const [selectedRep, setSelectedRep] = useState(REP_DEFAULT);
+    const [selectedReps, setSelectedReps] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
     const [summaryData, setSummaryData] = useState<ZoneA_SummaryRow[]>([]);
     const [lineItems, setLineItems] = useState<ZoneB_DetailRow[]>([]);
     const repList = useRepList();
 
-    // Groups first, then the current sales team by name. The rows arrive
+    // "Interne" first, then the current sales team by name. The rows arrive
     // unfiltered and are narrowed in memory, so the hook's `matches` carries the
     // same membership rule the server-side pages send as p_reps.
-    const repFilter = useRepFilter(selectedRep, repList);
+    const repFilter = useRepFilter(selectedReps, repList);
 
     const clearData = () => { setSummaryData([]); setLineItems([]); };
 
@@ -156,12 +156,13 @@ export default function WeeklyDetail() {
                     <p className="text-xs md:text-sm text-ink-mute mt-0.5">Devis · Vue équipe complète</p>
                 </div>
                 <div className="rounded-md border border-primary/40">
-                    <Select
-                        value={selectedRep}
-                        onChange={setSelectedRep}
+                    <MultiSelect
+                        values={repFilter.selected}
+                        onChange={setSelectedReps}
                         options={repFilter.options}
-                        variant={selectedRep !== REP_DEFAULT ? 'accent' : 'default'}
-                        className="w-48"
+                        allLabel={REP_ALL_LABEL}
+                        allIcon={repFilter.allIcon}
+                        className="w-52"
                     />
                 </div>
             </div>

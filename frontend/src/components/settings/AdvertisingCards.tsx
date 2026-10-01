@@ -151,6 +151,8 @@ export function AdsSyncCard() {
                                         {s.first_date && formatShortDate(s.first_date)} →{' '}
                                         {s.last_date && formatShortDate(s.last_date)} · {s.days} jours ·{' '}
                                         {s.campaigns} campagnes
+                                        {/* Several ad accounts are summed into one channel. */}
+                                        {s.ad_accounts.length > 1 && ` · ${s.ad_accounts.length} comptes publicitaires`}
                                         {s.currencies.length > 0 && (
                                             <span className={cn('ml-1 font-bold',
                                                 s.currencies.some(c => c !== 'CAD')

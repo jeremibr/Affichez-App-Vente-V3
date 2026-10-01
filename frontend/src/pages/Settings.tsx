@@ -15,13 +15,27 @@ import { AdsSyncCard } from '../components/settings/AdvertisingCards';
 import { DEPARTMENTS, MONTHS } from '../lib/constants';
 import { Select } from '../components/Select';
 import { useAuth } from '../contexts/AuthContext';
+import { SECTIONS, DEFAULT_FLAGS } from '../lib/sections';
+import type { SectionFlags } from '../lib/sections';
 
 type Tab = 'objectives' | 'quarters' | 'sync' | 'logs' | 'users' | 'excluded';
 
 interface Objective { id: string; year: number; month: number; department: string; target_amount: number; }
 interface Quarter { id: string; year: number; quarter: number; start_date: string; end_date: string; num_weeks: number; }
 interface WebhookLog { id: string; received_at: string; action: string; status_code: number; zoho_id: string | null; error_message: string | null; }
-interface AllowedUser { email: string; name: string | null; role: string; can_access_factures: boolean; rep_name: string | null; }
+interface AllowedUser extends SectionFlags { email: string; name: string | null; role: string; rep_name: string | null; }
+
+const EMPTY_USER: AllowedUser = { email: '', name: '', role: 'member', rep_name: '', ...DEFAULT_FLAGS };
+
+/** The section flags of a row, with the column default wherever one is missing. */
+function flagsOf(row: Partial<SectionFlags>): SectionFlags {
+    const flags = { ...DEFAULT_FLAGS };
+    for (const s of SECTIONS) {
+        const value = row[s.column];
+        if (typeof value === 'boolean') flags[s.column] = value;
+    }
+    return flags;
+}
 
 export default function Settings() {
     const { isAdmin } = useAuth();
@@ -594,7 +608,10 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
     const [users, setUsers] = useState<AllowedUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState<AllowedUser>({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' });
+    const [form, setForm] = useState<AllowedUser>(EMPTY_USER);
+    // Somebody who is not a user of the Zoho organisation - an outside ad manager,
+    // for instance - is not in the picker and is added by address.
+    const [manualEmail, setManualEmail] = useState(false);
     const [saving, setSaving] = useState(false);
     const [repOptions, setRepOptions] = useState<string[]>([]);
     const [zohoUsers, setZohoUsers] = useState<{ name: string; email: string }[]>([]);
@@ -636,12 +653,12 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             email: form.email.trim().toLowerCase(),
             name: form.name?.trim() || null,
             role: form.role,
-            can_access_factures: form.can_access_factures,
+            ...flagsOf(form),
             rep_name: form.rep_name?.trim() || null,
         };
         const { error } = await supabase.from('allowed_users').upsert(payload, { onConflict: 'email' });
         if (error) setMessage({ type: 'error', text: 'Erreur: ' + error.message });
-        else { setMessage({ type: 'success', text: 'Utilisateur sauvegardé.' }); setShowForm(false); setForm({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' }); fetchUsers(); }
+        else { setMessage({ type: 'success', text: 'Utilisateur sauvegardé.' }); setShowForm(false); setForm(EMPTY_USER); fetchUsers(); }
         setSaving(false);
     };
 
@@ -653,7 +670,8 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
     };
 
     const handleEdit = (user: AllowedUser) => {
-        setForm({ ...user, name: user.name ?? '', rep_name: user.rep_name ?? '' });
+        setForm({ ...user, ...flagsOf(user), name: user.name ?? '', rep_name: user.rep_name ?? '' });
+        setManualEmail(false);
         setShowForm(true);
     };
 
@@ -662,9 +680,9 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-base font-semibold text-ink">Gestion des utilisateurs</h2>
-                    <p className="text-xs text-ink-mute mt-0.5">Contrôlez qui peut se connecter et accéder au module Factures.</p>
+                    <p className="text-xs text-ink-mute mt-0.5">Seules les personnes de cette liste peuvent se connecter. Cochez les sections que chacune peut ouvrir.</p>
                 </div>
-                <button onClick={() => { setForm({ email: '', name: '', role: 'member', can_access_factures: false, rep_name: '' }); setShowForm(true); }}
+                <button onClick={() => { setForm(EMPTY_USER); setManualEmail(false); setShowForm(true); }}
                     className="btn btn-md btn-primary">
                     <Plus className="w-4 h-4" /> Ajouter
                 </button>
@@ -694,10 +712,40 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                     ) : (
                         /* Adding: Zoho user picker */
                         <div>
-                            <label className="block text-xs font-semibold text-ink-mute mb-1.5">
-                                Utilisateur Zoho *
-                            </label>
-                            {zohoUsersError ? (
+                            <div className="flex items-center justify-between gap-3 mb-1.5">
+                                <label className="block text-xs font-semibold text-ink-mute">
+                                    {manualEmail ? 'Courriel *' : 'Utilisateur Zoho *'}
+                                </label>
+                                {!zohoUsersError && (
+                                    <button type="button"
+                                            onClick={() => { setManualEmail(m => !m); setForm(f => ({ ...f, email: '', name: '', rep_name: '' })); }}
+                                            className="text-2xs font-semibold text-ink-mute hover:text-primary-press transition-colors">
+                                        {manualEmail ? 'Choisir dans la liste Zoho' : 'Saisir un autre courriel'}
+                                    </button>
+                                )}
+                            </div>
+                            {manualEmail && !zohoUsersError ? (
+                                <div className="space-y-2">
+                                    <input
+                                        type="email"
+                                        value={form.email}
+                                        onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                                        className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        placeholder="prenom@exemple.com"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={form.name ?? ''}
+                                        onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                                        className="w-full bg-sand rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                        placeholder="Nom (facultatif)"
+                                    />
+                                    <p className="text-2xs text-ink-mute">
+                                        Pour quelqu&rsquo;un qui n&rsquo;est pas dans votre organisation Zoho. La connexion se fait
+                                        toujours avec Zoho : la personne doit avoir un compte Zoho à cette adresse.
+                                    </p>
+                                </div>
+                            ) : zohoUsersError ? (
                                 <div className="bg-tone-warn-soft border border-tone-warn/40 rounded-md px-3 py-2.5 text-xs text-tone-warn-ink space-y-2">
                                     <p className="font-semibold">Impossible de charger les utilisateurs Zoho.</p>
                                     <p>Vérifiez que la fonction <code className="font-mono bg-tone-warn/20 px-1 rounded-xs">get-zoho-users</code> est déployée et que le token Zoho a le scope <code className="font-mono bg-tone-warn/20 px-1 rounded-xs">ZohoBooks.settings.READ</code>.</p>
@@ -735,7 +783,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                     ))}
                                 </select>
                             )}
-                            {form.email && !zohoUsersError && (
+                            {form.email && !zohoUsersError && !manualEmail && (
                                 <div className="flex items-center gap-2 mt-2 pl-1">
                                     <span className="text-xs text-ink-mute truncate">{form.email}</span>
                                     {form.rep_name && (
@@ -773,12 +821,31 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <input type="checkbox" id="factures-access" checked={form.can_access_factures}
-                            onChange={e => setForm(f => ({ ...f, can_access_factures: e.target.checked }))}
-                            className="w-4 h-4 accent-primary rounded-xs" />
-                        <label htmlFor="factures-access" className="text-sm font-medium text-ink-secondary cursor-pointer">Accès au module Factures</label>
-                    </div>
+                    <fieldset>
+                        <legend className="block text-xs font-semibold text-ink-mute mb-1.5">Sections accessibles</legend>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                            {SECTIONS.map(s => {
+                                const admin = form.role === 'admin';
+                                return (
+                                    <label key={s.key}
+                                           className={cn('flex items-center gap-2.5 text-sm font-medium',
+                                                         admin ? 'text-ink-mute' : 'text-ink-secondary cursor-pointer')}>
+                                        <input type="checkbox"
+                                               checked={admin || form[s.column]}
+                                               disabled={admin}
+                                               onChange={e => setForm(f => ({ ...f, [s.column]: e.target.checked }))}
+                                               className="w-4 h-4 accent-primary rounded-xs" />
+                                        {s.label}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        <p className="text-2xs text-ink-mute mt-2">
+                            {form.role === 'admin'
+                                ? 'Un administrateur a accès à toutes les sections, à Notre équipe et à l’Administration.'
+                                : 'Un membre ne voit que les sections cochées. Notre équipe et l’Administration restent réservées aux administrateurs.'}
+                        </p>
+                    </fieldset>
                     <div className="flex items-center gap-3">
                         <button onClick={handleSave} disabled={saving || !form.email.trim()}
                             className="btn btn-md btn-primary">
@@ -798,7 +865,7 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                             <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Courriel</th>
                             <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Nom</th>
                             <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rôle</th>
-                            <th className="px-5 py-3 text-center text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Factures</th>
+                            <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Sections</th>
                             <th className="px-5 py-3 text-left text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Rep Zoho</th>
                             <th className="px-5 py-3 text-center text-xs font-semibold text-ink-mute uppercase tracking-eyebrow">Actions</th>
                         </tr>
@@ -818,10 +885,8 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                                         {user.role}
                                     </span>
                                 </td>
-                                <td className="px-5 py-3 text-center">
-                                    {user.can_access_factures
-                                        ? <CheckCircle2 className="w-4 h-4 text-tone-good mx-auto" />
-                                        : <span className="text-ink-faint text-xs">—</span>}
+                                <td className="px-5 py-3">
+                                    <SectionChips user={user} />
                                 </td>
                                 <td className="px-5 py-3">
                                     {user.rep_name
@@ -850,8 +915,26 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
                 </table>
             </div>
             <p className="text-xs text-ink-mute px-1">
-                Les utilisateurs pré-configurés ici obtiennent automatiquement leur rôle et accès lors de leur première connexion via Zoho. Les membres avec Accès Factures ne voient que leurs propres données.
+                Une personne absente de cette liste ne peut pas se connecter, même avec une adresse @affichez.ca. Supprimer quelqu&rsquo;un lui retire l&rsquo;accès immédiatement. Dans Devis et Factures, un membre ne voit que ses propres données.
             </p>
+        </div>
+    );
+}
+
+/** The sections a user can open, as chips. An admin has them all by role. */
+function SectionChips({ user }: { user: AllowedUser }) {
+    const chip = 'px-2 py-0.5 rounded-full text-2xs font-semibold whitespace-nowrap';
+    if (user.role === 'admin') {
+        return <span className={cn(chip, 'bg-stone text-ink-secondary')}>Toutes</span>;
+    }
+    const flags = flagsOf(user);
+    const open = SECTIONS.filter(s => flags[s.column]);
+    if (open.length === 0) {
+        return <span className={cn(chip, 'bg-tone-warn-soft text-tone-warn-ink')}>Aucune</span>;
+    }
+    return (
+        <div className="flex flex-wrap gap-1">
+            {open.map(s => <span key={s.key} className={cn(chip, 'bg-stone text-ink-secondary')}>{s.label}</span>)}
         </div>
     );
 }

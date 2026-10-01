@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2, TrendingUp, Users, Percent, DollarSign } from 'lucide-react';
@@ -7,6 +7,7 @@ import type { ZohoLeadKPIs, ZohoLeadsMonthlyRow, ZohoLeadFilterOptions } from '.
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { formatCurrencyCAD, cn } from '../lib/utils';
 import { InfoHint } from '../components/InfoHint';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,8 +29,10 @@ export default function PortailLeads({ propRepName }: Props) {
     const [_monthParam, _setMonthParam] = useUrlState('month', 'Toutes');
     const selectedMonth: number | 'Toutes' = _monthParam === 'Toutes' ? 'Toutes' : Number(_monthParam);
     const setSelectedMonth = (v: number | 'Toutes') => _setMonthParam(v === 'Toutes' ? 'Toutes' : String(v));
-    const [selectedSource, setSelectedSource] = useUrlState('source', 'Toutes');
-    const [selectedService, setSelectedService] = useUrlState('service', 'Tous');
+    // Several values each; an empty list is "no filter". The Détail tab reads the
+    // same two URL keys, so a selection follows from one tab to the other.
+    const [selectedSources, setSelectedSources] = useUrlList('source');
+    const [selectedServices, setSelectedServices] = useUrlList('service');
 
     const [loading, setLoading] = useState(true);
     const [kpis, setKpis] = useState<ZohoLeadKPIs | null>(null);
@@ -44,21 +47,21 @@ export default function PortailLeads({ propRepName }: Props) {
         if (!repParam) return;
         setLoading(true);
         const monthParam = selectedMonth === 'Toutes' ? null : selectedMonth;
-        const sourceParam = selectedSource === 'Toutes' ? null : selectedSource;
-        const serviceParam = selectedService === 'Tous' ? null : selectedService;
+        const sourcesParam = selectedSources.length > 0 ? selectedSources : null;
+        const servicesParam = selectedServices.length > 0 ? selectedServices : null;
 
         const [
             { data: kpiData },
             { data: monthData },
         ] = await Promise.all([
-            cachedRpc('get_zoho_lead_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
-            cachedRpc('get_zoho_leads_monthly_summary', { p_year: year, p_rep: repParam, p_source: sourceParam, p_service: serviceParam }),
+            cachedRpc('get_zoho_lead_kpis', { p_year: year, p_month: monthParam, p_rep: repParam, p_sources: sourcesParam, p_services: servicesParam }),
+            cachedRpc('get_zoho_leads_monthly_summary', { p_year: year, p_rep: repParam, p_sources: sourcesParam, p_services: servicesParam }),
         ]);
 
         setKpis((kpiData as ZohoLeadKPIs[])?.[0] ?? null);
         setMonthly((monthData as ZohoLeadsMonthlyRow[]) ?? []);
         setLoading(false);
-    }, [year, selectedMonth, selectedSource, selectedService, repParam]);
+    }, [year, selectedMonth, selectedSources, selectedServices, repParam]);
 
     const fetchOptions = useCallback(async () => {
         const { data } = await cachedRpc<ZohoLeadFilterOptions>(
@@ -98,11 +101,11 @@ export default function PortailLeads({ propRepName }: Props) {
     const yearOptions = [2025, 2026, 2027].map(y => ({ value: String(y), label: String(y) }));
     const monthOptions = useMemo(() => [{ value: 'Toutes', label: 'Année complète' }, ...MONTHS.map(m => ({ value: String(m.value), label: m.label }))], []);
     const sourceOptions = useMemo(
-        () => [{ value: 'Toutes', label: 'Toutes sources' }, ...(options?.sources ?? []).map(s => ({ value: s, label: s }))],
+        () => (options?.sources ?? []).map(s => ({ value: s, label: s })),
         [options],
     );
     const serviceOptions = useMemo(
-        () => [{ value: 'Tous', label: 'Tous services' }, ...(options?.services ?? []).map(s => ({ value: s, label: s }))],
+        () => (options?.services ?? []).map(s => ({ value: s, label: s })),
         [options],
     );
 
@@ -140,10 +143,12 @@ export default function PortailLeads({ propRepName }: Props) {
                             <Select value={String(selectedMonth)} onChange={v => setSelectedMonth(v === 'Toutes' ? 'Toutes' : Number(v))} options={monthOptions} className="w-40" />
                         </FilterGroup>
                         <FilterGroup label="Source">
-                            <Select value={selectedSource} onChange={setSelectedSource} options={sourceOptions} className="w-52" />
+                            <MultiSelect values={selectedSources} onChange={setSelectedSources} options={sourceOptions}
+                                         allLabel="Toutes sources" className="w-52" />
                         </FilterGroup>
                         <FilterGroup label="Service">
-                            <Select value={selectedService} onChange={setSelectedService} options={serviceOptions} className="w-48" />
+                            <MultiSelect values={selectedServices} onChange={setSelectedServices} options={serviceOptions}
+                                         allLabel="Tous services" className="w-48" />
                         </FilterGroup>
                     </FilterBar>
 

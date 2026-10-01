@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useUrlState, useUrlStateNumber } from '../hooks/useUrlState';
+import { useUrlState, useUrlStateNumber, useUrlList } from '../hooks/useUrlState';
 import { supabase } from '../lib/supabase';
 import { cachedRpc, invalidateRpcCache } from '../lib/rpcCache';
 import { Loader2 } from 'lucide-react';
@@ -9,23 +9,20 @@ import { OFFICES } from '../lib/constants';
 import { useRepTeam, INTERNAL_LABEL } from '../lib/repTeam';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
 import { Select } from '../components/Select';
+import { MultiSelect } from '../components/MultiSelect';
 import { useAuth } from '../contexts/AuthContext';
-import { useRepFilter, REP_DEFAULT, REP_ALL, REP_INTERNAL } from '../hooks/useRepFilter';
+import { useRepFilter, REP_ALL_LABEL } from '../hooks/useRepFilter';
 
 export default function FQuarterlyAverages() {
     const { isAdmin, repName: authRepName } = useAuth();
 
     const [year, setYear] = useUrlStateNumber('year', 2026);
     const [selectedOffice, setSelectedOffice] = useUrlState('office', 'Toutes');
-    const [selectedRep, setSelectedRep] = useUrlState('rep', isAdmin ? REP_DEFAULT : (authRepName ?? REP_DEFAULT));
+    // Admin only; a rep is pinned to their own name, whatever the URL says.
+    const [selectedReps, setSelectedReps] = useUrlList('rep');
     const [loading, setLoading] = useState(true);
     const [yoyData, setYoyData] = useState<YoYRow[]>([]);
     const [teamTotals, setTeamTotals] = useState<QuarterTotalsRow[]>([]);
-
-    // A group needs every rep's rows, so it is fetched unfiltered and grouped here.
-    const repParam = isAdmin
-        ? (selectedRep === REP_ALL || selectedRep === REP_INTERNAL ? null : selectedRep)
-        : (authRepName ?? null);
 
     const repTeam = useRepTeam();
 
@@ -67,6 +64,14 @@ export default function FQuarterlyAverages() {
         return Array.from(reps).sort((a, b) => a.localeCompare(b));
     }, [groupedYoyData]);
 
+    // "Interne" first, then the current sales team by name. Former staff and
+    // internal billing live behind "Interne" rather than as 20 more rows.
+    const repFilter = useRepFilter(selectedReps, uniqueReps);
+    const repOptions = repFilter.options;
+    // One rep is asked for by name. A group or several reps need every rep's
+    // rows, so they are fetched unfiltered and narrowed here.
+    const repParam = isAdmin ? repFilter.rep : (authRepName ?? null);
+
     const fetchAverages = useCallback(async () => {
         setLoading(true);
         const p_office = selectedOffice === 'Toutes' ? null : selectedOffice;
@@ -101,10 +106,6 @@ export default function FQuarterlyAverages() {
     }, [fetchAverages]);
 
     const officeOptions = useMemo(() => [{ value: 'Toutes', label: 'Tout le réseau' }, ...OFFICES], []);
-    // Groups first, then the current sales team by name. Former staff and
-    // internal billing live behind "Interne" rather than as 20 more rows.
-    const repFilter = useRepFilter(selectedRep, uniqueReps);
-    const repOptions = repFilter.options;
     const yearOptions = [2025, 2026].map(y => ({ value: String(y), label: String(y) }));
 
     return (
@@ -128,7 +129,8 @@ export default function FQuarterlyAverages() {
                 </FilterGroup>
                 {isAdmin && (
                     <FilterGroup label="Représentant">
-                        <Select value={selectedRep} onChange={setSelectedRep} options={repOptions} className="w-48" />
+                        <MultiSelect values={repFilter.selected} onChange={setSelectedReps} options={repOptions}
+                                     allLabel={REP_ALL_LABEL} allIcon={repFilter.allIcon} className="w-48" />
                     </FilterGroup>
                 )}
             </FilterBar>
@@ -151,7 +153,7 @@ export default function FQuarterlyAverages() {
                                 data={dataForQuarter}
                                 currentYear={year}
                                 dealLabel="facture"
-                                previousTotalOverride={isAdmin && selectedRep === REP_DEFAULT ? previousTotalByQuarter.get(q) : undefined}
+                                previousTotalOverride={isAdmin && repFilter.isAll ? previousTotalByQuarter.get(q) : undefined}
                             />
                         );
                     })}
