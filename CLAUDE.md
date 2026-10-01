@@ -325,10 +325,23 @@ still hold (Replace it first), and update the SQL literals (`Meta Ads`,
 touching those values. `get_zoho_account_filter_options` still reads stored
 values rather than the set, so a stray word would show up in the filter within a
 day. The pre-cleanup baseline lives in schema `backup` (not served by the API):
-`backup.source_baseline` holds every record's value before the merges and
-`backup.source_final_check` must stay empty. The sync login (Eva (IA)) must stay
+`backup.source_baseline` holds every record's value before the merges. It is a
+historical record, so later retags and renames show up as differences in
+`backup.source_final_check`; that is expected. The sync login (Eva (IA)) must stay
 in English: Zoho returns picklist labels in the caller's language, and a French
 login once wrote French labels into 135 rows.
+
+**Renaming a value in the set is a relabel, and it has three consequences.** On
+2026-10-01 `Publicité/Recherche Google` became `Google Organique` and `Facebook`
+became `Meta Organique`. Zoho kept the stored value and changed the label, and
+the API returns the label, so: (1) the syncs write the new word from then on,
+but a relabel modifies no record, so rows already mirrored keep the old word
+until a full walk (`scripts/zoho-crm-full-sync.sh`); (2) any SQL that names the
+value literally must change in the same release (here the organic map,
+`20261001120000_organic_source_labels.sql`); (3) the new label applies only to
+the language of the session that made it, so the other language needs the same
+label through Translations → Import, or French and English users read different
+words again.
 
 ### Publicité: ad spend against revenue
 
@@ -344,12 +357,13 @@ credentials: **`docs/ADVERTISING.md`**.
   are SECURITY INVOKER, so a non-admin caller gets zero spend, not an error.
 - **Channel ↔ source mapping is fixed** in `ad_channel_source_map()`:
   `Google Ads` → google, `Meta Ads` → meta (`20260929160000_google_ads_channel.sql`).
-  `Publicité/Recherche Google` is deliberately **not** a channel: it mixes organic search with ads,
-  and since the 2026-09-29 source cleanup it also holds the 3,336 former `Internet` accounts. Leads
-  and Comptes share the Zoho Global Set `Origine`, so every source value exists on both modules.
+  `Google Organique` (named `Publicité/Recherche Google` until 2026-10-01) is deliberately **not** a
+  paid channel: its older accounts mix organic search with ads, and since the 2026-09-29 source
+  cleanup it also holds the 3,336 former `Internet` accounts. Leads and Comptes share the Zoho
+  Global Set `Origine`, so every source value exists on both modules.
 - **Two views, one page.** `?vue=organique` (the default for now, `DEFAULT_VIEW` in
-  `Advertising.tsx`) attributes the same cohorts to `Publicité/Recherche Google` and `Facebook`
-  with no spend at all (`p_organic => true` on `get_ad_performance` / `get_ad_monthly`, organic
+  `Advertising.tsx`) attributes the same cohorts to `Google Organique` and `Meta Organique`
+  (formerly `Facebook`) with no spend at all (`p_organic => true` on `get_ad_performance` / `get_ad_monthly`, organic
   map in `ad_channel_source_map(true)`); `?vue=payant` is the ad view. Cost, return and net are
   NULL whenever a period has no spend, in either view.
 - **Attribution is by channel and month of account creation, never per lead or per campaign** —

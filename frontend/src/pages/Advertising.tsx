@@ -28,7 +28,7 @@ import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
  *               Google Ads / Meta Ads (the channel cards, the comparison, the
  *               monthly chart and the campaign table).
  *   organique — the accounts that came through the same platforms without an
- *               ad ("Publicité/Recherche Google", "Facebook"): accounts and
+ *               ad ("Google Organique", "Meta Organique"): accounts and
  *               revenue only, no spend, no return, no campaigns.
  *
  * Attribution is by channel and by month of account creation. Revenue for a

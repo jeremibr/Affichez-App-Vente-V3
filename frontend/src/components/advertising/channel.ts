@@ -14,10 +14,14 @@ export const CHANNEL_LABEL: Record<AdChannel, string> = {
  */
 export type AdView = 'organique' | 'payant';
 
-/** Organic counterpart of each channel: the same platform, no ad behind it. */
+/**
+ * Organic counterpart of each channel: the same platform, no ad behind it.
+ * The words are the Zoho source values themselves, so a card title and the
+ * "Origine" line under it read the same.
+ */
 export const CHANNEL_LABEL_ORGANIC: Record<AdChannel, string> = {
-    google: 'Recherche Google',
-    meta: 'Facebook',
+    google: 'Google Organique',
+    meta: 'Meta Organique',
 };
 
 export function channelLabel(channel: AdChannel, organic: boolean): string {
