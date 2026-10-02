@@ -117,6 +117,17 @@ export function adAccountLabel(account: AdAccountOption): string {
 }
 
 /**
+ * The part of an ad-account selection that narrows anything. A platform with
+ * every one of its accounts selected is not narrowed, so those accounts are left
+ * out: ticking both Google accounts is the same request as ticking none. Ids
+ * that are not on offer are dropped. Returned in the order of `choices`.
+ */
+export function narrowingAdAccounts(choices: AdAccountOption[], selectedIds: string[]): AdAccountOption[] {
+    return choices.filter(a => selectedIds.includes(a.id)
+        && choices.some(b => b.platform === a.platform && !selectedIds.includes(b.id)));
+}
+
+/**
  * Whether spend from `adAccountId` is counted under an ad-account selection.
  * A selection narrows only the platforms it names: picking one Google account
  * leaves Meta whole. `selected` is null when nothing is selected. This is the

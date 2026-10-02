@@ -18,8 +18,9 @@
 //
 // Each platform is optional: a platform whose secrets are missing is skipped.
 //
-// Google can be several ad accounts: GOOGLE_ADS_CUSTOMER_ID takes a list
-// ("579-661-3141, 437-363-4595"; dashes and separators are free). Every account
+// Each platform can be several ad accounts. GOOGLE_ADS_CUSTOMER_ID and
+// META_AD_ACCOUNT_ID both take a list ("579-661-3141, 437-363-4595";
+// "act_1124619897926603, 6342420329119051"; separators are free). Every account
 // is written under its own ad_account_id, so the RPCs sum them per platform and
 // a campaign id can never collide across accounts.
 
@@ -43,7 +44,7 @@ const GOOGLE_LOGIN_CUSTOMER_ID = digitsOnly(Deno.env.get('GOOGLE_ADS_LOGIN_CUSTO
 
 const META_API_VERSION = Deno.env.get('META_GRAPH_VERSION') ?? 'v25.0';
 const META_ACCESS_TOKEN = Deno.env.get('META_ACCESS_TOKEN') ?? '';
-const META_AD_ACCOUNT_ID = (Deno.env.get('META_AD_ACCOUNT_ID') ?? '').trim().replace(/^act_/i, '');
+const META_AD_ACCOUNT_IDS = metaAccountIds(Deno.env.get('META_AD_ACCOUNT_ID') ?? '');
 
 // 35 days covers Google's ~30-day invalid-click adjustment window.
 const ROLLING_DAYS = Number(Deno.env.get('ADS_SYNC_ROLLING_DAYS') ?? '35');
@@ -63,6 +64,15 @@ function digitsOnly(v: string): string {
  */
 function customerIds(v: string): string[] {
   return [...new Set((v.match(/\d{3}[-\s]?\d{3}[-\s]?\d{4}/g) ?? []).map(digitsOnly))];
+}
+
+/**
+ * "act_1124619897926603, 6342420329119051" -> ['1124619897926603', '6342420329119051'],
+ * without duplicates. A Meta ad account id is one run of digits; the act_ prefix
+ * and whatever separates two ids are ignored.
+ */
+function metaAccountIds(v: string): string[] {
+  return [...new Set(v.match(/\d{5,}/g) ?? [])];
 }
 
 /** Today on Montreal's calendar; the UTC date is already tomorrow in the evening. */
@@ -432,7 +442,7 @@ async function googleCampaigns(errors: string[]): Promise<CampaignRow[]> {
 
 // ─── Meta ─────────────────────────────────────────────────────────────────────
 
-const metaConfigured = () => Boolean(META_ACCESS_TOKEN && META_AD_ACCOUNT_ID);
+const metaConfigured = () => Boolean(META_ACCESS_TOKEN && META_AD_ACCOUNT_IDS.length > 0);
 
 /** `lead` is Meta's roll-up of the specific lead action types; prefer it to avoid double counting. */
 function metaLeadCount(actions: unknown): number {
@@ -451,10 +461,10 @@ function metaUrl(path: string, params: Record<string, string>): string {
   return `https://graph.facebook.com/${META_API_VERSION}/${path}?${qs}`;
 }
 
-/** Currency and display name of the ad account. Either can be missing; neither stops a sync. */
-async function metaAccount(): Promise<{ currency: string | null; name: string | null }> {
+/** Currency and display name of one ad account. Either can be missing; neither stops a sync. */
+async function metaAccount(accountId: string): Promise<{ currency: string | null; name: string | null }> {
   try {
-    const res = await fetch(metaUrl(`act_${META_AD_ACCOUNT_ID}`, { fields: 'currency,name' }));
+    const res = await fetch(metaUrl(`act_${accountId}`, { fields: 'currency,name' }));
     if (!res.ok) return { currency: null, name: null };
     const body = await res.json();
     return { currency: body.currency ?? null, name: String(body.name ?? '').trim() || null };
@@ -521,10 +531,11 @@ async function metaGet(url: string): Promise<Record<string, unknown>> {
 }
 
 /**
- * Daily per-campaign insights (time_increment=1), one calendar month per request.
- * Dates older than Meta's retention are skipped: Meta has no data to return there.
- * A failed month is recorded and the rest continue, except on a rate limit, where
- * further requests would only fail the same way.
+ * Daily per-campaign insights (time_increment=1), one calendar month per request,
+ * for every ad account in turn. Dates older than Meta's retention are skipped:
+ * Meta has no data to return there. A failed month is recorded and the rest
+ * continue, for this account and the others, except on a rate limit, where
+ * further requests would only fail the same way: that stops the whole walk.
  */
 async function syncMeta(start: string, end: string, errors: string[], accounts: AccountRow[]): Promise<SpendRow[]> {
   const rows: SpendRow[] = [];
@@ -532,87 +543,95 @@ async function syncMeta(start: string, end: string, errors: string[], accounts: 
   const from = start < earliest ? earliest : start;
   if (from > end) return rows;
 
-  const { currency, name } = await metaAccount();
   const now = new Date().toISOString();
-  accounts.push({ platform: 'meta', ad_account_id: META_AD_ACCOUNT_ID, name, currency, synced_at: now });
+  // With one account the messages read as they always did; with several, each says whose it is.
+  const tag = (accountId: string) => (META_AD_ACCOUNT_IDS.length > 1 ? `${accountId} ` : '');
 
-  for (const [since, until] of monthWindows(from, end)) {
-    try {
-      let url: string | null = metaUrl(`act_${META_AD_ACCOUNT_ID}/insights`, {
-        level: 'campaign',
-        fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions',
-        time_range: JSON.stringify({ since, until }),
-        time_increment: '1',
-        limit: '500',
-      });
-      let guard = 0;
+  walk: for (const accountId of META_AD_ACCOUNT_IDS) {
+    const { currency, name } = await metaAccount(accountId);
+    accounts.push({ platform: 'meta', ad_account_id: accountId, name, currency, synced_at: now });
 
-      while (url && guard++ < 200) {
-        const data = await metaGet(url);
-        for (const row of (data.data ?? []) as Array<Record<string, unknown>>) {
-          const date = String(row.date_start ?? '');
-          if (!date || !row.campaign_id) continue;
-          const leads = metaLeadCount(row.actions);
-          rows.push({
-            platform: 'meta',
-            ad_account_id: META_AD_ACCOUNT_ID,
-            campaign_id: String(row.campaign_id),
-            campaign_name: (row.campaign_name as string) ?? null,
-            campaign_status: null,
-            spend_date: date,
-            currency,
-            spend: Number(row.spend ?? 0),
-            impressions: Number(row.impressions ?? 0),
-            clicks: Number(row.clicks ?? 0),
-            conversions: leads,
-            leads,
-            synced_at: now,
-          });
+    for (const [since, until] of monthWindows(from, end)) {
+      try {
+        let url: string | null = metaUrl(`act_${accountId}/insights`, {
+          level: 'campaign',
+          fields: 'campaign_id,campaign_name,spend,impressions,clicks,actions',
+          time_range: JSON.stringify({ since, until }),
+          time_increment: '1',
+          limit: '500',
+        });
+        let guard = 0;
+
+        while (url && guard++ < 200) {
+          const data = await metaGet(url);
+          for (const row of (data.data ?? []) as Array<Record<string, unknown>>) {
+            const date = String(row.date_start ?? '');
+            if (!date || !row.campaign_id) continue;
+            const leads = metaLeadCount(row.actions);
+            rows.push({
+              platform: 'meta',
+              ad_account_id: accountId,
+              campaign_id: String(row.campaign_id),
+              campaign_name: (row.campaign_name as string) ?? null,
+              campaign_status: null,
+              spend_date: date,
+              currency,
+              spend: Number(row.spend ?? 0),
+              impressions: Number(row.impressions ?? 0),
+              clicks: Number(row.clicks ?? 0),
+              conversions: leads,
+              leads,
+              synced_at: now,
+            });
+          }
+          // paging.next is a complete URL, access token and cursor included.
+          url = ((data.paging as { next?: string } | undefined)?.next) ?? null;
         }
-        // paging.next is a complete URL, access token and cursor included.
-        url = ((data.paging as { next?: string } | undefined)?.next) ?? null;
+      } catch (e) {
+        errors.push(`${tag(accountId)}${since}..${until}: ${errorText(e)}`);
+        if (e instanceof MetaApiError && e.rateLimited) break walk;
       }
-    } catch (e) {
-      errors.push(`${since}..${until}: ${errorText(e)}`);
-      if (e instanceof MetaApiError && e.rateLimited) break;
     }
   }
   return rows;
 }
 
 /**
- * Every campaign in the ad account with its configured status. The effective_status
+ * Every campaign of every ad account with its configured status. The effective_status
  * filter is passed explicitly so archived campaigns, which can still carry
  * historical spend, are included. DELETED cannot be requested on this endpoint.
+ * One account failing is recorded and the others are still read.
  */
 async function metaCampaigns(errors: string[]): Promise<CampaignRow[]> {
   const rows: CampaignRow[] = [];
-  try {
-    const now = new Date().toISOString();
-    let url: string | null = metaUrl(`act_${META_AD_ACCOUNT_ID}/campaigns`, {
-      fields: 'id,name,status,effective_status',
-      effective_status: JSON.stringify(['ACTIVE', 'PAUSED', 'ARCHIVED', 'IN_PROCESS', 'WITH_ISSUES']),
-      limit: '500',
-    });
-    let guard = 0;
-    while (url && guard++ < 50) {
-      const data = await metaGet(url);
-      for (const c of (data.data ?? []) as Array<{ id?: string; name?: string; status?: string }>) {
-        if (!c.id) continue;
-        rows.push({
-          platform: 'meta',
-          ad_account_id: META_AD_ACCOUNT_ID,
-          campaign_id: String(c.id),
-          campaign_name: c.name ?? null,
-          status: normalizeStatus(c.status),
-          platform_status: c.status ?? null,
-          synced_at: now,
-        });
+  const now = new Date().toISOString();
+  for (const accountId of META_AD_ACCOUNT_IDS) {
+    try {
+      let url: string | null = metaUrl(`act_${accountId}/campaigns`, {
+        fields: 'id,name,status,effective_status',
+        effective_status: JSON.stringify(['ACTIVE', 'PAUSED', 'ARCHIVED', 'IN_PROCESS', 'WITH_ISSUES']),
+        limit: '500',
+      });
+      let guard = 0;
+      while (url && guard++ < 50) {
+        const data = await metaGet(url);
+        for (const c of (data.data ?? []) as Array<{ id?: string; name?: string; status?: string }>) {
+          if (!c.id) continue;
+          rows.push({
+            platform: 'meta',
+            ad_account_id: accountId,
+            campaign_id: String(c.id),
+            campaign_name: c.name ?? null,
+            status: normalizeStatus(c.status),
+            platform_status: c.status ?? null,
+            synced_at: now,
+          });
+        }
+        url = ((data.paging as { next?: string } | undefined)?.next) ?? null;
       }
-      url = ((data.paging as { next?: string } | undefined)?.next) ?? null;
+    } catch (e) {
+      errors.push(`campaigns: ${errorText(e)}`);
     }
-  } catch (e) {
-    errors.push(`campaigns: ${errorText(e)}`);
   }
   return rows;
 }
@@ -674,13 +693,27 @@ async function checkScope(): Promise<Record<string, unknown>> {
 
   if (metaConfigured()) {
     try {
-      const res = await fetch(metaUrl(`act_${META_AD_ACCOUNT_ID}`, { fields: 'name,currency,account_status' }));
+      // One probe per ad account: the token can be assigned one and not the other.
+      const accounts: Record<string, unknown>[] = [];
+      for (const accountId of META_AD_ACCOUNT_IDS) {
+        const res = await fetch(metaUrl(`act_${accountId}`, { fields: 'name,currency,account_status' }));
+        accounts.push({
+          ad_account_id: accountId,
+          status: res.status,
+          ok: res.ok,
+          detail: redact(await res.text()).slice(0, 500),
+        });
+      }
+      const failed = accounts.find((a) => a.ok !== true);
       out.meta = {
         configured: true,
         api_version: META_API_VERSION,
-        status: res.status,
-        ok: res.ok,
-        detail: redact(await res.text()).slice(0, 500),
+        // status and detail are kept for the Settings card: the first account that
+        // failed, or the first account when all of them answered.
+        status: (failed ?? accounts[0]).status,
+        ok: !failed,
+        detail: (failed ?? accounts[0]).detail,
+        accounts,
       };
     } catch (e) {
       out.meta = { configured: true, ok: false, detail: errorText(e, 500) };
@@ -792,6 +825,7 @@ Deno.serve(async (req: Request) => {
       google: runGoogle,
       meta: runMeta,
       google_accounts: runGoogle ? GOOGLE_CUSTOMER_IDS : [],
+      meta_accounts: runMeta ? META_AD_ACCOUNT_IDS : [],
       duration_ms: Date.now() - startedAt,
       errors,
     });

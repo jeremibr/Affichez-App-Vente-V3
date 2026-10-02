@@ -493,7 +493,16 @@ those two channels. Setup and credentials: **`docs/ADVERTISING.md`**.
   through the same manager account and both in CAD. Each is stored under its own `ad_account_id`
   and every RPC groups by platform, so the channel figure is their sum. Adding an account does not
   bring in its past: run `scripts/ads-google-backfill.sh` once.
-- **The "Compte publicitaire" filter narrows the spend, not the accounts** (`p_ad_accounts` on
+- **Meta is two ad accounts too.** `META_AD_ACCOUNT_ID` takes a list the same way:
+  `1124619897926603` (Affichez) and `6342420329119051` (La boutique Promo), both read with the one
+  System User token and both in CAD. Past spend comes from `scripts/ads-meta-backfill.sh`, a
+  calendar year per call, clipped to the 37 months Meta keeps. **Deploy the function before
+  changing either secret**: a build that expects one id reads a list as a single wrong id and every
+  scheduled run fails until the new build is live. One account failing is recorded and the others
+  still sync; a Meta rate limit stops the whole walk, since every further request would fail the
+  same way.
+- **The ad-account filters ("Compte Google Ads", "Compte Meta Ads") narrow the spend, not the
+  accounts** (`p_ad_accounts` on
   `get_ad_performance` and `get_ad_monthly`, `20261002100000_ad_account_filter.sql`; the campaign
   table applies the same rule in the browser, its rows carry `ad_account_id`). Spend, impressions,
   clicks and days of data follow the selection. Accounts created and revenue do not: they come
@@ -501,9 +510,16 @@ those two channels. Setup and credentials: **`docs/ADVERTISING.md`**.
   still computed, the channel's accounts against the selected accounts' spend, and the page says
   so; with GLOBAL/PUB alone that is the figure the page showed before the second account existed
   (2026: 0.45 against 0.25 for both). Three rules: the selection **narrows only the platforms it
-  names** (one Google account selected leaves Meta whole); every account ticked is stored as the
-  empty list, the same as none; and the filter is shown only in the paid view, for a platform
-  that has several accounts. The list on offer is read from `ad_spend_daily`; `ad_accounts` only
+  names** (one Google account selected leaves Meta whole); a platform with every one of its
+  accounts ticked is not narrowed, so those accounts leave the selection, the same as ticking none
+  (`narrowingAdAccounts` in `components/advertising/channel.ts`); and a filter is shown only in
+  the paid view, for a platform that has several accounts. There is **one dropdown per platform**
+  over a single `?compte=` list: one list of every account read as if ticking a Google account
+  left Meta out. A platform with exactly two accounts gets a single-choice `Select` (all, one, or
+  the other): in a list to tick, ticking the second account made both ticked, which is "all", and
+  the selection appeared to be thrown away. From three accounts on it is a `MultiSelect`. One small account alone gives an absurd return (La boutique Promo, 2026:
+  66.73), because the whole channel's revenue is held against its spend; the notice says what is
+  being compared, and the figure is only as good as the CRM source tagging. The list on offer is read from `ad_spend_daily`; `ad_accounts` only
   holds the names (`customer.descriptive_name`, Meta's `name`), rewritten by the sync on every
   run, so an account with no name yet is offered by its id. The page sends `p_ad_accounts` only
   when something is selected, which is what lets it run against a database without the parameter.

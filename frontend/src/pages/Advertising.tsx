@@ -20,9 +20,9 @@ import { ChannelCard } from '../components/advertising/ChannelCard';
 import { SpendVsRevenueChart } from '../components/advertising/SpendVsRevenueChart';
 import { CampaignTable } from '../components/advertising/CampaignTable';
 import {
-    CHANNEL_LABEL, AD_VIEWS, AD_VIEW_PARAM, DEFAULT_AD_VIEW,
+    CHANNEL_LABEL, CHANNELS, AD_VIEWS, AD_VIEW_PARAM, DEFAULT_AD_VIEW,
     channelLabel, isCohortOpen, parseAdView, viewHasSpend, formatAdDay,
-    adAccountLabel, inAdAccountSelection,
+    adAccountLabel, inAdAccountSelection, narrowingAdAccounts,
 } from '../components/advertising/channel';
 import type { AdView } from '../components/advertising/channel';
 import { ChannelLogo, ChannelLogoTile } from '../components/advertising/ChannelLogo';
@@ -73,6 +73,9 @@ const WINDOW_OPTIONS = [
 ];
 
 const CURRENT_YEAR = new Date().getFullYear();
+
+/** The "every account" choice of a two-account platform. Never sent: it is the empty selection. */
+const ALL_AD_ACCOUNTS = 'Tous';
 
 /** What the filters offer when their list could not be read: nothing, but loaded. */
 const NO_OPTIONS: AdFilterOptions = {
@@ -157,9 +160,8 @@ export default function Advertising() {
     /** The accounts the spend is limited to, or null for all of them. */
     const pickedAdAccounts = useMemo<AdAccountOption[] | null>(() => {
         if (!hasSpend) return null;
-        const picked = adAccountChoices.filter(a => selectedAdAccounts.includes(a.id));
-        // Every account ticked is the same request as none ticked.
-        return picked.length > 0 && picked.length < adAccountChoices.length ? picked : null;
+        const picked = narrowingAdAccounts(adAccountChoices, selectedAdAccounts);
+        return picked.length > 0 ? picked : null;
     }, [hasSpend, adAccountChoices, selectedAdAccounts]);
     const adAccountsParam = useMemo(
         () => (pickedAdAccounts ? pickedAdAccounts.map(a => a.id) : null),
@@ -181,7 +183,8 @@ export default function Advertising() {
         selectedServices.length > 0,
         selectedDomaines.length > 0,
         selectedRegions.length > 0,
-        pickedAdAccounts !== null,
+        // One per platform: each has a dropdown of its own.
+        ...CHANNELS.map(c => (pickedAdAccounts ?? []).some(acc => acc.platform === c)),
         campaignPlatform !== 'Toutes',
         campaignStatuses.length > 0,
     ].filter(Boolean).length;
@@ -262,10 +265,27 @@ export default function Advertising() {
 
     const optionList = (values: string[] | undefined) => (values ?? []).map(v => ({ value: v, label: v }));
 
-    const adAccountOptions = useMemo(
-        () => adAccountChoices.map(a => ({ value: a.id, label: adAccountLabel(a) })),
+    // One dropdown per platform. A single list of every account read as if
+    // ticking a Google account left Meta out, when a platform that is not named
+    // is counted whole; a filter of its own for each platform says that by itself.
+    const adAccountFilters = useMemo(
+        () => CHANNELS
+            .map(channel => ({
+                channel,
+                options: adAccountChoices.filter(a => a.platform === channel).map(a => ({
+                    value: a.id,
+                    label: adAccountLabel(a),
+                    icon: <ChannelLogo channel={channel} size="xs" />,
+                })),
+            }))
+            .filter(f => f.options.length > 0),
         [adAccountChoices],
     );
+    /** The selection with one platform's part replaced; the other platforms keep theirs. */
+    const setAdAccountsOf = (channel: AdChannel, ids: string[]) => {
+        const others = (pickedAdAccounts ?? []).filter(a => a.platform !== channel).map(a => a.id);
+        setSelectedAdAccounts(narrowingAdAccounts(adAccountChoices, [...others, ...ids]).map(a => a.id));
+    };
     // The campaign rows carry their ad account, so the same selection is applied here.
     const visibleCampaigns = useMemo(
         () => campaigns.filter(c => inAdAccountSelection(c.platform, c.ad_account_id, pickedAdAccounts)),
@@ -364,15 +384,38 @@ export default function Advertising() {
                     <MultiSelect values={selectedRegions} onChange={setSelectedRegions}
                                  options={optionList(options?.regions)} allLabel="Toutes les régions" className="w-44" />
                 </FilterGroup>
-                {hasSpend && adAccountOptions.length > 0 && (
-                    <FilterGroup label="Compte publicitaire">
-                        {/* Every account ticked is "all": stored as the empty list, so
-                            the link and the request are the same either way. */}
-                        <MultiSelect values={adAccountsParam ?? []}
-                                     onChange={ids => setSelectedAdAccounts(ids.length === adAccountOptions.length ? [] : ids)}
-                                     options={adAccountOptions} allLabel="Tous les comptes" className="w-56" />
-                    </FilterGroup>
-                )}
+                {hasSpend && adAccountFilters.map(f => {
+                    const picked = (pickedAdAccounts ?? []).filter(a => a.platform === f.channel).map(a => a.id);
+                    const logo = <ChannelLogo channel={f.channel} size="xs" />;
+                    return (
+                        <FilterGroup key={f.channel} label={`Compte ${CHANNEL_LABEL[f.channel]}`}>
+                            {f.options.length === 2 ? (
+                                // Two accounts leave three choices: all, one, or the other.
+                                // A list to tick would let both be ticked, which is "all"
+                                // again and reads as the selection being thrown away.
+                                <Select
+                                    value={picked[0] ?? ALL_AD_ACCOUNTS}
+                                    onChange={v => setAdAccountsOf(f.channel, v === ALL_AD_ACCOUNTS ? [] : [v])}
+                                    options={[
+                                        { value: ALL_AD_ACCOUNTS, label: 'Tous les comptes', icon: logo },
+                                        ...f.options,
+                                    ]}
+                                    searchable={false}
+                                    className="w-56" />
+                            ) : (
+                                // From three accounts on, a subset means something. Every
+                                // account ticked is not a narrowing, so it is stored as none.
+                                <MultiSelect
+                                    values={picked}
+                                    onChange={ids => setAdAccountsOf(f.channel, ids)}
+                                    options={f.options}
+                                    allLabel="Tous les comptes"
+                                    allIcon={logo}
+                                    className="w-56" />
+                            )}
+                        </FilterGroup>
+                    );
+                })}
                 <FilterGroup label="Statut">
                     <Select value={ratingScope} onChange={setRatingScope} className="w-52"
                             options={[
@@ -488,13 +531,19 @@ function NarrowedNotice() {
 }
 
 function AdAccountNotice({ accounts }: { accounts: AdAccountOption[] }) {
+    // One clause per platform, since each is narrowed on its own.
+    const byPlatform = CHANNELS
+        .map(c => ({ channel: c, names: accounts.filter(a => a.platform === c).map(adAccountLabel) }))
+        .filter(g => g.names.length > 0);
     return (
         <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-tone-neutral-soft border border-hairline">
             <Info className="w-4 h-4 text-tone-neutral-ink shrink-0 mt-0.5" />
             <div className="text-xs text-tone-neutral-ink leading-relaxed">
                 <strong className="font-semibold">
                     Dépense limitée à{' '}
-                    <span translate="no">{accounts.map(adAccountLabel).join(' et ')}</span>.
+                    <span translate="no">
+                        {byPlatform.map(g => `${CHANNEL_LABEL[g.channel]} : ${g.names.join(' et ')}`).join(' ; ')}
+                    </span>.
                 </strong>{' '}
                 Les comptes créés et leurs revenus restent ceux de tout le canal : le CRM
                 n&rsquo;indique pas de quel compte publicitaire vient un client. Le coût par compte et
