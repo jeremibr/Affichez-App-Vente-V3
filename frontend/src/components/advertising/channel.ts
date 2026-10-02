@@ -1,4 +1,4 @@
-import type { AdChannel } from '../../types/database';
+import type { AdAccountOption, AdChannel } from '../../types/database';
 
 export const CHANNELS: AdChannel[] = ['google', 'meta'];
 
@@ -103,4 +103,32 @@ export function cohortBoundsLabel(from: string | null, before: string | null): s
     if (from) return `comptes créés depuis le ${formatAdDay(from)}`;
     if (before) return `comptes créés avant le ${formatAdDay(before)}`;
     return null;
+}
+
+/** A Google customer id the way Google Ads prints it: 437-363-4595. */
+export function formatAccountId(id: string): string {
+    return /^\d{10}$/.test(id) ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
+}
+
+/** How a filter and a notice name an ad account: its name and its id, or the id alone. */
+export function adAccountLabel(account: AdAccountOption): string {
+    const id = formatAccountId(account.id);
+    return account.name ? `${account.name} · ${id}` : id;
+}
+
+/**
+ * Whether spend from `adAccountId` is counted under an ad-account selection.
+ * A selection narrows only the platforms it names: picking one Google account
+ * leaves Meta whole. `selected` is null when nothing is selected. This is the
+ * rule p_ad_accounts follows in get_ad_performance and get_ad_monthly; the
+ * campaign table applies it here because its rows already carry the account.
+ */
+export function inAdAccountSelection(
+    platform: AdChannel,
+    adAccountId: string,
+    selected: AdAccountOption[] | null,
+): boolean {
+    if (selected === null) return true;
+    const ofPlatform = selected.filter(a => a.platform === platform);
+    return ofPlatform.length === 0 || ofPlatform.some(a => a.id === adAccountId);
 }

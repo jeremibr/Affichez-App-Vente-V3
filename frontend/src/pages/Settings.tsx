@@ -623,11 +623,13 @@ function UsersManager({ setMessage }: { setMessage: (m: { type: 'success' | 'err
             if (data) setRepOptions((data as { rep_name: string }[]).map(r => r.rep_name));
         });
         setZohoUsersLoading(true);
-        fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-zoho-users`, {
-            headers: {
-                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            },
-        })
+        // The signed-in admin's own token: the function refuses anything else,
+        // the anon key included.
+        supabase.auth.getSession()
+            .then(({ data: { session } }) => fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-zoho-users`,
+                { headers: { Authorization: `Bearer ${session?.access_token ?? ''}` } },
+            ))
             .then(r => r.json())
             .then(data => {
                 if (data.users?.length) setZohoUsers(data.users);

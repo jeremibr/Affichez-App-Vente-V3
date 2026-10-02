@@ -50,8 +50,9 @@ There is no service layer abstraction; Supabase calls are made directly inside p
 
 ### Access: the user list, then sections
 
-`allowed_users` is the whole access model (migration `20261001130000_section_access.sql`).
-Two roles, `admin` and `member`, and five section flags; there is no third role.
+`allowed_users` is the whole access model (migrations `20261001130000_section_access.sql`
+and `20261002090000_section_row_access.sql`). Two roles, `admin` and `member`, and
+five section flags; there is no third role.
 
 **1. Not in the list, no access.** `zoho-auth` gives a session only to an address
 that has a row; the `@affichez.ca` auto-registration is gone. A session without a
@@ -60,8 +61,9 @@ table**: each table in `public` carries a RESTRICTIVE policy `listed_users_only`
 (`app_is_listed()`), which is ANDed with the table's own policies. The app shows
 `AccessDenied` instead of the routes.
 
-> A table created after that migration needs the same policy. Nothing adds it
-> automatically, and without it the new table is readable by any session.
+> A table created after that migration needs the same policy, and a read policy
+> naming the sections that may read it (rule 2 below). Nothing adds either
+> automatically, and without them the new table is readable by any session.
 
 Identity is the email in the session token, so two more things hold it up:
 
@@ -72,8 +74,16 @@ Identity is the email in the session token, so two more things hold it up:
   of their own before its owner first signs in. Turning sign-ups off in the
   Supabase dashboard closes the same door one layer earlier.
 - **A SECURITY DEFINER function bypasses RLS**, so each one that returns data
-  refuses an anonymous or unlisted API caller itself (`get_sales_team`,
-  `tasks_visible_reps`). Write a new one the same way, or make it SECURITY INVOKER.
+  refuses the wrong API caller itself: `get_sales_team` and `tasks_visible_reps`
+  an anonymous or unlisted one, the three Publicité RPCs anyone without the
+  section (`app_require_section('publicite')`, first statement of the body, which
+  raises 42501 and reaches the browser as a 403). Write a new one the same way,
+  or make it SECURITY INVOKER.
+- **An edge function is reachable with the anon key**, which ships in the
+  frontend bundle. One that returns data checks its caller: `get-zoho-users`
+  (the Zoho user directory behind the "add user" picker) asks `app_is_admin()`
+  with the caller's own session token and answers 403 to anything else. The
+  sync functions return counts only and are not gated.
 
 **2. A member opens the sections ticked for them** in Paramètres → Utilisateurs.
 One boolean column each, listed once in `src/lib/sections.ts`:
@@ -89,26 +99,63 @@ One boolean column each, listed once in `src/lib/sections.ts`:
 An admin has all five whatever the columns say. Notre équipe and Administration
 have no flag: admin-only. An "ads manager" is a member with only Publicité ticked.
 
-What a flag protects, and what it only hides:
+**A flag locks the data, not only the screens.** Each table is readable by the
+sections that have a screen on it and by nobody else; the policies call
+`app_can_access('<section>')` or `app_can_access_any('<a>', '<b>')`:
 
-- **Comptes, Publicité: protected at the row level.** `zoho_accounts` is readable
-  with `comptes` OR `publicite` (the ad RPCs are SECURITY INVOKER and read it);
-  `ad_spend_daily` and `ad_campaigns` with `publicite`. Policies call
-  `app_can_access('<section>')`.
-- **Devis, Factures, Mon Portail: screens only.** `sales`, `invoices` and
-  `zoho_leads` stay readable to every listed user, because Mon Portail is built on
-  them. Unticking Devis removes the screens, not the API access.
-- **Settings are written by admins only**, in the database too: `objectives`,
-  `objectives_factures`, `rep_objectives`, `rep_objectives_dept`,
-  `excluded_clients`, `reps` and `leads` carry restrictive `admin_*_only` policies
-  on insert, update and delete. Every listed user can still read them.
+| table | read in full by | own rows only |
+|---|---|---|
+| `sales` | Devis | Mon Portail |
+| `invoices` | Factures, Comptes | Mon Portail |
+| `zoho_leads` | Comptes, Mon Portail | |
+| `zoho_accounts` | Comptes | |
+| `ad_spend_daily`, `ad_campaigns` | Publicité | |
+| `objectives` | Devis | |
+| `objectives_factures` | Factures | |
+| `rep_objectives`, `rep_objectives_dept` | Devis, Factures | Mon Portail |
+| `excluded_clients`, `excluded_reps` | Devis, Factures, Mon Portail | |
+| `fiscal_quarters` | Devis, Factures | |
+| `zoho_books_customers` | Factures | |
+| `zoho_tasks`, `webhook_log`, `zoho_books_users`, `department_mappings`, `leads` | admins | |
+
+"Own rows" is `rep_name = app_portal_rep()`: the caller's `rep_name`, and only
+while Mon Portail is ticked. Every portal screen already filtered on that name,
+so a rep's figures are the same rows as before. Four things in that table are
+deliberate and easy to "tidy" into a bug:
+
+- **Mon Portail also reads the invoices of the accounts the rep holds a lead or
+  contact on**, whoever sold them. Mes Leads totals revenue per account, and an
+  invoice belongs to an account. Without that clause the "facturé" figures drop
+  to the rep's own invoices, silently.
+- **`zoho_leads` is not cut down to own rows.** `zoho_leads_unique` hides a
+  converted lead behind the contact it became, and that contact can belong to
+  another rep; with only their own rows a rep's list would grow leads that are
+  hidden today.
+- **Comptes reads `invoices` in full**: its detail screen opens any account's
+  billing history. Publicité reads neither `invoices` nor `zoho_accounts`: its
+  three RPCs are SECURITY DEFINER and return aggregates only.
+- **The invoices policy reads `rep_name` on every row**, so the covering index
+  the Comptes RPCs scan carries it (`invoices_crm_account_cover2_idx`). Take the
+  column out and every account lookup pays a heap fetch: 56 → 90 ms measured.
+
+> **A hidden table does not raise an error inside an RPC, it changes the result.**
+> A caller who cannot read `excluded_clients` gets totals with the excluded
+> clients counted in; one who cannot read `objectives` gets a target of 0. When
+> a screen starts reading a table, add its section to that table's policy in
+> the same release, and check as a member, not as an admin.
+
+**Settings are written by admins only**, in the database too: `objectives`,
+`objectives_factures`, `rep_objectives`, `rep_objectives_dept`, `excluded_clients`,
+`reps` and `leads` have one write policy (`<table>_admin_all`) and the restrictive
+`admin_*_only` policies on top.
 
 `AuthContext` reads the user's own row with `select('*')` and exposes `access`
 (`granted` / `denied` / `error`), `isAdmin` and `sections`. `App.tsx` builds the
 routes from `sections`; a URL outside them falls to the catch-all and lands on
 `homePathFor(sections)`, the first section the person can open. When you add a
-section: a column, a line in `SECTIONS`, a `WHEN` in `app_can_access`, the route
-and the nav entry.
+section: a column, a line in `SECTIONS`, a `WHEN` in `app_can_access` and a line
+in `app_can_access_any`, the read policies of the tables its screens use, the
+route and the nav entry.
 
 ### Filters take several values
 
@@ -364,14 +411,13 @@ with the **Comptes** section (see **Access** above). Its grain is the Zoho CRM
 three contacts is one account, so its revenue is counted once with no dedupe layer.
 
 **Restricted at the row level, not just in the nav.** `zoho_accounts` carries a
-SELECT policy on `app_can_access('comptes') OR app_can_access('publicite')`, so
-anyone else reading it through PostgREST gets zero rows rather than the client
-list. Every reader is a Comptes or Publicité screen and all of them are SECURITY
-INVOKER, so nothing else changes;
-`zoho_accounts_enriched` is `security_invoker=true` and follows the table.
-`invoices` and `zoho_leads` deliberately stay readable to any signed-in user —
-the Factures module and Mon Portail are built on them. The syncs write with the
-service role and bypass RLS.
+SELECT policy on `app_can_access('comptes')`, so anyone else reading it through
+PostgREST gets zero rows rather than the client list. The Comptes RPCs are
+SECURITY INVOKER and follow that policy; `zoho_accounts_enriched` is
+`security_invoker=true` and follows the table. The section also reads `invoices`
+and `zoho_leads` in full, which its detail screen shows account by account (the
+table under **Access** has every reader). The syncs write with the service role
+and bypass RLS.
 
 The Leads pages and every `get_zoho_lead*` RPC are still there and still work —
 only the routes and nav entries in `App.tsx` / `Layout.tsx` are commented out.
@@ -447,8 +493,26 @@ those two channels. Setup and credentials: **`docs/ADVERTISING.md`**.
   through the same manager account and both in CAD. Each is stored under its own `ad_account_id`
   and every RPC groups by platform, so the channel figure is their sum. Adding an account does not
   bring in its past: run `scripts/ads-google-backfill.sh` once.
-- **Restricted at the row level** (`app_can_access('publicite')` policy), not just hidden in the
-  nav. The RPCs are SECURITY INVOKER, so a caller without the section gets zero spend, not an error.
+- **The "Compte publicitaire" filter narrows the spend, not the accounts** (`p_ad_accounts` on
+  `get_ad_performance` and `get_ad_monthly`, `20261002100000_ad_account_filter.sql`; the campaign
+  table applies the same rule in the browser, its rows carry `ad_account_id`). Spend, impressions,
+  clicks and days of data follow the selection. Accounts created and revenue do not: they come
+  from the CRM source, which does not say which ad account a client came from. The ratios are
+  still computed, the channel's accounts against the selected accounts' spend, and the page says
+  so; with GLOBAL/PUB alone that is the figure the page showed before the second account existed
+  (2026: 0.45 against 0.25 for both). Three rules: the selection **narrows only the platforms it
+  names** (one Google account selected leaves Meta whole); every account ticked is stored as the
+  empty list, the same as none; and the filter is shown only in the paid view, for a platform
+  that has several accounts. The list on offer is read from `ad_spend_daily`; `ad_accounts` only
+  holds the names (`customer.descriptive_name`, Meta's `name`), rewritten by the sync on every
+  run, so an account with no name yet is offered by its id. The page sends `p_ad_accounts` only
+  when something is selected, which is what lets it run against a database without the parameter.
+- **Restricted at the row level** (`app_can_access('publicite')` policy on the two ad tables), not
+  just hidden in the nav. `get_ad_performance`, `get_ad_monthly` and `get_ad_filter_options` are
+  **SECURITY DEFINER**: revenue per channel is built on `zoho_accounts` and `invoices`, which the
+  section must not read, so the functions run as their owner, return aggregates, and refuse a
+  caller without the section with a 403. `get_ad_campaigns` and `get_ad_spend_status` read the ad
+  tables only and stay SECURITY INVOKER (zero rows without the section, not an error).
 - **Three views, one page**, all defined in `ad_channel_source_map(p_view)`
   (`20261001150000_ad_views_and_filters.sql`), which returns each source with the creation-date
   range its accounts are taken from:

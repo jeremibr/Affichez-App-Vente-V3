@@ -8,7 +8,7 @@ import { MultiSelect } from '../MultiSelect';
 import type { CsvColumn } from '../../lib/csv';
 import { useSort, type SortConfig } from '../../hooks/useSort';
 import { SortIcon } from '../SortIcon';
-import { CHANNEL_LABEL, CHANNELS } from './channel';
+import { CHANNEL_LABEL, CHANNELS, formatAccountId } from './channel';
 import { ChannelLogo } from './ChannelLogo';
 
 const STATUS_LABEL: Record<AdCampaignStatus, string> = {
@@ -33,11 +33,6 @@ const FILTER_LABEL: Record<(typeof CAMPAIGN_STATUS_FILTERS)[number], string> = {
     paused: 'En pause',
     removed: 'Supprimées',
 };
-
-/** A Google customer id the way Google Ads prints it: 437-363-4595. */
-function formatAccountId(id: string): string {
-    return /^\d{10}$/.test(id) ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
-}
 
 /**
  * Per-campaign figures as reported by the ad platforms, filterable by platform and

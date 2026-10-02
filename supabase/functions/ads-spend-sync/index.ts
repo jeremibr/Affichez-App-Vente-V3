@@ -127,9 +127,43 @@ interface SpendRow {
   synced_at: string;
 }
 
+/** The name an ad platform gives an account, for the Publicité account filter. */
+interface AccountRow {
+  platform: 'google' | 'meta';
+  ad_account_id: string;
+  name: string | null;
+  currency: string | null;
+  synced_at: string;
+}
+
 // ─── Supabase ─────────────────────────────────────────────────────────────────
 
 const BATCH = 500;
+
+/**
+ * Account names are a label, not a figure: a failure here is logged and the
+ * sync carries on. An account whose name could not be read is inserted without
+ * one and never overwrites a name already stored.
+ */
+async function upsertAccounts(rows: AccountRow[]): Promise<void> {
+  const groups: Array<[AccountRow[], string]> = [
+    [rows.filter((r) => r.name), 'resolution=merge-duplicates'],
+    [rows.filter((r) => !r.name), 'resolution=ignore-duplicates'],
+  ];
+  for (const [group, prefer] of groups) {
+    if (group.length === 0) continue;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/ad_accounts?on_conflict=platform,ad_account_id`, {
+        method: 'POST',
+        headers: { ...SB_HEADERS, Prefer: prefer },
+        body: JSON.stringify(group),
+      });
+      if (!res.ok) console.warn('ad_accounts upsert failed: ' + (await res.text()).slice(0, 300));
+    } catch (e) {
+      console.warn('ad_accounts upsert failed: ' + errorText(e));
+    }
+  }
+}
 
 async function upsertSpend(rows: SpendRow[]): Promise<number> {
   for (let i = 0; i < rows.length; i += BATCH) {
@@ -286,12 +320,16 @@ async function googleSearch(customerId: string, query: string, token: string): P
   return out;
 }
 
-async function googleCurrency(customerId: string, token: string): Promise<string | null> {
+/** Currency and display name of one ad account. Either can be missing; neither stops a sync. */
+async function googleAccount(customerId: string, token: string): Promise<{ currency: string | null; name: string | null }> {
   try {
-    const rows = await googleSearch(customerId, 'SELECT customer.currency_code FROM customer LIMIT 1', token);
-    return (rows[0]?.customer as { currencyCode?: string } | undefined)?.currencyCode ?? null;
+    const rows = await googleSearch(
+      customerId, 'SELECT customer.currency_code, customer.descriptive_name FROM customer LIMIT 1', token,
+    );
+    const customer = rows[0]?.customer as { currencyCode?: string; descriptiveName?: string } | undefined;
+    return { currency: customer?.currencyCode ?? null, name: customer?.descriptiveName?.trim() || null };
   } catch {
-    return null;
+    return { currency: null, name: null };
   }
 }
 
@@ -301,7 +339,7 @@ async function googleCurrency(customerId: string, token: string): Promise<string
  * independent, and dropping a good account's spend because another one errored
  * would understate the channel.
  */
-async function syncGoogle(start: string, end: string, errors: string[]): Promise<SpendRow[]> {
+async function syncGoogle(start: string, end: string, errors: string[], accounts: AccountRow[]): Promise<SpendRow[]> {
   const rows: SpendRow[] = [];
   let token: string;
   try {
@@ -314,7 +352,8 @@ async function syncGoogle(start: string, end: string, errors: string[]): Promise
 
   for (const customerId of GOOGLE_CUSTOMER_IDS) {
     try {
-      const currency = await googleCurrency(customerId, token);
+      const { currency, name } = await googleAccount(customerId, token);
+      accounts.push({ platform: 'google', ad_account_id: customerId, name, currency, synced_at: now });
       const results = await googleSearch(
         customerId,
         'SELECT campaign.id, campaign.name, campaign.status, segments.date, ' +
@@ -412,13 +451,15 @@ function metaUrl(path: string, params: Record<string, string>): string {
   return `https://graph.facebook.com/${META_API_VERSION}/${path}?${qs}`;
 }
 
-async function metaCurrency(): Promise<string | null> {
+/** Currency and display name of the ad account. Either can be missing; neither stops a sync. */
+async function metaAccount(): Promise<{ currency: string | null; name: string | null }> {
   try {
-    const res = await fetch(metaUrl(`act_${META_AD_ACCOUNT_ID}`, { fields: 'currency' }));
-    if (!res.ok) return null;
-    return (await res.json()).currency ?? null;
+    const res = await fetch(metaUrl(`act_${META_AD_ACCOUNT_ID}`, { fields: 'currency,name' }));
+    if (!res.ok) return { currency: null, name: null };
+    const body = await res.json();
+    return { currency: body.currency ?? null, name: String(body.name ?? '').trim() || null };
   } catch {
-    return null;
+    return { currency: null, name: null };
   }
 }
 
@@ -485,14 +526,15 @@ async function metaGet(url: string): Promise<Record<string, unknown>> {
  * A failed month is recorded and the rest continue, except on a rate limit, where
  * further requests would only fail the same way.
  */
-async function syncMeta(start: string, end: string, errors: string[]): Promise<SpendRow[]> {
+async function syncMeta(start: string, end: string, errors: string[], accounts: AccountRow[]): Promise<SpendRow[]> {
   const rows: SpendRow[] = [];
   const earliest = metaEarliestDate(todayInMontreal());
   const from = start < earliest ? earliest : start;
   if (from > end) return rows;
 
-  const currency = await metaCurrency();
+  const { currency, name } = await metaAccount();
   const now = new Date().toISOString();
+  accounts.push({ platform: 'meta', ad_account_id: META_AD_ACCOUNT_ID, name, currency, synced_at: now });
 
   for (const [since, until] of monthWindows(from, end)) {
     try {
@@ -712,9 +754,11 @@ Deno.serve(async (req: Request) => {
     }
 
     const rows: SpendRow[] = [];
-    if (runGoogle) rows.push(...await syncGoogle(start, end, errors));
-    if (runMeta) rows.push(...await syncMeta(start, end, errors));
+    const accounts: AccountRow[] = [];
+    if (runGoogle) rows.push(...await syncGoogle(start, end, errors, accounts));
+    if (runMeta) rows.push(...await syncMeta(start, end, errors, accounts));
     const upserted = await upsertSpend(rows);
+    await upsertAccounts(accounts);
 
     const campaignRows: CampaignRow[] = [];
     if (runGoogle) campaignRows.push(...await googleCampaigns(errors));

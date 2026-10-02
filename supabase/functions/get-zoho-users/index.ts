@@ -1,6 +1,15 @@
 // supabase/functions/get-zoho-users/index.ts
 // Returns the list of active users from Zoho Books (both orgs), deduplicated by email.
 // Used by the admin Utilisateurs panel to pre-configure access before first login.
+//
+// Admins only. The gateway accepts any token signed for the project, and the
+// anon key shipped in the frontend bundle is one, so the check has to happen
+// here: the caller's own session token is asked whether it is an admin.
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+// Only identifies the project to the API gateway; the role comes from the
+// caller's Authorization header.
+const API_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const ORGS = [
   { id: Deno.env.get('ZOHO_ORG_ID_QC')  ?? '48244978',  office: 'QC'  },
@@ -27,9 +36,39 @@ async function getAccessToken(): Promise<string> {
 
 interface ZohoUser { name: string; email: string; }
 
+/**
+ * app_is_admin() is the definition every policy uses: listed in allowed_users,
+ * role admin, session opened through the Zoho sign-in. Calling it with the
+ * caller's token keeps one definition instead of a second one here. Anything
+ * but a clean `true` is a refusal, including a failed lookup.
+ */
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  const auth = req.headers.get('Authorization') ?? '';
+  if (!/^Bearer\s+\S+/i.test(auth)) return false;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/app_is_admin`, {
+      method: 'POST',
+      headers: { apikey: API_KEY, Authorization: auth, 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) return false;
+    return (await res.json()) === true;
+  } catch (err) {
+    console.error('get-zoho-users admin check failed:', err);
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS });
+  }
+
+  if (!(await callerIsAdmin(req))) {
+    return new Response(JSON.stringify({ error: 'forbidden', users: [] }), {
+      status: 403,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

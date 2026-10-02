@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type {
     AdPerformanceRow, AdMonthlyRow, AdCampaignRow, AdSpendStatusRow, AdChannel, AdFilterOptions,
+    AdAccountOption,
 } from '../types/database';
 import { MONTHS } from '../lib/constants';
 import { FilterBar, FilterGroup } from '../components/FilterBar';
@@ -21,6 +22,7 @@ import { CampaignTable } from '../components/advertising/CampaignTable';
 import {
     CHANNEL_LABEL, AD_VIEWS, AD_VIEW_PARAM, DEFAULT_AD_VIEW,
     channelLabel, isCohortOpen, parseAdView, viewHasSpend, formatAdDay,
+    adAccountLabel, inAdAccountSelection,
 } from '../components/advertising/channel';
 import type { AdView } from '../components/advertising/channel';
 import { ChannelLogo, ChannelLogoTile } from '../components/advertising/ChannelLogo';
@@ -49,6 +51,12 @@ import { AdvertisingIcon } from '../components/advertising/AdvertisingIcon';
  * return no cost and no return, and the page says so. A source filter selects
  * whole channels and keeps every ratio.
  *
+ * The ad-account filter works the other way round: it narrows the spend and
+ * leaves the accounts whole, because the CRM does not record which ad account a
+ * client came from. It is offered for a platform synced from several ad
+ * accounts, in the paid view only, and the ratios stay: they compare the
+ * channel's accounts with the spend of the ad accounts selected.
+ *
  * Organic is the default view while the Google Ads cohort is young;
  * DEFAULT_AD_VIEW is the one line to flip when the paid figures carry enough
  * months.
@@ -67,7 +75,9 @@ const WINDOW_OPTIONS = [
 const CURRENT_YEAR = new Date().getFullYear();
 
 /** What the filters offer when their list could not be read: nothing, but loaded. */
-const NO_OPTIONS: AdFilterOptions = { sources: [], services: [], reps: [], domaines: [], regions: [] };
+const NO_OPTIONS: AdFilterOptions = {
+    sources: [], services: [], reps: [], domaines: [], regions: [], ad_accounts: [],
+};
 
 const YEAR_OPTIONS = [
     { value: 'Toutes', label: 'Toutes les années' },
@@ -104,6 +114,8 @@ export default function Advertising() {
     const [selectedServices, setSelectedServices] = useUrlList('service');
     const [selectedDomaines, setSelectedDomaines] = useUrlList('domaine');
     const [selectedRegions, setSelectedRegions] = useUrlList('region');
+    // Spend filter: the ad accounts whose spend is counted. Empty is all of them.
+    const [selectedAdAccounts, setSelectedAdAccounts] = useUrlList('compte');
 
     const [options, setOptions] = useState<AdFilterOptions | null>(null);
     const [loading, setLoading] = useState(true);
@@ -136,6 +148,24 @@ export default function Advertising() {
     const domainesParam = selectedDomaines.length > 0 ? selectedDomaines : null;
     const regionsParam = selectedRegions.length > 0 ? selectedRegions : null;
 
+    // Only a platform synced from several ad accounts has anything to choose
+    // between; with one account each, the filter is not shown at all.
+    const adAccountChoices = useMemo<AdAccountOption[]>(() => {
+        const all = options?.ad_accounts ?? [];
+        return all.filter(a => all.filter(b => b.platform === a.platform).length > 1);
+    }, [options]);
+    /** The accounts the spend is limited to, or null for all of them. */
+    const pickedAdAccounts = useMemo<AdAccountOption[] | null>(() => {
+        if (!hasSpend) return null;
+        const picked = adAccountChoices.filter(a => selectedAdAccounts.includes(a.id));
+        // Every account ticked is the same request as none ticked.
+        return picked.length > 0 && picked.length < adAccountChoices.length ? picked : null;
+    }, [hasSpend, adAccountChoices, selectedAdAccounts]);
+    const adAccountsParam = useMemo(
+        () => (pickedAdAccounts ? pickedAdAccounts.map(a => a.id) : null),
+        [pickedAdAccounts],
+    );
+
     /** The accounts are a subset the spend cannot be matched to. */
     const narrowed = repsParam !== null || servicesParam !== null
         || domainesParam !== null || regionsParam !== null;
@@ -151,6 +181,7 @@ export default function Advertising() {
         selectedServices.length > 0,
         selectedDomaines.length > 0,
         selectedRegions.length > 0,
+        pickedAdAccounts !== null,
         campaignPlatform !== 'Toutes',
         campaignStatuses.length > 0,
     ].filter(Boolean).length;
@@ -158,7 +189,7 @@ export default function Advertising() {
     const clearFilters = () => {
         setYearParam(String(CURRENT_YEAR), {
             month: null, fenetre: null, statut: null, plateforme: null, campagnes: null,
-            rep: null, source: null, service: null, domaine: null, region: null,
+            rep: null, source: null, service: null, domaine: null, region: null, compte: null,
         });
     };
 
@@ -173,9 +204,11 @@ export default function Advertising() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchOptions(); }, [fetchOptions]);
 
-    // A source filter in the URL can only be checked against the view's own
-    // sources, so the first read waits for them rather than running unfiltered.
-    const waitingForOptions = selectedSources.length > 0 && options === null;
+    // A source or an ad account in the URL can only be checked against what the
+    // options offer, so the first read waits for them rather than running
+    // unfiltered.
+    const waitingForOptions = options === null
+        && (selectedSources.length > 0 || (hasSpend && selectedAdAccounts.length > 0));
 
     const fetchData = useCallback(async () => {
         if (waitingForOptions) return;
@@ -184,6 +217,9 @@ export default function Advertising() {
             p_window_months: windowMonths, p_exclude_ratings: excludeRatings, p_view: viewArg,
             p_reps: repsParam, p_sources: sourcesParam, p_services: servicesParam,
             p_domaines: domainesParam, p_regions: regionsParam,
+            // Sent only when set, so the page still reads a database that does
+            // not have the parameter yet.
+            ...(adAccountsParam ? { p_ad_accounts: adAccountsParam } : {}),
         };
 
         const [
@@ -213,7 +249,7 @@ export default function Advertising() {
         setStatus((statusData as AdSpendStatusRow[]) ?? []);
         setLoading(false);
     }, [yearValue, monthValue, windowMonths, excludeRatings, viewArg, hasSpend, waitingForOptions,
-        repsParam, sourcesParam, servicesParam, domainesParam, regionsParam]);
+        repsParam, sourcesParam, servicesParam, domainesParam, regionsParam, adAccountsParam]);
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => { fetchData(); }, [fetchData]);
@@ -225,6 +261,16 @@ export default function Advertising() {
     );
 
     const optionList = (values: string[] | undefined) => (values ?? []).map(v => ({ value: v, label: v }));
+
+    const adAccountOptions = useMemo(
+        () => adAccountChoices.map(a => ({ value: a.id, label: adAccountLabel(a) })),
+        [adAccountChoices],
+    );
+    // The campaign rows carry their ad account, so the same selection is applied here.
+    const visibleCampaigns = useMemo(
+        () => campaigns.filter(c => inAdAccountSelection(c.platform, c.ad_account_id, pickedAdAccounts)),
+        [campaigns, pickedAdAccounts],
+    );
 
     /** The date that separates "Google inconnu" from "Google Organique", from the data. */
     const splitDate = perf.find(p => p.cohort_from || p.cohort_before);
@@ -318,6 +364,15 @@ export default function Advertising() {
                     <MultiSelect values={selectedRegions} onChange={setSelectedRegions}
                                  options={optionList(options?.regions)} allLabel="Toutes les régions" className="w-44" />
                 </FilterGroup>
+                {hasSpend && adAccountOptions.length > 0 && (
+                    <FilterGroup label="Compte publicitaire">
+                        {/* Every account ticked is "all": stored as the empty list, so
+                            the link and the request are the same either way. */}
+                        <MultiSelect values={adAccountsParam ?? []}
+                                     onChange={ids => setSelectedAdAccounts(ids.length === adAccountOptions.length ? [] : ids)}
+                                     options={adAccountOptions} allLabel="Tous les comptes" className="w-56" />
+                    </FilterGroup>
+                )}
                 <FilterGroup label="Statut">
                     <Select value={ratingScope} onChange={setRatingScope} className="w-52"
                             options={[
@@ -347,6 +402,7 @@ export default function Advertising() {
                                 <PartialNotice channels={partial.map(p => p.channel)} />
                             )}
                             {!noSpendData && narrowed && <NarrowedNotice />}
+                            {!noSpendData && pickedAdAccounts && <AdAccountNotice accounts={pickedAdAccounts} />}
                         </>
                     )}
 
@@ -368,7 +424,7 @@ export default function Advertising() {
 
                     {hasSpend && (
                         <CampaignTable
-                            rows={campaigns}
+                            rows={visibleCampaigns}
                             platform={campaignPlatform}
                             onPlatformChange={setCampaignPlatform}
                             statuses={campaignStatuses}
@@ -426,6 +482,24 @@ function NarrowedNotice() {
                 Les comptes et leurs revenus suivent les filtres représentant, service, domaine et
                 région. La dépense, elle, est rapportée par campagne et ne peut pas être répartie
                 ainsi : la diviser par une partie seulement des comptes donnerait un coût trop élevé.
+            </div>
+        </div>
+    );
+}
+
+function AdAccountNotice({ accounts }: { accounts: AdAccountOption[] }) {
+    return (
+        <div className="flex items-start gap-3 px-4 py-3.5 rounded-xl bg-tone-neutral-soft border border-hairline">
+            <Info className="w-4 h-4 text-tone-neutral-ink shrink-0 mt-0.5" />
+            <div className="text-xs text-tone-neutral-ink leading-relaxed">
+                <strong className="font-semibold">
+                    Dépense limitée à{' '}
+                    <span translate="no">{accounts.map(adAccountLabel).join(' et ')}</span>.
+                </strong>{' '}
+                Les comptes créés et leurs revenus restent ceux de tout le canal : le CRM
+                n&rsquo;indique pas de quel compte publicitaire vient un client. Le coût par compte et
+                le rendement comparent donc tous les comptes du canal à la dépense des comptes
+                publicitaires choisis.
             </div>
         </div>
     );

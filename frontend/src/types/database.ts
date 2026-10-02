@@ -732,6 +732,15 @@ export type AdFilterOptions = {
     reps: string[];
     domaines: string[];
     regions: string[];
+    /** Every ad account spend was imported from. Missing on a database older than the filter. */
+    ad_accounts?: AdAccountOption[];
+};
+
+/** An ad account. `name` is null until a sync has read it from the platform. */
+export type AdAccountOption = {
+    platform: AdChannel;
+    id: string;
+    name: string | null;
 };
 
 /** get_ad_monthly - one row per channel per month, all 12 months present. */
